@@ -1,0 +1,46 @@
+# Melarium — nginx site config (Debian: /etc/nginx/sites-available/melarium)
+#
+# Setup:
+#   sudo cp deploy/nginx.melarium.conf.example /etc/nginx/sites-available/melarium
+#   sudo ln -s /etc/nginx/sites-available/melarium /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#   sudo certbot --nginx -d melarium.app -d www.melarium.app
+#
+# certbot rewrites this file to add the `listen 443 ssl;` block and the
+# http->https redirect — run it after the plain-HTTP block below is working.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name melarium.app www.melarium.app;
+
+    root /var/www/melarium/frontend;
+    index index.html;
+
+    # Voice-note / photo uploads (Groq features) can be a few MB.
+    client_max_body_size 20m;
+
+    # .NET backend running in Docker — see docker-compose.yml (127.0.0.1:5080 -> container:8080)
+    location /api/ {
+        proxy_pass http://127.0.0.1:5080/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /swagger/ {
+        proxy_pass http://127.0.0.1:5080/swagger/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /health {
+        proxy_pass http://127.0.0.1:5080/health;
+    }
+
+    # React SPA — unknown paths fall back to index.html for client-side routing.
+    location / {
+        try_files $uri /index.html;
+    }
+}

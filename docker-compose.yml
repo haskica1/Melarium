@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      # Bound to localhost only, e.g. for `psql`/DBeaver over an SSH tunnel — not reachable
+      # from the public internet. Remove entirely if you never need direct DB access.
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Jwt__Secret: ${JWT_SECRET}
+      Smtp__Password: ${SMTP_PASSWORD}
+      Groq__ApiKey: ${GROQ_API_KEY}
+      Bootstrap__SysAdminEmail: ${SYSADMIN_EMAIL}
+      Bootstrap__SysAdminPassword: ${SYSADMIN_PASSWORD}
+      AllowedOrigins: "https://${DOMAIN}"
+      FrontendUrl: "https://${DOMAIN}"
+      App__PublicBaseUrl: "https://${DOMAIN}"
+      Storage__Provider: Local
+      Storage__LocalPath: /app/uploads
+    volumes:
+      - uploads-data:/app/uploads
+    ports:
+      # nginx on the host reverse-proxies to this port (see deploy/nginx.melarium.conf.example).
+      # Bound to localhost only — the container is never exposed directly to the internet.
+      - "127.0.0.1:5080:8080"
+
+volumes:
+  postgres-data:
+  uploads-data:
