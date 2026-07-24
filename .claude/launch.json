@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "backend-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "backend/Melarium.API/Melarium.API.csproj", "--urls", "http://localhost:62648"],
+      "port": 62648
+    },
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "C:\\Users\\asimh\\AppData\\Local\\nvm\\v25.2.1\\node.exe",
+      "runtimeArgs": ["frontend/node_modules/vite/bin/vite.js", "frontend"],
+      "port": 5173
+    }
+  ],
+  "autoVerify": true
+}

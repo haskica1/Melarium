@@ -1,0 +1,212 @@
+# =============================================================================
+# Melarium App — .gitignore
+# Stack: .NET 10 (C#) + React + TypeScript + Vite + Tailwind CSS
+# OS: Windows | IDE: Visual Studio + VS Code
+# =============================================================================
+
+
+# =============================================================================
+# .NET BUILD OUTPUT
+# =============================================================================
+
+# Compiled output
+**/bin/
+**/obj/
+
+# NuGet packages (restored on build)
+**/packages/
+*.nupkg
+*.snupkg
+
+# .NET publish output
+**/publish/
+**/out/
+
+# MSBuild binary and source logs
+*.binlog
+*.msbuild.log
+
+# Test results
+**/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+
+# =============================================================================
+# FRONTEND BUILD OUTPUT
+# =============================================================================
+
+# Vite / TypeScript build output
+frontend/dist/
+frontend/build/
+
+# TypeScript incremental compilation cache
+*.tsbuildinfo
+
+# Vite cache
+frontend/.vite/
+
+
+# =============================================================================
+# DEPENDENCIES
+# =============================================================================
+
+# Node.js — never commit this; restore with `npm install`
+node_modules/
+**/node_modules/
+
+
+# =============================================================================
+# ENVIRONMENT & SECRETS
+# =============================================================================
+
+# Environment variable files — NEVER commit secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+!frontend/.env.production
+
+# ASP.NET Core user secrets (stored locally per machine)
+**/secrets.json
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+
+# Connection strings / config overrides with real credentials
+**/appsettings.Production.json
+
+
+# =============================================================================
+# SECURITY — PRIVATE KEYS & CERTIFICATES
+# =============================================================================
+
+# Private keys
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+
+# SSH keys
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+*.ppk
+
+# JWT signing keys / secrets files
+**/jwt_secret*
+**/signing_key*
+
+
+# =============================================================================
+# IDE — VISUAL STUDIO
+# =============================================================================
+
+# Visual Studio solution user options (machine-specific)
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio local settings folder
+**/.vs/
+
+# Rider (JetBrains)
+.idea/
+*.sln.iml
+
+# ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+
+# =============================================================================
+# IDE — VS CODE
+# =============================================================================
+
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+
+
+# =============================================================================
+# LOGS & TEMPORARY FILES
+# =============================================================================
+
+# Log files
+*.log
+*.log.*
+logs/
+**/logs/
+
+# Temporary directories
+tmp/
+temp/
+**/tmp/
+**/temp/
+
+# Crash dumps
+*.dmp
+*.mdmp
+
+# npm debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# =============================================================================
+# OS-GENERATED FILES
+# =============================================================================
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# macOS (if any collaborators use Mac)
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+
+# =============================================================================
+# TESTING & COVERAGE
+# =============================================================================
+
+coverage/
+.nyc_output/
+*.lcov
+lcov.info
+
+
+# =============================================================================
+# MISC / TOOLING
+# =============================================================================
+
+# Docker local compose overrides (if added later)
+docker-compose.override.yml
+
+
+# =============================================================================
+# LOCAL FILE STORAGE (SPEC-05 — dev uploads, never committed)
+# =============================================================================
+backend/Melarium.API/uploads/
