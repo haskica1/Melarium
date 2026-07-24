@@ -140,7 +140,14 @@ SystemAdmin from `SYSADMIN_EMAIL`/`SYSADMIN_PASSWORD` — no manual DB step need
 
 ## 6. Build and deploy the frontend
 
-Static build — no Node.js server needed at runtime, nginx just serves the files.
+Static build — no Node.js server needed at runtime, nginx just serves the files. Install
+Node.js 20+ first (not needed at runtime, only to run this build):
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+node --version   # v20.x
+```
 
 ```bash
 cd /opt/melarium/frontend
