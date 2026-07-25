@@ -9,7 +9,7 @@ import {
   ApplicationMethod, ApplicationMethodLabels,
 } from '../../core/models'
 import type { CreateTreatmentEntryPayload } from '../../core/models'
-import { ConfirmDialog, FormHeader } from '../../shared/components'
+import { ConfirmDialog, FormHeader, ErrorMessage } from '../../shared/components'
 import { useToast } from '../../core/context/ToastContext'
 import { TREATMENT_PRESETS } from './presets'
 
@@ -48,7 +48,7 @@ export default function TreatmentFormPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const { data: apiaries = [] } = useApiaries()
+  const { data: apiaries = [], isError: apiariesError } = useApiaries()
   const { data: existing, isLoading: loadingExisting } = useTreatment(treatmentId ?? 0)
   const createTreatment = useCreateTreatment()
   const updateTreatment = useUpdateTreatment(treatmentId ?? 0)
@@ -72,7 +72,7 @@ export default function TreatmentFormPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [pendingSave, setPendingSave] = useState<TreatmentCommonPayload | null>(null)
 
-  const { data: hives = [], isLoading: loadingHives } = useBeehivesByApiary(apiaryId)
+  const { data: hives = [], isLoading: loadingHives, isError: hivesError } = useBeehivesByApiary(apiaryId)
 
   // Guards the "pre-check all hives" init so it runs once per apiary pick (not on refetches).
   const initializedApiary = useRef<number>(0)
@@ -224,6 +224,14 @@ export default function TreatmentFormPage() {
           </div>
         )}
 
+        {/* Without the apiary list the form cannot be completed — say so instead of showing an
+            empty dropdown that looks like "you have no apiaries". */}
+        {apiariesError && (
+          <div className="mb-4">
+            <ErrorMessage message="Greška pri učitavanju pčelinjaka. Osvježite stranicu." />
+          </div>
+        )}
+
         <form onSubmit={onSubmit} className="space-y-6">
           {/* Preset quick-fill */}
           <div className="bg-honey-50 dark:bg-slate-800/60 border border-honey-100 dark:border-slate-700 rounded-xl px-4 py-3">
@@ -317,6 +325,8 @@ export default function TreatmentFormPage() {
               <p className="text-sm text-gray-400 dark:text-slate-500 py-4">Prvo odaberite pčelinjak.</p>
             ) : loadingHives ? (
               <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-honey-500" /></div>
+            ) : hivesError ? (
+              <ErrorMessage message="Greška pri učitavanju košnica. Osvježite stranicu." />
             ) : hives.length === 0 ? (
               <p className="text-sm text-gray-400 dark:text-slate-500 py-4">Ovaj pčelinjak nema košnica.</p>
             ) : (

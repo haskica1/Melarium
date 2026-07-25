@@ -1,5 +1,6 @@
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
+using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Admin.DTOs;
 using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Entities;
@@ -11,11 +12,13 @@ public class AdminService : IAdminService
 {
     private readonly IUnitOfWork _uow;
     private readonly INotificationService _notifications;
+    private readonly ISessionRevoker _sessions;
 
-    public AdminService(IUnitOfWork uow, INotificationService notifications)
+    public AdminService(IUnitOfWork uow, INotificationService notifications, ISessionRevoker sessions)
     {
         _uow           = uow;
         _notifications = notifications;
+        _sessions      = sessions;
     }
 
     // ── Organizations ──────────────────────────────────────────────────────────
@@ -285,6 +288,13 @@ public class AdminService : IAdminService
 
         var newBeehiveIds = role == UserRole.Beekeeper ? dto.AssignedBeehiveIds : new List<int>();
         await _uow.Users.SetBeehiveAssignmentsAsync(id, newBeehiveIds);
+
+        // Role, organisation and apiary are baked into the JWT. Leaving old sessions alive would
+        // let a demoted user keep acting with their previous privileges until the token expires.
+        // (Beehive assignments are resolved per request from the database, so they need no revoke.)
+        if (role != oldRole || dto.OrganizationId != oldOrgId || dto.ApiaryId != oldApiaryId)
+            await _sessions.RevokeAllAsync(id);
+
         await _uow.SaveChangesAsync();
 
         var updated = await _uow.Users.GetByIdWithAssignedBeehivesAsync(id);
@@ -408,8 +418,8 @@ public class AdminService : IAdminService
 
         if (user.Role == UserRole.SystemAdmin)
         {
-            var allUsers = await _uow.Users.GetAllAsync();
-            var adminCount = allUsers.Count(u => u.Role == UserRole.SystemAdmin);
+            // COUNT in SQL rather than materialising every user just to count one role.
+            var adminCount = await _uow.Users.CountByRoleAsync(UserRole.SystemAdmin);
             if (adminCount <= 1)
                 throw new BusinessRuleException("Cannot delete the last SystemAdmin account.");
         }

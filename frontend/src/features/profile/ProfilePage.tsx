@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { useMutation } from '@tanstack/react-query'
-import { Check, Eye, EyeOff, KeyRound, Mail, User } from 'lucide-react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Check, Eye, EyeOff, KeyRound, Mail, MailWarning, User } from 'lucide-react'
 import { useAuth } from '../../core/context/AuthContext'
 import { profileService } from '../../core/services/profileService'
 import type { UpdateProfilePayload } from '../../core/services/profileService'
@@ -17,11 +18,24 @@ interface ProfileForm {
 }
 
 export default function ProfilePage() {
-  const { user, updateUser } = useAuth()
+  const { user, updateUser, logout } = useAuth()
+  const navigate = useNavigate()
   const [showCurrent, setShowCurrent] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [resent, setResent] = useState(false)
+
+  // Verification state is not part of the cached auth session — read it from the API.
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: () => profileService.get(),
+  })
+
+  const resendVerification = useMutation({
+    mutationFn: () => profileService.resendVerification(),
+    onSuccess: () => setResent(true),
+  })
 
   const {
     register,
@@ -45,7 +59,18 @@ export default function ProfilePage() {
 
   const mutation = useMutation({
     mutationFn: (payload: UpdateProfilePayload) => profileService.update(payload),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
+      // Changing the password revokes every refresh token server-side, so this session is already
+      // dead — end it here rather than letting the user hit a confusing 401 minutes later.
+      if (variables.newPassword) {
+        logout()
+        navigate('/login', {
+          replace: true,
+          state: { notice: 'Lozinka je promijenjena. Prijavite se novom lozinkom.' },
+        })
+        return
+      }
+
       updateUser({ firstName: data.firstName, lastName: data.lastName, email: data.email })
       reset({
         firstName: data.firstName,
@@ -58,11 +83,16 @@ export default function ProfilePage() {
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     },
-    onError: (err: { response?: { data?: { message?: string } } }) => {
-      const msg = err?.response?.data?.message ?? 'Something went wrong.'
-      if (msg.toLowerCase().includes('password')) {
+    // apiClient replaces the AxiosError with a plain Error carrying the server's message —
+    // reading err.response here always fell through to the generic fallback.
+    onError: (err: Error) => {
+      const msg = err.message || 'Greška pri spremanju profila.'
+      const lower = msg.toLowerCase()
+      if (lower.includes('current password')) {
         setError('currentPassword', { message: msg })
-      } else if (msg.toLowerCase().includes('email')) {
+      } else if (lower.includes('password')) {
+        setError('newPassword', { message: msg })
+      } else if (lower.includes('email')) {
         setError('email', { message: msg })
       } else {
         setError('root', { message: msg })
@@ -123,6 +153,31 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* ── Unconfirmed address ──────────────────────────────────────────────── */}
+      {profile && !profile.emailVerifiedAt && (
+        <div
+          role="status"
+          className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-3"
+        >
+          <MailWarning className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="flex-1 text-sm text-amber-800 dark:text-amber-300">
+            {resent
+              ? 'Link za potvrdu je poslan — provjerite e-poštu.'
+              : 'Vaša e-pošta još nije potvrđena. Bez potvrde ne možete vratiti pristup računu ako zaboravite lozinku.'}
+          </p>
+          {!resent && (
+            <button
+              type="button"
+              onClick={() => resendVerification.mutate()}
+              disabled={resendVerification.isPending}
+              className="btn-secondary text-sm shrink-0 justify-center"
+            >
+              {resendVerification.isPending ? 'Slanje…' : 'Pošalji ponovo'}
+            </button>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
@@ -203,7 +258,7 @@ export default function ProfilePage() {
             <div className="relative">
               <input
                 {...register('newPassword', {
-                  minLength: newPassword ? { value: 6, message: 'Minimum 6 znakova' } : undefined,
+                  minLength: newPassword ? { value: 8, message: 'Lozinka mora imati najmanje 8 znakova' } : undefined,
                 })}
                 type={showNew ? 'text' : 'password'}
                 className={clsx('form-input pr-10', errors.newPassword && 'border-red-400 focus:ring-red-300')}

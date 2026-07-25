@@ -4,7 +4,7 @@ import { ChevronRight, Plus, Leaf } from 'lucide-react'
 import { CollapsibleSection } from '../../shared/components/CollapsibleSection'
 import { format } from 'date-fns'
 import { useDietsByBeehive } from '../../core/services/queries'
-import { LoadingSpinner } from '../../shared/components'
+import { LoadingSpinner, ErrorMessage } from '../../shared/components'
 import { DietStatus } from '../../core/models'
 import type { Diet } from '../../core/models'
 import { usePermissions } from '../../core/hooks/usePermissions'
@@ -78,7 +78,7 @@ function DietCard({ diet }: { diet: Diet }) {
 // ── Section ───────────────────────────────────────────────────────────────────
 
 export default function DietSection({ beehiveId }: { beehiveId: number }) {
-  const { data: diets = [], isLoading } = useDietsByBeehive(beehiveId)
+  const { data: diets = [], isLoading, isError } = useDietsByBeehive(beehiveId)
   const { canManageDiets, isAssignedToHive } = usePermissions()
   const canManageThisDiet = canManageDiets || isAssignedToHive(beehiveId)
   const [showAll, setShowAll] = useState(false)
@@ -101,6 +101,8 @@ export default function DietSection({ beehiveId }: { beehiveId: number }) {
     >
       {isLoading ? (
         <LoadingSpinner message="Učitavanje prehrana…" />
+      ) : isError ? (
+        <ErrorMessage message="Greška pri učitavanju programa prehrane." />
       ) : diets.length === 0 ? (
         <div className="card text-center py-8 text-gray-400 dark:text-slate-500">
           <Leaf className="w-10 h-10 mx-auto mb-3 text-gray-200 dark:text-slate-700" />

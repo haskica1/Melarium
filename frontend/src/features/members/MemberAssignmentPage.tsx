@@ -9,7 +9,7 @@ import {
   useUpdateApiaryAssignment,
 } from '../../core/services/orgQueries'
 import { useAuth } from '../../core/context/AuthContext'
-import { FormHeader } from '../../shared/components'
+import { FormHeader, ErrorState, ErrorMessage } from '../../shared/components'
 
 export default function MemberAssignmentPage() {
   const { id } = useParams<{ id: string }>()
@@ -19,8 +19,9 @@ export default function MemberAssignmentPage() {
 
   const isOrgAdmin = user?.role === 'OrganizationAdmin'
 
-  const { data: member, isLoading: loadingMember } = useOrgMember(memberId)
-  const { data: beehives = [], isLoading: loadingBeehives } = useAvailableBeehives()
+  const { data: member, isLoading: loadingMember, isError: memberError, refetch: refetchMember } =
+    useOrgMember(memberId)
+  const { data: beehives = [], isLoading: loadingBeehives, isError: beehivesError } = useAvailableBeehives()
   const { data: apiaries = [], isLoading: loadingApiaries } = useAvailableApiaries(isOrgAdmin)
 
   const updateBeehives = useUpdateBeehiveAssignments(memberId)
@@ -73,6 +74,11 @@ export default function MemberAssignmentPage() {
     )
   }
 
+  // A failed request is not the same as "no such member" — checked before the not-found branch.
+  if (memberError) {
+    return <ErrorState message="Greška pri učitavanju člana." onRetry={refetchMember} />
+  }
+
   if (!member) {
     return (
       <div className="text-center py-20 text-gray-500 dark:text-slate-400">Član nije pronađen.</div>
@@ -121,6 +127,8 @@ export default function MemberAssignmentPage() {
               <div className="flex justify-center py-6">
                 <Loader2 className="w-5 h-5 animate-spin text-honey-400" />
               </div>
+            ) : beehivesError ? (
+              <ErrorMessage message="Greška pri učitavanju košnica. Osvježite stranicu." />
             ) : beehives.length === 0 ? (
               <p className="text-sm text-gray-400 dark:text-slate-500 py-2">
                 Nema dostupnih košnica za dodjeljivanje.

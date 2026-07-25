@@ -9,9 +9,15 @@
     },
     {
       "name": "frontend-dev",
-      "runtimeExecutable": "C:\\Users\\asimh\\AppData\\Local\\nvm\\v25.2.1\\node.exe",
+      "runtimeExecutable": "node",
       "runtimeArgs": ["frontend/node_modules/vite/bin/vite.js", "frontend"],
       "port": 5173
+    },
+    {
+      "name": "frontend-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["frontend/node_modules/vite/bin/vite.js", "preview", "--port", "4173", "frontend"],
+      "port": 4173
     }
   ],
   "autoVerify": true

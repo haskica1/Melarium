@@ -47,6 +47,9 @@ public static class DependencyInjection
         // Subscription-plan enforcement (SPEC-09) — single source of truth for plan gates
         services.AddScoped<IPlanGuard, PlanGuard>();
 
+        // Session termination — used wherever a credential or a JWT-carried privilege changes
+        services.AddScoped<ISessionRevoker, SessionRevoker>();
+
         // Application services
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<ICalendarService, CalendarService>();

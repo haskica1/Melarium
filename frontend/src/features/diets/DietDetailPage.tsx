@@ -14,6 +14,7 @@ import {
 import {
   ErrorMessage, ConfirmDialog, VitalCard, PageSkeleton,
 } from '../../shared/components'
+import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
 import { DietStatus, FeedingEntryStatus } from '../../core/models'
 import type { FeedingEntry } from '../../core/models'
 import { usePermissions } from '../../core/hooks/usePermissions'
@@ -119,6 +120,7 @@ function CompleteEarlyModal({
   onCancel: () => void
   isLoading: boolean
 }) {
+  const { panelProps } = useDialogBehavior({ open: true, onClose: onCancel })
   const [comment, setComment] = useState('')
   const [err, setErr] = useState('')
 
@@ -128,7 +130,11 @@ function CompleteEarlyModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div
+      {...panelProps}
+      aria-label="Prekini prehranu ranije"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 outline-none"
+    >
       <div className="bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl p-6 w-full max-w-md animate-fade-in">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-500/15 flex items-center justify-center shrink-0">

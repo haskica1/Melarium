@@ -4,6 +4,8 @@ using System.Security.Cryptography;
 using System.Text;
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
+using Melarium.Application.Common.Models;
+using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Auth.DTOs;
 using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Entities;
@@ -15,24 +17,43 @@ namespace Melarium.Application.Features.Auth;
 
 public class AuthService : IAuthService
 {
+    /// <summary>
+    /// A BCrypt hash of a throwaway value, verified against when the email is unknown so that a
+    /// failed login costs the same whether or not the account exists (no user enumeration by timing).
+    /// </summary>
+    private static readonly string DummyPasswordHash =
+        BCrypt.Net.BCrypt.HashPassword("melarium-timing-equalizer");
+
     private readonly IUnitOfWork _uow;
     private readonly IConfiguration _config;
     private readonly INotificationService _notifications;
+    private readonly IEmailQueue _emailQueue;
+    private readonly ISessionRevoker _sessions;
 
-    public AuthService(IUnitOfWork uow, IConfiguration config, INotificationService notifications)
+    public AuthService(
+        IUnitOfWork uow,
+        IConfiguration config,
+        INotificationService notifications,
+        IEmailQueue emailQueue,
+        ISessionRevoker sessions)
     {
         _uow = uow;
         _config = config;
         _notifications = notifications;
+        _emailQueue = emailQueue;
+        _sessions = sessions;
     }
 
     public async Task<LoginResponseDto> LoginAsync(LoginDto dto)
     {
-        var user = await _uow.Users.GetByEmailAsync(dto.Email.Trim().ToLower())
-            ?? throw new BusinessRuleException("Invalid email or password.");
+        var user = await _uow.Users.GetByEmailAsync(dto.Email.Trim().ToLower());
 
-        if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-            throw new BusinessRuleException("Invalid email or password.");
+        // Always run a verify — skipping it for unknown emails makes "no such user" measurably
+        // faster than "wrong password", which is enough to enumerate accounts.
+        var passwordMatches = BCrypt.Net.BCrypt.Verify(dto.Password, user?.PasswordHash ?? DummyPasswordHash);
+
+        if (user is null || !passwordMatches)
+            throw new UnauthorizedException("Pogrešna e-pošta ili lozinka.");
 
         return await IssueTokensAsync(user);
     }
@@ -96,6 +117,10 @@ public class AuthService : IAuthService
             $"Vaša organizacija '{organization.Name}' je spremna. Vi ste njen administrator — počnite dodavanjem prvog pčelinjaka.",
             NotificationType.AccountCreated);
 
+        // Confirm the address is real. Delivery is best-effort and sign-in is not blocked on it —
+        // a failed email must never leave someone unable to use the account they just created.
+        await SendVerificationEmailAsync(user);
+
         return await IssueTokensAsync(user);
     }
 
@@ -110,7 +135,7 @@ public class AuthService : IAuthService
         // Reuse of an already-rotated/revoked token signals theft — revoke the user's whole active set.
         if (stored.RevokedAt is not null)
         {
-            await RevokeAllActiveForUserAsync(stored.UserId);
+            await _sessions.RevokeAllAsync(stored.UserId);
             await _uow.SaveChangesAsync();
             throw new UnauthorizedException("Refresh token has been revoked.");
         }
@@ -141,7 +166,150 @@ public class AuthService : IAuthService
         }
     }
 
+    // ── Password reset ─────────────────────────────────────────────────────────
+
+    public async Task ForgotPasswordAsync(string email)
+    {
+        var user = await _uow.Users.GetByEmailAsync(email.Trim().ToLower());
+
+        // No account? Do nothing, but report success to the caller. Telling them "unknown address"
+        // would turn this endpoint into a free account-enumeration oracle.
+        if (user is null) return;
+
+        var raw = await IssueUserTokenAsync(
+            user.Id, UserTokenPurpose.PasswordReset, GetHours("Auth:PasswordResetTokenHours", 2));
+
+        _emailQueue.Enqueue(new QueuedEmail(
+            user.Id,
+            "Zahtjev za promjenu lozinke",
+            "Primili smo zahtjev za promjenu lozinke na vašem računu. Link vrijedi ograničeno vrijeme i "
+            + "može se iskoristiti samo jednom. Ako niste vi tražili promjenu, slobodno zanemarite ovu poruku — "
+            + "vaša lozinka ostaje nepromijenjena.",
+            BuildFrontendUrl($"/reset-password?token={raw}"),
+            "Postavi novu lozinku"));
+    }
+
+    public async Task ResetPasswordAsync(ResetPasswordDto dto)
+    {
+        var token = await _uow.UserTokens.GetByHashAsync(Hash(dto.Token), UserTokenPurpose.PasswordReset);
+
+        if (token is null || token.UsedAt is not null || token.ExpiresAt <= DateTime.UtcNow)
+            throw new BusinessRuleException(
+                "Link za promjenu lozinke nije važeći ili je istekao. Zatražite novi.");
+
+        var user = await _uow.Users.GetByIdAsync(token.UserId)
+            ?? throw new BusinessRuleException("Link za promjenu lozinke nije važeći ili je istekao. Zatražite novi.");
+
+        var now = DateTime.UtcNow;
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        token.UsedAt = now;
+
+        // Receiving this email proved control of the mailbox — no separate confirmation needed.
+        user.EmailVerifiedAt ??= now;
+
+        // Whoever triggered the reset (often: the account was compromised) must not keep a
+        // working session. Everything signed in with the old password is cut off.
+        await _sessions.RevokeAllAsync(user.Id);
+
+        await _uow.SaveChangesAsync();
+
+        await _notifications.NotifyAsync(
+            user.Id,
+            "Lozinka je promijenjena",
+            "Vaša lozinka je uspješno promijenjena i odjavljeni ste sa svih uređaja. "
+            + "Ako to niste bili vi, odmah zatražite novu promjenu lozinke i kontaktirajte podršku.",
+            NotificationType.PasswordChanged);
+    }
+
+    // ── Email verification ─────────────────────────────────────────────────────
+
+    public async Task VerifyEmailAsync(string token)
+    {
+        var stored = await _uow.UserTokens.GetByHashAsync(Hash(token), UserTokenPurpose.EmailVerification)
+            ?? throw new BusinessRuleException("Link za potvrdu e-pošte nije važeći.");
+
+        var user = await _uow.Users.GetByIdAsync(stored.UserId)
+            ?? throw new BusinessRuleException("Link za potvrdu e-pošte nije važeći.");
+
+        // Clicking the link twice (or a mail client pre-fetching it) must not look like a failure.
+        if (user.EmailVerifiedAt is not null) return;
+
+        if (stored.UsedAt is not null || stored.ExpiresAt <= DateTime.UtcNow)
+            throw new BusinessRuleException("Link za potvrdu e-pošte je istekao. Zatražite novi.");
+
+        var now = DateTime.UtcNow;
+        user.EmailVerifiedAt = now;
+        stored.UsedAt = now;
+
+        await _uow.SaveChangesAsync();
+    }
+
+    public async Task ResendVerificationEmailAsync(int userId)
+    {
+        var user = await _uow.Users.GetByIdAsync(userId)
+            ?? throw new NotFoundException(nameof(User), userId);
+
+        if (user.EmailVerifiedAt is not null) return;
+
+        await SendVerificationEmailAsync(user);
+        await _uow.SaveChangesAsync();
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Issues a verification token and queues the email. Does not save — the caller decides the
+    /// transaction boundary (registration saves as part of creating the account).
+    /// </summary>
+    private async Task SendVerificationEmailAsync(User user)
+    {
+        var raw = await IssueUserTokenAsync(
+            user.Id, UserTokenPurpose.EmailVerification, GetHours("Auth:EmailVerificationTokenHours", 48));
+
+        _emailQueue.Enqueue(new QueuedEmail(
+            user.Id,
+            "Potvrdite vašu e-poštu",
+            "Da biste primali obavijesti i mogli vratiti pristup računu ako zaboravite lozinku, "
+            + "potvrdite da je ova adresa vaša.",
+            BuildFrontendUrl($"/verify-email?token={raw}"),
+            "Potvrdi e-poštu"));
+    }
+
+    /// <summary>
+    /// Invalidates the user's outstanding tokens of this purpose and issues a fresh one.
+    /// Returns the raw value — only its hash is stored, so this is the one chance to send it.
+    /// </summary>
+    private async Task<string> IssueUserTokenAsync(int userId, UserTokenPurpose purpose, int lifetimeHours)
+    {
+        // A newly requested link supersedes earlier ones, so an old email can't be replayed.
+        var outstanding = await _uow.UserTokens.GetActiveByUserAsync(userId, purpose);
+        var now = DateTime.UtcNow;
+        foreach (var old in outstanding)
+            old.UsedAt = now;
+
+        var raw = GenerateRawToken();
+        await _uow.UserTokens.AddAsync(new UserToken
+        {
+            UserId    = userId,
+            Purpose   = purpose,
+            TokenHash = Hash(raw),
+            ExpiresAt = now.AddHours(lifetimeHours),
+        });
+        await _uow.SaveChangesAsync();
+
+        return raw;
+    }
+
+    private string BuildFrontendUrl(string pathAndQuery)
+    {
+        var baseUrl = _config["FrontendUrl"] ?? _config["App:PublicBaseUrl"] ?? "http://localhost:5173";
+        return $"{baseUrl.TrimEnd('/')}{pathAndQuery}";
+    }
+
+    private int GetHours(string key, int fallback) =>
+        int.TryParse(_config[key], out var value) && value > 0 ? value : fallback;
+
 
     /// <summary>
     /// Issues an access token + a new (persisted) refresh token for the user. <paramref name="onNewRefreshHash"/>
@@ -180,14 +348,6 @@ public class AuthService : IAuthService
             OrganizationName: user.Organization?.Name,
             AssignedBeehiveIds: assignedBeehiveIds
         );
-    }
-
-    private async Task RevokeAllActiveForUserAsync(int userId)
-    {
-        var active = await _uow.RefreshTokens.GetActiveByUserAsync(userId);
-        var now = DateTime.UtcNow;
-        foreach (var token in active)
-            token.RevokedAt = now;
     }
 
     private (string Token, DateTime ExpiresAt) GenerateAccessToken(User user)

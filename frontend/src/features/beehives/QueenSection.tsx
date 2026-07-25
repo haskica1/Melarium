@@ -7,7 +7,8 @@ import {
   useQueensByBeehive,
   useUpdateQueen,
 } from '../../core/services/queries'
-import { ConfirmDialog } from '../../shared/components'
+import { ConfirmDialog, ErrorMessage } from '../../shared/components'
+import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
 import {
   QueenMarkColor,
   QueenMarkColorLabels,
@@ -83,7 +84,8 @@ const extractApiError = (err: any): string => {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function QueenSection({ beehiveId, canManage }: { beehiveId: number; canManage: boolean }) {
-  const { data: queens = [], isLoading } = useQueensByBeehive(beehiveId)
+  const { data: queens = [], isLoading, isError } = useQueensByBeehive(beehiveId)
+
   const createQueen = useCreateQueen(beehiveId)
   const updateQueen = useUpdateQueen(beehiveId)
   const deleteQueen = useDeleteQueen(beehiveId)
@@ -93,6 +95,10 @@ export function QueenSection({ beehiveId, canManage }: { beehiveId: number; canM
   const [formError, setFormError] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Queen | null>(null)
+
+  // One behaviour hook per overlay — both are rendered inline rather than as separate components.
+  const editDialog = useDialogBehavior({ open: editTarget !== null, onClose: () => setEditTarget(null) })
+  const historyDialog = useDialogBehavior({ open: historyOpen, onClose: () => setHistoryOpen(false) })
 
   const active = queens.find(q => q.status === QueenStatus.Active)
   const season = active ? queenSeason(active.year) : 0
@@ -174,6 +180,8 @@ export function QueenSection({ beehiveId, canManage }: { beehiveId: number; canM
           <div className="h-4 bg-honey-50 dark:bg-slate-800 rounded w-2/3" />
           <div className="h-3 bg-honey-50 dark:bg-slate-800 rounded w-1/2" />
         </div>
+      ) : isError ? (
+        <ErrorMessage message="Greška pri učitavanju matice." />
       ) : active ? (
         <>
           <div className="flex items-start gap-3">
@@ -251,7 +259,11 @@ export function QueenSection({ beehiveId, canManage }: { beehiveId: number; canM
       {editTarget !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setEditTarget(null)} />
-          <div className="relative bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto animate-fade-in">
+          <div
+            {...editDialog.panelProps}
+            aria-label={editTarget === 'new' ? 'Nova matica' : 'Uredi maticu'}
+            className="relative bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto animate-fade-in outline-none"
+          >
             <h2 className="font-display text-lg font-bold text-gray-800 dark:text-slate-100 mb-4">
               {editTarget === 'new'
                 ? active ? 'Zamijeni maticu' : 'Dodaj maticu'
@@ -413,7 +425,11 @@ export function QueenSection({ beehiveId, canManage }: { beehiveId: number; canM
       {historyOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setHistoryOpen(false)} />
-          <div className="relative bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto animate-fade-in">
+          <div
+            {...historyDialog.panelProps}
+            aria-label="Historija matica"
+            className="relative bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto animate-fade-in outline-none"
+          >
             <div className="flex items-center gap-2 mb-4">
               <History className="w-5 h-5 text-honey-500" />
               <h2 className="font-display text-lg font-bold text-gray-800 dark:text-slate-100">Historija matica</h2>

@@ -6,7 +6,7 @@ import { Camera, Loader2, PencilLine, Plus, ReceiptText, Trash2 } from 'lucide-r
 import { useExpenses, useDeleteExpense } from '../../core/services/expenseQueries'
 import { ExpenseSource, ExpenseSourceLabels } from '../../core/models'
 import type { Expense } from '../../core/models'
-import { VitalCard, VitalsSkeleton, ConfirmDialog } from '../../shared/components'
+import { VitalCard, VitalsSkeleton, ConfirmDialog, ErrorState } from '../../shared/components'
 import { useToast } from '../../core/context/ToastContext'
 
 type SourceFilter = 'all' | 'manual' | 'scan'
@@ -19,7 +19,7 @@ const FILTERS: { key: SourceFilter; label: string }[] = [
 
 export default function ExpensesPage() {
   const navigate = useNavigate()
-  const { data: expenses = [], isLoading } = useExpenses()
+  const { data: expenses = [], isLoading, isError, refetch } = useExpenses()
   const deleteExpense = useDeleteExpense()
   const { toast } = useToast()
   const [confirmTarget, setConfirmTarget] = useState<Expense | null>(null)
@@ -99,8 +99,11 @@ export default function ExpensesPage() {
       {/* Loading */}
       {isLoading && <VitalsSkeleton />}
 
+      {/* Failed — must not fall through to the empty state below */}
+      {isError && <ErrorState message="Greška pri učitavanju troškova." onRetry={refetch} />}
+
       {/* Empty */}
-      {!isLoading && expenses.length === 0 && (
+      {!isLoading && !isError && expenses.length === 0 && (
         <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-2xl border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none">
           <ReceiptText className="w-12 h-12 text-honey-300 dark:text-honey-500/40 mx-auto mb-3" />
           <p className="text-gray-500 dark:text-slate-300 font-medium">Nema zabilježenih troškova.</p>

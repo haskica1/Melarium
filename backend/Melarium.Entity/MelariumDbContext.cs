@@ -37,6 +37,7 @@ public class MelariumDbContext : DbContext
     public DbSet<ApiaryMove> ApiaryMoves => Set<ApiaryMove>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<UserToken> UserTokens => Set<UserToken>();
     public DbSet<AdvisorConversation> AdvisorConversations => Set<AdvisorConversation>();
     public DbSet<AdvisorMessage> AdvisorMessages => Set<AdvisorMessage>();
     public DbSet<CalendarSettings> CalendarSettings => Set<CalendarSettings>();

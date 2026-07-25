@@ -1,8 +1,11 @@
-import { AlertTriangle, ArrowLeft, Loader2, PackageOpen, X } from 'lucide-react'
-import { useEffect } from 'react'
+import { AlertTriangle, ArrowLeft, Loader2, PackageOpen, RotateCw } from 'lucide-react'
+import { useRef } from 'react'
+import { Modal } from './Modal'
 
 export { VitalCard } from './VitalCard'
 export type { VitalCardProps } from './VitalCard'
+export { Modal } from './Modal'
+export type { ModalProps } from './Modal'
 
 // ── LoadingSpinner ─────────────────────────────────────────────────────────────
 
@@ -61,6 +64,43 @@ export function ErrorMessage({ message }: { message: string }) {
   )
 }
 
+// ── ErrorState ────────────────────────────────────────────────────────────────
+
+interface ErrorStateProps {
+  /** What failed, in the user's terms — e.g. "Greška pri učitavanju vrcanja." */
+  message?: string
+  onRetry?: () => void
+}
+
+/**
+ * Page-level failure. Use this instead of letting a failed query fall through to `EmptyState`:
+ * "Nema vrcanja" on a broken request is indistinguishable from the data actually being gone, which
+ * is the worst thing this app can tell a beekeeper.
+ *
+ * `ErrorMessage` above is the inline banner for a *part* of a page; this replaces the content.
+ */
+export function ErrorState({ message = 'Greška pri učitavanju podataka.', onRetry }: ErrorStateProps) {
+  return (
+    <div role="alert" className="flex flex-col items-center justify-center py-16 gap-4 text-center animate-fade-in">
+      <div className="w-16 h-16 bg-red-100 dark:bg-red-500/15 rounded-full flex items-center justify-center">
+        <AlertTriangle className="w-8 h-8 text-red-500" />
+      </div>
+      <div>
+        <p className="font-display text-lg font-semibold text-gray-700 dark:text-slate-200">{message}</p>
+        <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+          Provjerite internet konekciju i pokušajte ponovo.
+        </p>
+      </div>
+      {onRetry && (
+        <button onClick={onRetry} className="btn-secondary text-sm">
+          <RotateCw className="w-4 h-4" />
+          Pokušaj ponovo
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ── EmptyState ────────────────────────────────────────────────────────────────
 
 interface EmptyStateProps {
@@ -105,54 +145,34 @@ export function ConfirmDialog({
   onCancel,
   isLoading,
 }: ConfirmDialogProps) {
-  // Close on Escape key
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [onCancel])
-
-  if (!isOpen) return null
+  // Focus the safe option first — the destructive button should never be one stray Enter away.
+  const cancelRef = useRef<HTMLButtonElement>(null)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onCancel}
-      />
-      {/* Dialog */}
-      <div className="relative bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full animate-slide-up">
-        <button
-          onClick={onCancel}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-red-100 dark:bg-red-500/15 rounded-full flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5 text-red-500" />
-          </div>
-          <h3 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100">{title}</h3>
+    <Modal
+      open={isOpen}
+      onClose={onCancel}
+      title={title}
+      size="sm"
+      initialFocusRef={cancelRef}
+      icon={
+        <div className="w-10 h-10 bg-red-100 dark:bg-red-500/15 rounded-full flex items-center justify-center">
+          <AlertTriangle className="w-5 h-5 text-red-500" />
         </div>
-
-        <p className="text-sm text-gray-600 dark:text-slate-400 mb-6">{message}</p>
-
+      }
+      footer={
         <div className="flex gap-3 justify-end">
-          <button onClick={onCancel} className="btn-secondary text-sm">
+          <button ref={cancelRef} onClick={onCancel} className="btn-secondary text-sm">
             Otkaži
           </button>
-          <button
-            onClick={onConfirm}
-            className="btn-danger text-sm"
-            disabled={isLoading}
-          >
+          <button onClick={onConfirm} className="btn-danger text-sm" disabled={isLoading}>
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : confirmLabel}
           </button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <p className="text-sm text-gray-600 dark:text-slate-400">{message}</p>
+    </Modal>
   )
 }
 

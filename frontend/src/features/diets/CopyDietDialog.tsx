@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Copy, Search, X, Loader2, Leaf, Check } from 'lucide-react'
 import { useAllBeehives, useApiaries, useCopyDiet } from '../../core/services/queries'
 import { useToast } from '../../core/context/ToastContext'
-import { LoadingSpinner } from '../../shared/components'
+import { LoadingSpinner, ErrorMessage } from '../../shared/components'
+import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
 import type { Diet } from '../../core/models'
 
 /** Bosnian noun agreement for "košnica" after a count (accusative, as in "na N košnic…"). */
@@ -24,19 +25,15 @@ interface Group { apiaryId: number; apiaryName: string; hives: HiveOption[] }
  */
 export default function CopyDietDialog({ diet, onClose }: { diet: Diet; onClose: () => void }) {
   const { toast } = useToast()
-  const { data: beehives = [], isLoading: loadingHives } = useAllBeehives()
-  const { data: apiaries = [], isLoading: loadingApiaries } = useApiaries()
+  const { data: beehives = [], isLoading: loadingHives, isError: hivesError } = useAllBeehives()
+  const { data: apiaries = [], isLoading: loadingApiaries, isError: apiariesError } = useApiaries()
   const copyMutation = useCopyDiet(diet.id)
 
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<Set<number>>(new Set())
 
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
+  // Escape, focus trap, focus restore and scroll lock — shared with every other dialog.
+  const { panelProps } = useDialogBehavior({ open: true, onClose })
 
   const apiaryNameById = useMemo(
     () => new Map(apiaries.map(a => [a.id, a.name])),
@@ -107,10 +104,13 @@ export default function CopyDietDialog({ diet, onClose }: { diet: Diet; onClose:
   }
 
   const loading = loadingHives || loadingApiaries
+  const failed = hivesError || apiariesError
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      {...panelProps}
+      aria-label="Kopiraj prehranu na druge košnice"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 outline-none"
       onClick={onClose}
     >
       <div
@@ -155,6 +155,8 @@ export default function CopyDietDialog({ diet, onClose }: { diet: Diet; onClose:
         <div className="flex-1 overflow-y-auto p-4 sm:p-5">
           {loading ? (
             <LoadingSpinner message="Učitavanje košnica…" />
+          ) : failed ? (
+            <ErrorMessage message="Greška pri učitavanju košnica. Zatvorite i pokušajte ponovo." />
           ) : totalAvailable === 0 ? (
             <div className="text-center py-10 text-gray-400 dark:text-slate-500">
               <Leaf className="w-10 h-10 mx-auto mb-3 text-gray-200 dark:text-slate-700" />

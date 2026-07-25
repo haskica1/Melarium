@@ -6,7 +6,7 @@ import { useHarvest, useCreateHarvest, useUpdateHarvest } from '../../core/servi
 import { useTreatments } from '../../core/services/treatmentQueries'
 import { HoneyType, HoneyTypeLabels } from '../../core/models'
 import type { CreateHarvestEntryPayload } from '../../core/models'
-import { FormHeader } from '../../shared/components'
+import { FormHeader, ErrorMessage } from '../../shared/components'
 import { useToast } from '../../core/context/ToastContext'
 
 const HONEY_TYPES = Object.values(HoneyType).filter(v => typeof v === 'number') as HoneyType[]
@@ -20,7 +20,7 @@ export default function HarvestFormPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const { data: apiaries = [] } = useApiaries()
+  const { data: apiaries = [], isError: apiariesError } = useApiaries()
   const { data: existing, isLoading: loadingExisting } = useHarvest(harvestId ?? 0)
   const createHarvest = useCreateHarvest()
   const updateHarvest = useUpdateHarvest(harvestId ?? 0)
@@ -34,7 +34,7 @@ export default function HarvestFormPage() {
   const [frames, setFrames] = useState<Record<number, string>>({})
   const [formError, setFormError] = useState<string | null>(null)
 
-  const { data: hives = [], isLoading: loadingHives } = useBeehivesByApiary(apiaryId)
+  const { data: hives = [], isLoading: loadingHives, isError: hivesError } = useBeehivesByApiary(apiaryId)
 
   // Populate when editing
   useEffect(() => {
@@ -154,6 +154,14 @@ export default function HarvestFormPage() {
           </div>
         )}
 
+        {/* Without the apiary list the form cannot be completed — say so instead of showing an
+            empty dropdown that looks like "you have no apiaries". */}
+        {apiariesError && (
+          <div className="mb-4">
+            <ErrorMessage message="Greška pri učitavanju pčelinjaka. Osvježite stranicu." />
+          </div>
+        )}
+
         <form onSubmit={onSubmit} className="space-y-6">
           {/* Apiary + honey type */}
           <div className="grid grid-cols-2 gap-4">
@@ -223,6 +231,8 @@ export default function HarvestFormPage() {
               <p className="text-sm text-gray-400 dark:text-slate-500 py-4">Prvo odaberite pčelinjak.</p>
             ) : loadingHives ? (
               <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-honey-500" /></div>
+            ) : hivesError ? (
+              <ErrorMessage message="Greška pri učitavanju košnica. Osvježite stranicu." />
             ) : hives.length === 0 ? (
               <p className="text-sm text-gray-400 dark:text-slate-500 py-4">Ovaj pčelinjak nema košnica.</p>
             ) : (

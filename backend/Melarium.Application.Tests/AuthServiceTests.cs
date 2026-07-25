@@ -1,5 +1,6 @@
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
+using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Auth.DTOs;
 using Melarium.Application.Features.Notifications;
@@ -27,7 +28,12 @@ public class AuthServiceTests
         config["Jwt:Issuer"].Returns("MelariumTests");
         config["Jwt:Audience"].Returns("MelariumTests");
 
-        _service = new AuthService(_uow, config, Substitute.For<INotificationService>());
+        _service = new AuthService(
+            _uow,
+            config,
+            Substitute.For<INotificationService>(),
+            Substitute.For<IEmailQueue>(),
+            new SessionRevoker(_uow));
     }
 
     private static User OrgAdmin(int id = 1) => new()
@@ -44,12 +50,15 @@ public class AuthServiceTests
 
     // ── Login ──────────────────────────────────────────────────────────────────
 
+    // Failed credentials are 401 (UnauthorizedException), not 422 — and both branches must fail
+    // with the *same* exception and message so the response cannot distinguish "no such account"
+    // from "wrong password".
     [Fact]
     public async Task Login_UnknownEmail_ThrowsGenericCredentialError()
     {
         _uow.Users.GetByEmailAsync("asim@test.ba").Returns((User?)null);
 
-        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+        await Assert.ThrowsAsync<UnauthorizedException>(() =>
             _service.LoginAsync(new LoginDto("asim@test.ba", "x")));
     }
 
@@ -58,8 +67,22 @@ public class AuthServiceTests
     {
         _uow.Users.GetByEmailAsync("asim@test.ba").Returns(OrgAdmin());
 
-        await Assert.ThrowsAsync<BusinessRuleException>(() =>
+        await Assert.ThrowsAsync<UnauthorizedException>(() =>
             _service.LoginAsync(new LoginDto("asim@test.ba", "Wrong123!")));
+    }
+
+    [Fact]
+    public async Task Login_UnknownEmailAndWrongPassword_AreIndistinguishable()
+    {
+        _uow.Users.GetByEmailAsync("ghost@test.ba").Returns((User?)null);
+        _uow.Users.GetByEmailAsync("asim@test.ba").Returns(OrgAdmin());
+
+        var unknown = await Assert.ThrowsAsync<UnauthorizedException>(() =>
+            _service.LoginAsync(new LoginDto("ghost@test.ba", "Whatever1!")));
+        var wrongPassword = await Assert.ThrowsAsync<UnauthorizedException>(() =>
+            _service.LoginAsync(new LoginDto("asim@test.ba", "Whatever1!")));
+
+        Assert.Equal(unknown.Message, wrongPassword.Message);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using Melarium.Application.Common.Security;
 using Melarium.Application.Features.OrgManagement;
 using Melarium.Application.Features.OrgManagement.DTOs;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,10 +19,14 @@ namespace Melarium.API.Controllers;
 public class OrgManagementController : ControllerBase
 {
     private readonly IOrgManagementService _service;
+    private readonly IValidator<CreateOrgMemberDto> _createMemberValidator;
 
-    public OrgManagementController(IOrgManagementService service)
+    public OrgManagementController(
+        IOrgManagementService service,
+        IValidator<CreateOrgMemberDto> createMemberValidator)
     {
         _service = service;
+        _createMemberValidator = createMemberValidator;
     }
 
     /// <summary>Returns all User and Admin role members in the caller's organization.</summary>
@@ -41,6 +46,10 @@ public class OrgManagementController : ControllerBase
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> CreateMember([FromBody] CreateOrgMemberDto dto)
     {
+        var validation = await _createMemberValidator.ValidateAsync(dto);
+        if (!validation.IsValid)
+            return BadRequest(validation.ToDictionary());
+
         var created = await _service.CreateMemberAsync(dto);
         return CreatedAtAction(nameof(GetMember), new { id = created.Id }, created);
     }

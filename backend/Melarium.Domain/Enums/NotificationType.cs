@@ -31,4 +31,7 @@ public enum NotificationType
 
     // ── Calendar sync (SPEC-11) — daily 08:00 agenda of the day's obligations ──
     DailyAgenda            = 19,
+
+    // ── Account security — password reset/change; the user's cue that it wasn't them ──
+    PasswordChanged        = 20,
 }

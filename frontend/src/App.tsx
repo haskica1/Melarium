@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './core/context/AuthContext'
 import { ToastProvider } from './core/context/ToastContext'
 import Layout from './shared/components/Layout'
@@ -7,6 +7,9 @@ import AdminRoute from './shared/components/AdminRoute'
 import RoleRoute from './shared/components/RoleRoute'
 import LoginPage from './features/auth/LoginPage'
 import RegisterPage from './features/auth/RegisterPage'
+import ForgotPasswordPage from './features/auth/ForgotPasswordPage'
+import ResetPasswordPage from './features/auth/ResetPasswordPage'
+import VerifyEmailPage from './features/auth/VerifyEmailPage'
 import ApiaryListPage from './features/apiaries/ApiaryListPage'
 import ApiaryDetailPage from './features/apiaries/ApiaryDetailPage'
 import ApiaryFormPage from './features/apiaries/ApiaryFormPage'
@@ -35,6 +38,7 @@ import LearningTopicsAdminPage from './features/admin/LearningTopicsAdminPage'
 import LearningTopicFormPage from './features/admin/LearningTopicFormPage'
 import AdvisorPage from './features/advisor/AdvisorPage'
 import SmartRedirect from './shared/components/SmartRedirect'
+import NotFoundPage from './shared/components/NotFoundPage'
 import ScanPage from './features/beehives/ScanPage'
 import ProfilePage from './features/profile/ProfilePage'
 import StatsPage from './features/stats/StatsPage'
@@ -58,6 +62,10 @@ export default function App() {
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          {/* Both are reached from an emailed link, so they must work signed out. */}
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/scan/:uniqueId" element={<ScanPage />} />
 
           {/* Protected routes — redirect to /login if not authenticated */}
@@ -166,8 +174,8 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Unknown path — show a real 404 rather than silently bouncing to the home page. */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>
       </ToastProvider>

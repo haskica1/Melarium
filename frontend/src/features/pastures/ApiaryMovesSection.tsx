@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { ArrowRight, FileCheck2, Home, Loader2, MapPin, Tent, Trash2, Truck, X } from 'lucide-react'
 import { CollapsibleSection } from '../../shared/components/CollapsibleSection'
-import { ConfirmDialog } from '../../shared/components'
+import { ConfirmDialog, ErrorMessage } from '../../shared/components'
+import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
 import LocationPickerModal from '../../shared/components/LocationPickerModal'
 import {
   useApiaryMoves,
@@ -27,7 +28,7 @@ interface ApiaryMovesSectionProps {
 /** "Selidbe" section for the apiary detail page (SPEC-10) — history + "Preseli"/"Vrati na matičnu lokaciju". */
 export function ApiaryMovesSection({ apiaryId, canManage, hasHomeLocation }: ApiaryMovesSectionProps) {
   const { toast } = useToast()
-  const { data: moves = [], isLoading } = useApiaryMoves(apiaryId)
+  const { data: moves = [], isLoading, isError } = useApiaryMoves(apiaryId)
   const deleteMove = useDeleteApiaryMove(apiaryId)
   const setHomeLocation = useSetHomeLocation(apiaryId)
 
@@ -91,6 +92,8 @@ export function ApiaryMovesSection({ apiaryId, canManage, hasHomeLocation }: Api
     >
       {isLoading ? (
         <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-honey-500" /></div>
+      ) : isError ? (
+        <ErrorMessage message="Greška pri učitavanju selidbi." />
       ) : moves.length === 0 ? (
         <p className="text-center py-6 text-sm text-gray-400 dark:text-slate-500">
           Pčelinjak je na matičnoj lokaciji — još nema zabilježenih selidbi.
@@ -166,6 +169,7 @@ function MoveApiaryModal({ apiaryId, currentPastureId, canReturnHome, onClose }:
   canReturnHome: boolean
   onClose: () => void
 }) {
+  const { panelProps } = useDialogBehavior({ open: true, onClose })
   const { toast } = useToast()
   const { data: pastures = [] } = usePastures()
   const createMove = useCreateApiaryMove(apiaryId)
@@ -215,7 +219,12 @@ function MoveApiaryModal({ apiaryId, currentPastureId, canReturnHome, onClose }:
   const labelClass = 'block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+      {...panelProps}
+      aria-label="Preseli pčelinjak"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 outline-none"
+      onClick={onClose}
+    >
       <div
         className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-honey-100 dark:border-slate-800 w-full max-w-md"
         onClick={e => e.stopPropagation()}

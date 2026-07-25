@@ -9,7 +9,8 @@ import {
   useDeletePasture,
 } from '../../core/services/pastureQueries'
 import type { Pasture, SavePasturePayload } from '../../core/models'
-import { ConfirmDialog, EmptyState, VitalsSkeleton } from '../../shared/components'
+import { ConfirmDialog, EmptyState, ErrorState, VitalsSkeleton } from '../../shared/components'
+import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
 import LocationPickerModal from '../../shared/components/LocationPickerModal'
 import { usePermissions } from '../../core/hooks/usePermissions'
 import { useToast } from '../../core/context/ToastContext'
@@ -31,7 +32,7 @@ export default function PasturesPage() {
   const { canManageApiaries } = usePermissions()
   const { toast } = useToast()
 
-  const { data: pastures = [], isLoading } = usePastures()
+  const { data: pastures = [], isLoading, isError, refetch } = usePastures()
   const createPasture = useCreatePasture()
   const updatePasture = useUpdatePasture()
   const deletePasture = useDeletePasture()
@@ -99,7 +100,9 @@ export default function PasturesPage() {
 
       {isLoading && <VitalsSkeleton />}
 
-      {!isLoading && pastures.length === 0 && (
+      {isError && <ErrorState message="Greška pri učitavanju pašnjaka." onRetry={refetch} />}
+
+      {!isLoading && !isError && pastures.length === 0 && (
         <EmptyState
           title="Još nema pašnjaka."
           description="Dodajte pašnjake na koje selite pčelinjake — selidbe se bilježe na stranici pčelinjaka."
@@ -227,6 +230,7 @@ interface PastureFormModalProps {
 }
 
 function PastureFormModal({ pasture, isSaving, onSave, onClose }: PastureFormModalProps) {
+  const { panelProps } = useDialogBehavior({ open: true, onClose })
   const [name, setName] = useState(pasture?.name ?? '')
   const [address, setAddress] = useState(pasture?.address ?? '')
   const [floraNotes, setFloraNotes] = useState(pasture?.floraNotes ?? '')
@@ -265,7 +269,12 @@ function PastureFormModal({ pasture, isSaving, onSave, onClose }: PastureFormMod
   const labelClass = 'block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div
+      {...panelProps}
+      aria-label={pasture ? 'Uredi pašnjak' : 'Novi pašnjak'}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 outline-none"
+      onClick={onClose}
+    >
       <div
         className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-honey-100 dark:border-slate-800 w-full max-w-lg max-h-[90vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}

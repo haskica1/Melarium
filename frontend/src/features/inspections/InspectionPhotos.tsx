@@ -7,6 +7,8 @@ import {
   useInspectionPhotos,
 } from '../../core/services/queries'
 import { useToast } from '../../core/context/ToastContext'
+import { ConfirmDialog } from '../../shared/components'
+import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
 import type { InspectionPhoto, PhotoAnalysis } from '../../core/models'
 
 /**
@@ -105,6 +107,11 @@ export function PhotoLightbox({ photos, index, canManage, inspectionId, onNaviga
 }) {
   const photo = photos[index]
   const { toast } = useToast()
+  // Was window.confirm — the only native browser dialog left in the app.
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  // The nested ConfirmDialog owns Escape while it is open, so closing it does not also close the
+  // lightbox behind it.
+  const { panelProps } = useDialogBehavior({ open: !confirmDeleteOpen, onClose })
   const deleteMutation = useDeleteInspectionPhoto(inspectionId)
   const analyzeMutation = useAnalyzeInspectionPhoto(inspectionId)
   const analysis = parsePhotoAnalysis(photo.analysisJson)
@@ -121,21 +128,21 @@ export function PhotoLightbox({ photos, index, canManage, inspectionId, onNaviga
     }
   }
 
+  // Escape/focus/scroll-lock come from the shared hook; only the gallery arrows are local.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
       if (e.key === 'ArrowLeft' && index > 0) onNavigate(index - 1)
       if (e.key === 'ArrowRight' && index < photos.length - 1) onNavigate(index + 1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [index, photos.length, onNavigate, onClose])
+  }, [index, photos.length, onNavigate])
 
   const handleDelete = async () => {
-    if (!window.confirm('Obrisati ovu fotografiju?')) return
     try {
       await deleteMutation.mutateAsync(photo.id)
       toast.success('Fotografija obrisana.')
+      setConfirmDeleteOpen(false)
       if (photos.length <= 1) onClose()
       else if (index >= photos.length - 1) onNavigate(index - 1)
     } catch {
@@ -145,7 +152,9 @@ export function PhotoLightbox({ photos, index, canManage, inspectionId, onNaviga
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-fade-in"
+      {...panelProps}
+      aria-label="Pregled fotografije"
+      className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-fade-in outline-none"
       onClick={onClose}
     >
       <div
@@ -161,7 +170,7 @@ export function PhotoLightbox({ photos, index, canManage, inspectionId, onNaviga
             {canManage && (
               <button
                 type="button"
-                onClick={handleDelete}
+                onClick={() => setConfirmDeleteOpen(true)}
                 disabled={deleteMutation.isPending}
                 className="p-2 rounded-lg hover:bg-white/10 text-white/80 hover:text-red-400 transition-colors"
                 title="Obriši fotografiju"
@@ -244,6 +253,15 @@ export function PhotoLightbox({ photos, index, canManage, inspectionId, onNaviga
           {analysis && !analyzeMutation.isPending && <AnalysisPanel analysis={analysis} />}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmDeleteOpen}
+        title="Obriši fotografiju"
+        message="Ova fotografija će biti trajno obrisana. Ova radnja se ne može poništiti."
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDeleteOpen(false)}
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   )
 }

@@ -18,13 +18,20 @@ export const advisorService = {
     return data
   },
 
+  // Both calls below wait on a Groq chat completion. They must match the backend's 60 s
+  // HttpClient budget — apiClient's 10 s default aborted the request while the server kept
+  // going, so the answer was persisted and billed but shown to the user as an error.
   async create(payload: CreateConversationPayload): Promise<AdvisorConversationDetail> {
-    const { data } = await apiClient.post<AdvisorConversationDetail>('/advisor/conversations', payload)
+    const { data } = await apiClient.post<AdvisorConversationDetail>('/advisor/conversations', payload, {
+      timeout: 60_000,
+    })
     return data
   },
 
   async sendMessage(id: number, payload: SendMessagePayload): Promise<AdvisorMessagePair> {
-    const { data } = await apiClient.post<AdvisorMessagePair>(`/advisor/conversations/${id}/messages`, payload)
+    const { data } = await apiClient.post<AdvisorMessagePair>(`/advisor/conversations/${id}/messages`, payload, {
+      timeout: 60_000,
+    })
     return data
   },
 

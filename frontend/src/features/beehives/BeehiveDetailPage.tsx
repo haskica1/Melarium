@@ -11,7 +11,7 @@ import {
 } from '../../core/services/queries'
 import {
   PageSkeleton,
-  ErrorMessage,
+  ErrorState,
   EmptyState,
   ConfirmDialog,
   HoneyLevelBadge,
@@ -29,6 +29,7 @@ import { useOutbox } from '../../core/hooks/useOutbox'
 import { DietStatus, HoneyLevel } from '../../core/models'
 import type { Inspection } from '../../core/models'
 import { usePermissions } from '../../core/hooks/usePermissions'
+import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
 
 // QR label side in mm — printable range. Empty/invalid input falls back to the minimum.
 const QR_MIN_MM = 10
@@ -43,7 +44,7 @@ export default function BeehiveDetailPage() {
   const beehiveId = Number(id)
 
   const { canEditDelete, canManageInspections, canManageHiveTodos, isAssignedToHive } = usePermissions()
-  const { data: beehive, isLoading, error } = useBeehive(beehiveId)
+  const { data: beehive, isLoading, isError, refetch } = useBeehive(beehiveId)
   const deleteMutation = useDeleteInspection(beehiveId)
 
   // Unsent offline inspections for this hive (SPEC-07)
@@ -61,6 +62,7 @@ export default function BeehiveDetailPage() {
   const [qrOpen, setQrOpen] = useState(false)
   // Kept as strings so the field can be cleared / retyped freely; clamped to 10–200 mm on blur & export.
   const [qrSize, setQrSize] = useState({ w: '60', h: '60' })
+  const qrDialog = useDialogBehavior({ open: qrOpen, onClose: () => setQrOpen(false) })
 
   const handleDelete = async () => {
     if (!deleteTarget) return
@@ -69,7 +71,7 @@ export default function BeehiveDetailPage() {
   }
 
   if (isLoading) return <PageSkeleton />
-  if (error) return <ErrorMessage message={error.message} />
+  if (isError) return <ErrorState message="Greška pri učitavanju košnice." onRetry={refetch} />
   if (!beehive) return null
 
   const hasQr = !!beehive.uniqueId && !!beehive.qrCodeBase64
@@ -322,7 +324,11 @@ export default function BeehiveDetailPage() {
       {qrOpen && hasQr && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setQrOpen(false)} />
-          <div className="relative bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full animate-fade-in">
+          <div
+            {...qrDialog.panelProps}
+            aria-label="QR kod košnice"
+            className="relative bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full animate-fade-in outline-none"
+          >
             <div className="text-center mb-3">
               <h2 className="font-display text-xl font-bold text-gray-800 dark:text-slate-100">{beehive.name}</h2>
               <p className="text-xs text-gray-400 dark:text-slate-500 font-mono mt-1">{beehive.uniqueId}</p>

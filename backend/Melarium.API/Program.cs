@@ -10,6 +10,7 @@ using Melarium.Entity;
 using Melarium.Entity.Seed;
 using Melarium.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -209,6 +210,33 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
             }));
 
+    // Endpoints that send mail to an address the caller names (password reset, resend
+    // verification). Tighter than login: each accepted request puts a message in someone's
+    // inbox, so this is an abuse budget, not a usability one. Kept separate from "login" so a
+    // reset burst can never lock out sign-ins.
+    options.AddPolicy("auth-email", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+
+    // Redeeming an emailed token (reset / verify). The tokens are 256-bit so guessing is not the
+    // threat — this just bounds automated hammering. More generous than auth-email because a
+    // user legitimately retries a link.
+    options.AddPolicy("auth-token", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+
     // Voice parsing calls a paid external API (Groq) per request — throttle so a single
     // client cannot burn through the quota.
     options.AddPolicy("voice-parse", httpContext =>
@@ -244,6 +272,22 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 
+// Reverse-proxy awareness. The API always runs behind a proxy that terminates TLS (nginx on the
+// VPS, Render's edge), so the socket peer is the proxy — not the client. Without this every
+// request looks like it comes from one address and the rate limiters above collapse into a
+// single shared bucket for the whole platform (5 logins/min for *everyone*).
+//
+// KnownProxies/KnownNetworks are cleared because the proxy's address is not fixed (Docker bridge
+// gateway, Render edge). That is safe only because the container is never exposed directly:
+// docker-compose binds it to 127.0.0.1 and nginx is the sole entry point. If that ever changes,
+// pin the proxy address here instead — otherwise clients could spoof X-Forwarded-For.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 // Health check — liveness probe at /health for the deployment platform.
 builder.Services.AddHealthChecks();
 
@@ -251,12 +295,25 @@ var app = builder.Build();
 
 // ── Middleware Pipeline ────────────────────────────────��──────────────────────
 
-// Global exception handler must be first in the pipeline
+// Restore the real client IP/scheme from the proxy's headers. Must run before anything that
+// reads them — the rate limiter partitions on RemoteIpAddress.
+app.UseForwardedHeaders();
+
+// Global exception handler must be first after the proxy fix-up
 app.UseGlobalExceptionHandling();
 
-// Swagger available in all environments so the deployed API can be explored
-app.UseSwagger();
-app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Melarium API v1"));
+// Swagger is Development-only: in production it published the full API surface, every schema
+// and every admin endpoint to anonymous callers.
+// Registered BEFORE UseSecurityHeaders on purpose — Swagger's middleware short-circuits its own
+// requests, so the restrictive `default-src 'none'` CSP below never applies to the Swagger UI
+// (which loads its own CSS/JS). Do not reorder these two.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Melarium API v1"));
+}
+
+app.UseSecurityHeaders();
 
 // HTTPS redirect only in local dev — Render (and most cloud hosts) terminate
 // TLS at the proxy level; the container itself only serves plain HTTP.

@@ -1,4 +1,5 @@
 using Melarium.Application.Common.Interfaces;
+using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Auth.DTOs;
 using Melarium.Application.Features.Notifications;
@@ -27,7 +28,12 @@ public class RegistrationTrialTests
         config["Jwt:Audience"].Returns("MelariumTests");
         config["Plans:Trial:Days"].Returns("30");
 
-        _service = new AuthService(_uow, config, Substitute.For<INotificationService>());
+        _service = new AuthService(
+            _uow,
+            config,
+            Substitute.For<INotificationService>(),
+            Substitute.For<IEmailQueue>(),
+            new SessionRevoker(_uow));
     }
 
     [Fact]

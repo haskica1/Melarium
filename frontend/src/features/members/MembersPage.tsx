@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, Pencil, AlertCircle, Search, UserPlus, X, Loader2, Eye, EyeOff } from 'lucide-react'
+import { Users, Pencil, AlertCircle, Search, UserPlus, Loader2, Eye, EyeOff } from 'lucide-react'
 import { useOrgMembers, useAvailableApiaries, useAvailableBeehives, useCreateOrgMember } from '../../core/services/orgQueries'
 import { useAuth } from '../../core/context/AuthContext'
-import { VitalCard, VitalsSkeleton } from '../../shared/components'
+import { VitalCard, VitalsSkeleton, ErrorState, ErrorMessage, Modal } from '../../shared/components'
 
 interface AddMemberForm {
   firstName: string
@@ -26,7 +26,7 @@ const EMPTY_FORM: AddMemberForm = {
 export default function MembersPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { data: members = [], isLoading, error } = useOrgMembers()
+  const { data: members = [], isLoading, isError, refetch } = useOrgMembers()
   const [query, setQuery] = useState('')
 
   const isOrgAdmin = user?.role === 'OrganizationAdmin'
@@ -39,7 +39,7 @@ export default function MembersPage() {
   const [formError, setFormError] = useState<string | null>(null)
 
   const { data: availableApiaries = [] } = useAvailableApiaries(isOrgAdmin && modalOpen)
-  const { data: availableBeehives = [] } = useAvailableBeehives()
+  const { data: availableBeehives = [], isError: availableBeehivesError } = useAvailableBeehives()
   const createMember = useCreateOrgMember()
 
   // Filter beehives to only show those from the org (all available for OrgAdmin)
@@ -84,8 +84,8 @@ export default function MembersPage() {
       setFormError('Unesite valjanu e-poštu.')
       return
     }
-    if (form.password.length < 6) {
-      setFormError('Lozinka mora imati najmanje 6 znakova.')
+    if (form.password.length < 8) {
+      setFormError('Lozinka mora imati najmanje 8 znakova.')
       return
     }
     if (form.role === 'ApiaryAdmin' && !form.apiaryId) {
@@ -161,15 +161,12 @@ export default function MembersPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="flex items-start gap-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 rounded-lg px-4 py-3 text-sm">
-          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          Greška pri učitavanju članova.
-        </div>
-      )}
-
+      {/* On failure show only the error — falling through to "Nema članova" would suggest the
+          organisation is empty rather than that the request failed. */}
       {isLoading ? (
         <VitalsSkeleton />
+      ) : isError ? (
+        <ErrorState message="Greška pri učitavanju članova." onRetry={refetch} />
       ) : members.length === 0 ? (
         <div className="text-center py-16 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-honey-200 dark:border-slate-700">
           <Users className="w-8 h-8 text-honey-300 dark:text-honey-500/50 mx-auto mb-2" />
@@ -278,26 +275,16 @@ export default function MembersPage() {
       )}
 
       {/* ── Add Member Modal ───────────────────────────────────────────────────── */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeModal} />
-          <div className="relative bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-slide-up">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-honey-500" />
-                <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100">Dodaj člana</h2>
-              </div>
-              <button
-                onClick={closeModal}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title="Dodaj člana"
+        size="md"
+        // Half-typed member details should survive a stray click on the backdrop.
+        closeOnBackdropClick={false}
+        icon={<UserPlus className="w-5 h-5 text-honey-500 mt-1" />}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
               {formError && (
                 <div className="flex items-start gap-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 rounded-xl px-4 py-3 text-sm">
                   <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -363,7 +350,7 @@ export default function MembersPage() {
                     onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                     className="form-input w-full pr-10"
                     required
-                    minLength={6}
+                    minLength={8}
                   />
                   <button
                     type="button"
@@ -375,7 +362,7 @@ export default function MembersPage() {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">Minimum 6 znakova</p>
+                <p className="mt-1 text-xs text-gray-400 dark:text-slate-500">Minimum 8 znakova</p>
               </div>
 
               {/* Role */}
@@ -436,7 +423,9 @@ export default function MembersPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                     Dodijeljene košnice
                   </label>
-                  {beehivesForRole.length === 0 ? (
+                  {availableBeehivesError ? (
+                    <ErrorMessage message="Greška pri učitavanju košnica. Osvježite stranicu." />
+                  ) : beehivesForRole.length === 0 ? (
                     <p className="text-sm text-gray-400 dark:text-slate-500 py-2">
                       Nema dostupnih košnica za dodjeljivanje.
                     </p>
@@ -467,28 +456,18 @@ export default function MembersPage() {
                 </div>
               )}
 
-              {/* Buttons */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                  Otkaži
-                </button>
-                <button
-                  type="submit"
-                  disabled={createMember.isPending}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-honey-500 hover:bg-honey-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors"
-                >
-                  {createMember.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Dodaj člana
-                </button>
-              </div>
-            </form>
+          {/* Buttons stay inside the <form> so Enter still submits. */}
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={closeModal} className="btn-secondary flex-1 justify-center">
+              Otkaži
+            </button>
+            <button type="submit" disabled={createMember.isPending} className="btn-primary flex-1 justify-center">
+              {createMember.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              Dodaj člana
+            </button>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </div>
   )
 }

@@ -25,6 +25,20 @@ public class UserRepository : Repository<User>, IUserRepository
             .ThenBy(u => u.FirstName)
             .ToListAsync();
 
+    public async Task<IEnumerable<User>> GetByOrganizationWithDetailsAsync(int organizationId) =>
+        await _context.Users
+            .AsNoTracking()
+            .Where(u => u.OrganizationId == organizationId)
+            .Include(u => u.Organization)
+            .Include(u => u.Apiary)
+            .Include(u => u.AssignedBeehives).ThenInclude(ub => ub.Beehive)
+            .OrderBy(u => u.LastName)
+            .ThenBy(u => u.FirstName)
+            .ToListAsync();
+
+    public async Task<int> CountByRoleAsync(UserRole role) =>
+        await _context.Users.CountAsync(u => u.Role == role);
+
     public async Task<User?> GetByIdWithOrganizationAsync(int id) =>
         await _context.Users
             .Include(u => u.Organization)

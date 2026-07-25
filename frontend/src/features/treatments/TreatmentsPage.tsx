@@ -5,7 +5,7 @@ import { FileDown, Loader2, PencilLine, Pill, Plus, Trash2, X } from 'lucide-rea
 import { useTreatments, useDeleteTreatment } from '../../core/services/treatmentQueries'
 import { TreatmentStatus } from '../../core/models'
 import type { Treatment } from '../../core/models'
-import { VitalCard, VitalsSkeleton, ConfirmDialog, EmptyState } from '../../shared/components'
+import { VitalCard, VitalsSkeleton, ConfirmDialog, EmptyState, ErrorState } from '../../shared/components'
 import { usePermissions } from '../../core/hooks/usePermissions'
 import { useToast } from '../../core/context/ToastContext'
 import { useAuth } from '../../core/context/AuthContext'
@@ -30,7 +30,7 @@ export default function TreatmentsPage() {
   const beehiveId = Number(searchParams.get('beehiveId')) || undefined
 
   const [year, setYear] = useState<number>(CURRENT_YEAR)
-  const { data: treatments = [], isLoading } = useTreatments({ year, beehiveId })
+  const { data: treatments = [], isLoading, isError, refetch } = useTreatments({ year, beehiveId })
   const deleteTreatment = useDeleteTreatment()
 
   const [confirmTarget, setConfirmTarget] = useState<Treatment | null>(null)
@@ -129,7 +129,9 @@ export default function TreatmentsPage() {
 
       {isLoading && <VitalsSkeleton />}
 
-      {!isLoading && treatments.length === 0 && (
+      {isError && <ErrorState message="Greška pri učitavanju tretmana." onRetry={refetch} />}
+
+      {!isLoading && !isError && treatments.length === 0 && (
         <EmptyState
           title="Još nema evidencije tretmana."
           description={`Za ${year}. godinu nema zabilježenih tretmana.`}

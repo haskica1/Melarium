@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, Moon, Sun } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../../core/context/AuthContext'
 import { useTheme } from '../../core/hooks/useTheme'
 import type { LoginResponse } from '../../core/services/authService'
+import { getServerError } from './authErrors'
 
 interface LoginForm {
   email: string
@@ -27,6 +28,9 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const returnUrl = searchParams.get('returnUrl')
+  // Set by flows that deliberately sign the user out (e.g. a password change).
+  const { state } = useLocation() as { state?: { notice?: string } }
+  const notice = state?.notice
   const [showPassword, setShowPassword] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
 
@@ -43,7 +47,9 @@ export default function LoginPage() {
       const destination = returnUrl ?? (response.role === 'SystemAdmin' ? '/admin' : '/apiaries')
       navigate(destination, { replace: true })
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Prijava neuspješna. Pokušajte ponovo.')
+      // authApi has no interceptors, so this is the raw AxiosError — `err.message` alone would
+      // show "Request failed with status code 401" instead of the server's reason.
+      setServerError(getServerError(err, 'Prijava neuspješna. Pokušajte ponovo.'))
     }
   }
 
@@ -118,6 +124,17 @@ export default function LoginPage() {
               <p className="text-gray-500 dark:text-slate-400 mt-1 text-sm">Prijavite se u vaš pčelarski radni prostor</p>
             </div>
 
+            {/* One-off notice carried over from a sign-out-forcing action */}
+            {notice && !serverError && (
+              <div
+                role="status"
+                className="mb-6 flex items-start gap-3 bg-green-50 dark:bg-green-500/10 border border-green-200 dark:border-green-500/30 text-green-800 dark:text-green-300 rounded-xl px-4 py-3 text-sm animate-slide-up"
+              >
+                <span className="mt-0.5">✅</span>
+                <span>{notice}</span>
+              </div>
+            )}
+
             {/* Server error */}
             {serverError && (
               <div className="mb-6 flex items-start gap-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 rounded-xl px-4 py-3 text-sm animate-slide-up">
@@ -157,9 +174,17 @@ export default function LoginPage() {
 
               {/* Password */}
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
-                  Lozinka
-                </label>
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-slate-300">
+                    Lozinka
+                  </label>
+                  <Link
+                    to="/forgot-password"
+                    className="text-xs font-medium text-honey-600 dark:text-honey-400 hover:text-honey-700 dark:hover:text-honey-300 transition-colors"
+                  >
+                    Zaboravili ste lozinku?
+                  </Link>
+                </div>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500 pointer-events-none" />
                   <input

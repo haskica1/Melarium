@@ -10,7 +10,7 @@ import {
   useApiariesByOrganization,
   useBeehivesByOrganization,
 } from '../../core/services/adminQueries'
-import { FormHeader } from '../../shared/components'
+import { FormHeader, ErrorState, ErrorMessage } from '../../shared/components'
 
 interface UserForm {
   firstName: string
@@ -28,8 +28,9 @@ export default function UserFormPage() {
   const userId = id ? parseInt(id) : 0
   const navigate = useNavigate()
 
-  const { data: existing, isLoading: loadingExisting } = useAdminUser(userId)
-  const { data: organizations = [] } = useAdminOrganizations()
+  const { data: existing, isLoading: loadingExisting, isError: existingError, refetch: refetchExisting } =
+    useAdminUser(userId)
+  const { data: organizations = [], isError: organizationsError } = useAdminOrganizations()
   const createUser = useCreateAdminUser()
   const updateUser = useUpdateAdminUser(userId)
 
@@ -120,6 +121,12 @@ export default function UserFormPage() {
     )
   }
 
+  // Never render the edit form on a failed load — the fields would fall back to their empty
+  // defaults, and saving would look like the admin deliberately blanked the account.
+  if (isEdit && existingError) {
+    return <ErrorState message="Greška pri učitavanju korisnika." onRetry={refetchExisting} />
+  }
+
   const inputCls = (hasError: boolean) =>
     `w-full px-4 py-3 rounded-xl border text-sm outline-none transition-all bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 dark:[color-scheme:dark] ${
       hasError
@@ -140,6 +147,14 @@ export default function UserFormPage() {
         {errors.root && (
           <div className="mb-5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 rounded-xl px-4 py-3 text-sm">
             {errors.root.message}
+          </div>
+        )}
+
+        {/* Role/organisation consistency is enforced server-side, so an empty organisation list
+            turns into a confusing rejection on save. Surface the real cause instead. */}
+        {organizationsError && (
+          <div className="mb-4">
+            <ErrorMessage message="Greška pri učitavanju organizacija. Osvježite stranicu." />
           </div>
         )}
 
@@ -198,7 +213,7 @@ export default function UserFormPage() {
                 className={inputCls(!!errors.password)}
                 {...register('password', {
                   required: isEdit ? false : 'Lozinka je obavezna',
-                  minLength: { value: 6, message: 'Minimum 6 znakova' },
+                  minLength: { value: 8, message: 'Lozinka mora imati najmanje 8 znakova' },
                 })}
               />
               {errors.password && <p className="mt-1.5 text-xs text-red-600">{errors.password.message}</p>}

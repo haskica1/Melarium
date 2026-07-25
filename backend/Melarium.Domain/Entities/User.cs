@@ -11,6 +11,13 @@ public class User : BaseEntity
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; } = UserRole.ApiaryAdmin;
 
+    /// <summary>
+    /// When the user proved control of <see cref="Email"/>. Null = unverified.
+    /// Accounts that existed before verification was introduced were backfilled as verified,
+    /// so null reliably means "signed up after this feature and has not confirmed yet".
+    /// </summary>
+    public DateTime? EmailVerifiedAt { get; set; }
+
     public int? OrganizationId { get; set; }
     public Organization? Organization { get; set; }
 

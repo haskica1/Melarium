@@ -3,10 +3,11 @@ import { format } from 'date-fns'
 import { Pill } from 'lucide-react'
 import { useTreatments } from '../../core/services/treatmentQueries'
 import { TreatmentStatus } from '../../core/models'
+import { ErrorMessage } from '../../shared/components'
 
 /** Compact treatment-status card for the beehive detail sidebar (SPEC-08). */
 export function HiveTreatmentCard({ beehiveId }: { beehiveId: number }) {
-  const { data: treatments = [], isLoading } = useTreatments({ beehiveId })
+  const { data: treatments = [], isLoading, isError } = useTreatments({ beehiveId })
 
   if (isLoading) return null
 
@@ -29,7 +30,11 @@ export function HiveTreatmentCard({ beehiveId }: { beehiveId: number }) {
         )}
       </div>
 
-      {!latest ? (
+      {/* This is a legal medicine register: showing "no treatments" when the request actually
+          failed could lead someone to re-treat a hive that is still in karenca. */}
+      {isError ? (
+        <ErrorMessage message="Greška pri učitavanju tretmana." />
+      ) : !latest ? (
         <p className="text-sm text-gray-400 dark:text-slate-500">Još nema tretmana za ovu košnicu.</p>
       ) : (
         <div className="space-y-2">

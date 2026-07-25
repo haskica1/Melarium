@@ -13,8 +13,22 @@
 - `POST /api/auth/register` — **self-service sign-up**: creates a new Organization and its OrganizationAdmin, auto-login
 - `POST /api/auth/refresh` — rotates the refresh token; **reuse of a rotated token revokes the user's whole active set**
 - `POST /api/auth/logout` — revokes the presented refresh token (idempotent)
-- Rate limiting per client IP: login 5/min, register 5/min, refresh 20/min → `429`
-- Passwords hashed with BCrypt; refresh tokens stored **hashed** (SHA-256)
+- `POST /api/auth/forgot-password` — emails a single-use reset link; **always 204**, so the response
+  cannot be used to test which addresses have accounts
+- `POST /api/auth/reset-password` — redeems the token, sets the new password, **revokes every session**,
+  and marks the address verified (receiving the mail proved control of it)
+- `POST /api/auth/verify-email` — redeems a verification token; idempotent when already verified
+- `POST /api/auth/resend-verification` — authenticated; re-sends the link to the signed-in user
+- Rate limiting per client IP: login 5/min, register 5/min, refresh 20/min, **auth-email 3/min**
+  (forgot-password, resend-verification), **auth-token 10/min** (reset, verify) → `429`
+- Bad credentials return **401** (not 422), with an identical message and cost for
+  "unknown email" and "wrong password" (dummy BCrypt verify equalises timing)
+- Passwords hashed with BCrypt; refresh + emailed tokens stored **hashed** (SHA-256).
+  One password policy for every entry point (`Common/Validation/PasswordRules`, min 8)
+- **Email verification is soft**: recorded on `User.EmailVerifiedAt`, surfaced as a profile banner,
+  never blocks sign-in. Accounts predating the feature were backfilled as verified by its migration
+- **Session revocation** (`ISessionRevoker`) fires wherever trust changes: password reset, password
+  change, and any edit to a user's role / organisation / apiary (all three are JWT claims)
 - JWT claims: `sub` (int user id), `email`, `role`, `jti`, `organizationId?`, `apiaryId?`
 - **Four roles** (`UserRole`): `SystemAdmin` (platform), `OrganizationAdmin` (whole org),
   `ApiaryAdmin` (one assigned apiary), `Beekeeper` (only explicitly assigned beehives)
@@ -202,7 +216,9 @@
 | Rate limiting | Fixed-window per IP: login/register 5/min, refresh 20/min, parse-voice 10/min |
 | Health check | `GET /health` (liveness, used by Render) |
 | CORS | `AllowedOrigins` config (comma-separated), overridable via env var |
-| API docs | Swagger UI at `/swagger` (all environments) |
+| API docs | Swagger UI at `/swagger` — **Development only** (not exposed in production) |
+| Security headers | `SecurityHeadersMiddleware` (nosniff, DENY framing, Referrer/Permissions-Policy, CSP) on the API; HSTS + SPA headers in nginx |
+| Reverse proxy | `UseForwardedHeaders` restores the real client IP — rate limiting partitions per client, not per proxy |
 | Frontend caching | TanStack Query v5; 30 s notification polling; PWA (Workbox NetworkFirst, 24 h) |
 | Localization | UI + API `*Name` fields + notifications in Bosnian (`BsLabels` backend, label maps frontend) |
 | Tests | `Melarium.Application.Tests` (xunit + NSubstitute): AccessGuard authorization matrix, Diet state machine, refresh-token rotation |

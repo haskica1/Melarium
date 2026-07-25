@@ -9,14 +9,14 @@ import {
 } from '../../core/services/learningQueries'
 import { MonthLabels } from '../../core/models'
 import type { AdminLearningTopic } from '../../core/models'
-import { ConfirmDialog, EmptyState, VitalsSkeleton } from '../../shared/components'
+import { ConfirmDialog, EmptyState, ErrorState, VitalsSkeleton } from '../../shared/components'
 import { useToast } from '../../core/context/ToastContext'
 
 export default function LearningTopicsAdminPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
 
-  const { data: topics = [], isLoading } = useAdminLearningTopics()
+  const { data: topics = [], isLoading, isError, refetch } = useAdminLearningTopics()
   const setPublished = useSetTopicPublished()
   const deleteTopic = useDeleteLearningTopic()
 
@@ -79,7 +79,9 @@ export default function LearningTopicsAdminPage() {
 
       {isLoading && <VitalsSkeleton />}
 
-      {!isLoading && topics.length === 0 && (
+      {isError && <ErrorState message="Greška pri učitavanju tema." onRetry={refetch} />}
+
+      {!isLoading && !isError && topics.length === 0 && (
         <EmptyState
           title="Još nema tema."
           description="Kreirajte prvu edukativnu temu — možete krenuti od AI nacrta."

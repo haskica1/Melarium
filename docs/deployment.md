@@ -13,7 +13,7 @@ Internet
 nginx (host, ports 80/443, Let's Encrypt TLS)
    ├── /              -> static files: frontend/dist (built React SPA)
    ├── /api/          -> proxy -> 127.0.0.1:5080 (Docker: api container, port 8080)
-   ├── /swagger/, /health -> proxy -> 127.0.0.1:5080
+   ├── /health        -> proxy -> 127.0.0.1:5080
    │
    └── Docker network
          ├── api container (Melarium.API, backend/Dockerfile)
@@ -184,8 +184,15 @@ installs — verify with `systemctl status certbot.timer`.
 - Open `https://melarium.app` — SPA loads, PWA manifest/icons work.
 - Log in, exercise a core flow (create an apiary/beehive, run an inspection).
 - `https://melarium.app/health` → `Healthy`.
-- `https://melarium.app/swagger` → Swagger UI (remove the `/swagger/` location from the
-  nginx config once you don't need it public anymore).
+- `https://melarium.app/swagger` → **404 expected**. Swagger is Development-only; in production
+  it would publish the whole API surface, every schema and every admin route to anonymous callers.
+  Use the local dev server (`dotnet run` → `http://localhost:62648/swagger`) to explore the API.
+- Confirm the security headers are live:
+  `curl -sI https://melarium.app | grep -i 'strict-transport\|x-frame\|x-content-type'`
+- Confirm rate limiting sees real client IPs: hit `POST /api/auth/login` with bad credentials
+  6× in a minute from one machine — the 6th must return `429`, and a *different* machine must
+  still be able to log in. If the second machine is also blocked, `UseForwardedHeaders` is not
+  taking effect and every client is sharing one bucket.
 
 ## 9. Backups
 
@@ -212,3 +219,24 @@ chmod +x deploy/deploy.sh   # once
 
 This pulls the latest commit, rebuilds and restarts the `api` container, rebuilds the
 frontend, syncs it to `/var/www/melarium/frontend`, and reloads nginx.
+
+### One-time: uploads volume ownership (non-root container)
+
+The API container now runs as the unprivileged user `1654` instead of root. A **newly created**
+`uploads-data` volume inherits the right ownership from the image, but a volume that already
+exists from an earlier deploy is still owned by root — the container would fail to write new
+inspection photos.
+
+Run this **once**, after the first deploy that includes the non-root Dockerfile:
+
+```bash
+cd /opt/melarium
+docker compose run --rm --user root api chown -R 1654:1654 /app/uploads
+docker compose up -d api
+```
+
+Then verify by uploading a photo to an inspection. If it fails, check the container logs:
+
+```bash
+docker compose logs --tail=50 api
+```

@@ -14,13 +14,20 @@ public class OrgManagementService : IOrgManagementService
     private readonly INotificationService _notifications;
     private readonly ICurrentUser _currentUser;
     private readonly IPlanGuard _plan;
+    private readonly ISessionRevoker _sessions;
 
-    public OrgManagementService(IUnitOfWork uow, INotificationService notifications, ICurrentUser currentUser, IPlanGuard plan)
+    public OrgManagementService(
+        IUnitOfWork uow,
+        INotificationService notifications,
+        ICurrentUser currentUser,
+        IPlanGuard plan,
+        ISessionRevoker sessions)
     {
         _uow           = uow;
         _notifications = notifications;
         _currentUser   = currentUser;
         _plan          = plan;
+        _sessions      = sessions;
     }
 
     public async Task<IEnumerable<OrgMemberDto>> GetMembersAsync()
@@ -28,12 +35,11 @@ public class OrgManagementService : IOrgManagementService
         if (_currentUser.OrganizationId is not int orgId)
             return [];
 
-        // AssignedBeehives (+ Beehive names) are included by the repository — one query
-        // for all members instead of an extra round-trip per Beekeeper.
-        var users = await _uow.Users.GetAllWithOrganizationAsync();
+        // Scoped in SQL. This used to load every user on the platform and filter in memory, so an
+        // organisation's member list got slower as *other* tenants signed up.
+        var users = await _uow.Users.GetByOrganizationWithDetailsAsync(orgId);
         return users
-            .Where(u => u.OrganizationId == orgId &&
-                        u.Role is UserRole.Beekeeper or UserRole.ApiaryAdmin)
+            .Where(u => u.Role is UserRole.Beekeeper or UserRole.ApiaryAdmin)
             .Select(MapMember)
             .ToList();
     }
@@ -145,6 +151,11 @@ public class OrgManagementService : IOrgManagementService
         var oldApiaryId = member.ApiaryId;
         member.ApiaryId = dto.ApiaryId;
         await _uow.Users.UpdateAsync(member);
+
+        // apiaryId is a JWT claim — an existing session would keep pointing at the old apiary.
+        if (dto.ApiaryId != oldApiaryId)
+            await _sessions.RevokeAllAsync(memberId);
+
         await _uow.SaveChangesAsync();
 
         // Notify admin of apiary assignment change

@@ -83,6 +83,22 @@ export const authService = {
     return data.token
   },
 
+  /**
+   * Requests a password-reset link. Always resolves — the API deliberately answers the same way
+   * for registered and unregistered addresses, so the UI must not branch on the result.
+   */
+  async forgotPassword(email: string): Promise<void> {
+    await authApi.post('/auth/forgot-password', { email })
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    await authApi.post('/auth/reset-password', { token, newPassword })
+  },
+
+  async verifyEmail(token: string): Promise<void> {
+    await authApi.post('/auth/verify-email', { token })
+  },
+
   logout(): void {
     const refreshToken = this.getRefreshToken()
     // Best-effort server-side revocation — don't block the UI on it.

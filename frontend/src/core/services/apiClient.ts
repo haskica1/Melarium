@@ -58,6 +58,19 @@ function hardLogout(): void {
   }
 }
 
+/**
+ * Controllers reject invalid input with `BadRequest(validation.ToDictionary())`, whose body is a
+ * flat `{ Field: ["message", …] }` map — not the Problem-Details shape the middleware emits. Without
+ * this, every validation failure surfaced as "Request failed with status code 400".
+ */
+function firstValidationMessage(data: unknown): string | undefined {
+  if (typeof data !== 'object' || data === null) return undefined
+  for (const value of Object.values(data as Record<string, unknown>)) {
+    if (Array.isArray(value) && typeof value[0] === 'string') return value[0]
+  }
+  return undefined
+}
+
 // On 401: try to rotate the refresh token once and replay the request; otherwise sign out.
 apiClient.interceptors.response.use(
   (response) => response,
@@ -90,6 +103,7 @@ apiClient.interceptors.response.use(
     // downstream; read `err.message`.
     const message =
       error.response?.data?.errors?.detail?.[0] ??
+      firstValidationMessage(error.response?.data) ??
       error.response?.data?.title ??
       error.response?.data?.message ??
       error.message ??

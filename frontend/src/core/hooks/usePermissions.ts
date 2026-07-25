@@ -32,6 +32,11 @@ export function usePermissions() {
     // Kept for backward compatibility in components that already use this name
     canEditDelete: isSystemAdmin || isOrgAdmin || isAdmin,
 
+    // Navigation visibility — lives here so Layout and Sidebar don't re-derive role rules.
+    canSeeExpenses: isSystemAdmin || isOrgAdmin || isAdmin,
+    canManageMembers: isOrgAdmin || isAdmin,
+    canSeePastures: isOrgAdmin || isSystemAdmin,
+
     isSystemAdmin,
     isOrgAdmin,
     isAdmin,

@@ -33,7 +33,8 @@ export default function AdvisorPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
 
-  const { data: conversations = [], isLoading: listLoading } = useAdvisorConversations()
+  const { data: conversations = [], isLoading: listLoading, isError: listError, refetch: refetchList } =
+    useAdvisorConversations()
   const { data: detail } = useAdvisorConversation(activeId ?? 0)
   const { data: newHive } = useBeehive(newBeehiveId ?? 0)
   const createMut = useCreateAdvisorConversation()
@@ -121,6 +122,16 @@ export default function AdvisorPage() {
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {listLoading ? (
               <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-honey-500" /></div>
+            ) : listError ? (
+              <div className="px-4 py-8 text-center">
+                <p className="text-sm text-red-600 dark:text-red-400">Greška pri učitavanju razgovora.</p>
+                <button
+                  onClick={() => refetchList()}
+                  className="mt-2 text-xs font-medium text-honey-600 dark:text-honey-400 hover:underline"
+                >
+                  Pokušaj ponovo
+                </button>
+              </div>
             ) : conversations.length === 0 ? (
               <p className="text-center text-sm text-gray-400 dark:text-slate-500 py-8 px-4">Još nema razgovora. Započnite novi.</p>
             ) : (

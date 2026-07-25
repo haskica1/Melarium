@@ -60,8 +60,11 @@ export const learningService = {
     return data
   },
 
+  /** Groq drafts a full article — matches the backend's 60 s budget, not apiClient's 10 s default. */
   async adminGenerateDraft(payload: GenerateDraftPayload): Promise<LearningDraft> {
-    const { data } = await apiClient.post<LearningDraft>('/admin/learning-topics/generate-draft', payload)
+    const { data } = await apiClient.post<LearningDraft>('/admin/learning-topics/generate-draft', payload, {
+      timeout: 60_000,
+    })
     return data
   },
 }

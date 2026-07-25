@@ -6,6 +6,7 @@ import { ArrowRight, Building2, Eye, EyeOff, Loader2, Lock, Mail, Moon, Sun, Use
 import clsx from 'clsx'
 import { useAuth } from '../../core/context/AuthContext'
 import { useTheme } from '../../core/hooks/useTheme'
+import { getServerError } from './authErrors'
 
 interface RegisterForm {
   firstName: string
@@ -34,22 +35,6 @@ function fieldClass(hasError: boolean) {
       ? 'border-red-400 focus:ring-2 focus:ring-red-200 dark:focus:ring-red-500/30'
       : 'border-gray-200 dark:border-slate-700 focus:border-honey-400 focus:ring-2 focus:ring-honey-100 dark:focus:ring-honey-500/20',
   )
-}
-
-// Pulls the most useful message out of the backend error shape
-// ({ title, errors: { detail | <field>: [...] } }).
-function getServerError(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    if (err.response?.status === 429)
-      return 'Previše pokušaja. Pričekajte minutu pa pokušajte ponovo.'
-    const data = err.response?.data as { title?: string; errors?: Record<string, string[]> } | undefined
-    const detail = data?.errors?.detail?.[0]
-    if (detail) return detail
-    const firstField = data?.errors && Object.values(data.errors)[0]?.[0]
-    if (firstField) return firstField
-    if (data?.title) return data.title
-  }
-  return 'Registracija neuspješna. Pokušajte ponovo.'
 }
 
 export default function RegisterPage() {
@@ -86,7 +71,7 @@ export default function RegisterPage() {
         setError('email', { message: 'Korisnik s ovom e-poštom već postoji.' })
         return
       }
-      setServerError(getServerError(err))
+      setServerError(getServerError(err, 'Registracija neuspješna. Pokušajte ponovo.'))
     }
   }
 

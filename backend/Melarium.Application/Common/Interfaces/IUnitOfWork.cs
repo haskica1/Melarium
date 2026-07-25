@@ -24,6 +24,7 @@ public interface IUnitOfWork : IDisposable
     IApiaryMoveRepository ApiaryMoves { get; }
     INotificationRepository Notifications { get; }
     IRefreshTokenRepository RefreshTokens { get; }
+    IUserTokenRepository UserTokens { get; }
     IAdvisorConversationRepository AdvisorConversations { get; }
     ICalendarSettingsRepository CalendarSettings { get; }
 

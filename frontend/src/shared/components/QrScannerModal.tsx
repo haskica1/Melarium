@@ -4,6 +4,7 @@ import { X, AlertCircle, Camera, Upload, Loader2, QrCode, Hash, SearchX, Chevron
 import { BrowserQRCodeReader, IScannerControls } from '@zxing/browser'
 import { beehiveService } from '../../core/services/beehiveService'
 import { downscaleForScan } from '../utils/imageDownscale'
+import { useDialogBehavior } from '../hooks/useDialogBehavior'
 import type { BeehiveNumberMatchResult } from '../../core/models'
 
 interface Props {
@@ -62,6 +63,9 @@ async function runDigitOcr(image: Blob): Promise<{ number: string | null; confid
 }
 
 export default function QrScannerModal({ onClose }: Props) {
+  // Rendered only while open, so `open` is constant true here.
+  const { panelProps } = useDialogBehavior({ open: true, onClose })
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const controlsRef = useRef<IScannerControls | null>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -194,7 +198,9 @@ export default function QrScannerModal({ onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-sm mx-4 mb-4 sm:mb-0 rounded-2xl overflow-hidden bg-slate-900 shadow-2xl"
+        {...panelProps}
+        aria-label="Skeniraj košnicu"
+        className="relative w-full max-w-sm mx-4 mb-4 sm:mb-0 rounded-2xl overflow-hidden bg-slate-900 shadow-2xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Tabs + close */}

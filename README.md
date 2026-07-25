@@ -33,7 +33,7 @@ docs/                       ← architecture, decisions (ADRs), API contracts, g
 
 ## Running Locally
 
-**Backend** (http://localhost:62648, Swagger at `/swagger`):
+**Backend** (http://localhost:62648, Swagger at `/swagger` — Development only):
 
 ```bash
 cd backend/Melarium.API

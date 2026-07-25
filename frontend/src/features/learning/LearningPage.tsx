@@ -4,7 +4,7 @@ import { CheckCircle2, GraduationCap, Paperclip, Video } from 'lucide-react'
 import { useLearningTopics } from '../../core/services/learningQueries'
 import { LearningCategory, LearningCategoryLabels, MonthLabels } from '../../core/models'
 import type { LearningTopicSummary } from '../../core/models'
-import { EmptyState, VitalsSkeleton } from '../../shared/components'
+import { EmptyState, ErrorState, VitalsSkeleton } from '../../shared/components'
 
 const CATEGORIES = Object.values(LearningCategory).filter(v => typeof v === 'number') as LearningCategory[]
 
@@ -15,7 +15,7 @@ const MONTH_LOCATIVE = [
 ] as const
 
 export default function LearningPage() {
-  const { data: topics = [], isLoading } = useLearningTopics()
+  const { data: topics = [], isLoading, isError, refetch } = useLearningTopics()
   const [category, setCategory] = useState<LearningCategory | 0>(0)
 
   const currentMonth = new Date().getMonth() + 1
@@ -74,7 +74,9 @@ export default function LearningPage() {
 
       {isLoading && <VitalsSkeleton />}
 
-      {!isLoading && topics.length === 0 && (
+      {isError && <ErrorState message="Greška pri učitavanju edukacije." onRetry={refetch} />}
+
+      {!isLoading && !isError && topics.length === 0 && (
         <EmptyState
           title="Još nema objavljenih tema."
           description="Edukativne teme objavljuje administrator platforme."

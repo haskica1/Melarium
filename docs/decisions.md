@@ -380,3 +380,54 @@ SystemAdmin-only and never shown in public UI/checkout.
 - Immediate Stripe/monthly billing — impossible for BiH now; Paddle deferred to Phase 2 with the
   two-field seam already in place.
 - Hardcoded limits — rejected; config keeps pricing/limits editable without a rebuild.
+
+---
+
+## ADR-029: Emailed Single-Use Tokens for Password Reset & Email Verification; Revoke Sessions on Trust Change
+
+**Status:** Accepted
+
+**Context:** The app shipped to production with no password recovery at all — a user who forgot
+their password was permanently locked out, recoverable only by a SystemAdmin editing the account by
+hand. Separately, a password change left every existing refresh token valid for its full 14 days, so
+"I changed my password" did not actually evict an attacker.
+
+**Decision:**
+- One `UserToken` table with a `UserTokenPurpose` discriminator (`PasswordReset`,
+  `EmailVerification`) rather than a table per flow. The lifecycle is identical — issue → email →
+  redeem once → expire — and `(TokenHash, Purpose)` is the unique lookup, so a verification link can
+  never be redeemed as a password reset.
+- Only the SHA-256 hash is stored, mirroring `RefreshToken` (ADR-017). A leaked database row is not
+  a usable link.
+- Issuing a new token invalidates the user's outstanding ones of that purpose, so an older email
+  cannot be replayed.
+- `POST /auth/forgot-password` always returns 204. Any observable difference between a registered
+  and unregistered address turns the endpoint into an account-enumeration oracle.
+- `ISessionRevoker` centralises "end this user's sessions" and is called from password reset,
+  profile password change, and any change to role / organisation / apiary — the three privileges
+  carried in the JWT. Beehive assignments are resolved per request from the database, so they need
+  no revocation.
+- Failed login returns **401** with one message and one cost for both branches (a dummy BCrypt
+  verify runs when the email is unknown, so timing does not leak existence).
+- **Email verification is soft**: recorded, surfaced, never enforced at login. Its migration
+  backfills every pre-existing account as verified.
+
+**Why:**
+- **Soft verification, grandfathered:** the app was already live. Enforcing verification — or
+  leaving existing rows null — would have locked out the entire user base on deploy. The flag can be
+  tightened later once adoption is real; the reverse is not recoverable.
+- **Revoke-all on password change over revoke-others:** keeping the current session alive needs the
+  caller's refresh token, which the profile endpoint does not receive. Signing everyone out is the
+  safe default; the client handles it by logging out and prompting a fresh sign-in.
+- **Reset also marks the address verified:** receiving the reset mail already proves control of the
+  mailbox — asking for a second confirmation would be theatre.
+- **Reuse the background email queue (ADR-021):** SMTP stays off the request path, so a slow or
+  broken mail server cannot fail a password-reset request.
+
+**Alternatives considered:**
+- Separate `PasswordResetToken` / `EmailVerificationToken` tables — rejected as near-duplicate
+  schema, config and repository code for one differing field.
+- Storing tokens in plaintext for re-display — rejected; the "secret address" model only suits the
+  calendar feed (ADR-011 scope), not a credential that can change a password.
+- 404/400 on unknown address in forgot-password — rejected (account enumeration).
+- Blocking login for unverified accounts — deferred; see the grandfathering rationale above.

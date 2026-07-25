@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { ArrowLeft, CloudOff, CreditCard, LogOut, Menu, Moon, QrCode, Search, Settings, Sun, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../../core/context/AuthContext'
+import { usePermissions } from '../../core/hooks/usePermissions'
 import { useTheme } from '../../core/hooks/useTheme'
 import { useOnlineStatus } from '../../core/hooks/useOnlineStatus'
 import { useOutbox } from '../../core/hooks/useOutbox'
@@ -11,6 +12,7 @@ import QrScannerModal from './QrScannerModal'
 import NotificationBell from './NotificationBell'
 import { CommandPalette } from './CommandPalette'
 import { Sidebar, getNavItems, type NavRoleFlags } from './Sidebar'
+import { ErrorBoundary } from './ErrorBoundary'
 
 // Root/landing pages never show a back arrow, even if browser history technically allows it.
 const ROOT_PATHS = ['/apiaries', '/admin']
@@ -31,13 +33,13 @@ export default function Layout() {
   const online = useOnlineStatus()
   const outboxItems = useOutbox(user?.email)
 
-  const isSystemAdmin  = user?.role === 'SystemAdmin'
-  const isOrgAdmin     = user?.role === 'OrganizationAdmin'
-  const isAdmin        = user?.role === 'ApiaryAdmin'
-  const canSeeExpenses = isSystemAdmin || isOrgAdmin || isAdmin
+  // Role rules come from usePermissions — this used to re-derive them, so the nav and the pages
+  // could disagree about who sees what.
+  const { isSystemAdmin, isOrgAdmin, isAdmin, canSeeExpenses, canManageMembers, canSeePastures } =
+    usePermissions()
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
-  const navFlags: NavRoleFlags = { isSystemAdmin, isOrgAdmin, isAdmin, canSeeExpenses }
+  const navFlags: NavRoleFlags = { isSystemAdmin, canSeeExpenses, canManageMembers, canSeePastures }
 
   // navigate(-1) mirrors real browser back — re-evaluated on every route change via useLocation().
   const canGoBack = !ROOT_PATHS.includes(pathname) && (window.history.state?.idx ?? 0) > 0
@@ -231,7 +233,7 @@ export default function Layout() {
               </div>
             </div>
 
-            {/* ── Mobile: dark toggle + hamburger ─────────────────────────────── */}
+            {/* ── Mobile: search + notifications + dark toggle + hamburger ────── */}
             <div className="sm:hidden flex items-center gap-1">
               <button
                 onClick={() => setPaletteOpen(true)}
@@ -240,6 +242,9 @@ export default function Layout() {
               >
                 <Search className="w-5 h-5" />
               </button>
+              {/* Smart alerts (frost, overdue inspections, end of karenca) are the reason to open
+                  the app in the field — the bell has to be reachable on a phone, not just desktop. */}
+              <NotificationBell />
               <button
                 onClick={toggleTheme}
                 className="p-2 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-honey-100 dark:hover:bg-slate-800 transition-colors"
@@ -337,7 +342,11 @@ export default function Layout() {
 
         {/* ── Main Content ──────────────────────────────────────────────────────── */}
         <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">
-          <Outlet />
+          {/* Keyed on the path so navigating away clears a crashed page — without the key the
+              boundary would stay in its error state for the rest of the session. */}
+          <ErrorBoundary key={pathname}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
 
         {/* ── Footer ────────────────────────────────────────────────────────────── */}

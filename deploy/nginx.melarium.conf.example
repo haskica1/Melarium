@@ -20,6 +20,42 @@ server {
     # Voice-note / photo uploads (Groq features) can be a few MB.
     client_max_body_size 20m;
 
+    # Don't advertise the exact nginx version.
+    server_tokens off;
+
+    # ── Security headers ─────────────────────────────────────────────────────
+    # `always` so they are sent on error responses too. HSTS lives here rather than
+    # in the API because TLS terminates at this proxy.
+    # Enable HSTS only once HTTPS is confirmed working — it is hard to undo
+    # (browsers cache it for max-age). Start with a short max-age, then raise it.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options    "nosniff"                             always;
+    add_header X-Frame-Options           "DENY"                                always;
+    add_header Referrer-Policy           "strict-origin-when-cross-origin"     always;
+    add_header Permissions-Policy        "geolocation=(self), camera=(self), microphone=(self), payment=()" always;
+
+    # ── Content-Security-Policy — VERIFY IN STAGING BEFORE ENABLING ──────────
+    # Left commented on purpose: a wrong CSP silently breaks features for live users.
+    # The directives below cover everything the SPA currently loads, but each needs
+    # confirming with the browser console open (Pašnjaci map, Skeniraj račun OCR,
+    # Edukacija video embeds, light/dark toggle):
+    #
+    #   'unsafe-inline' (script-src) — index.html's pre-paint theme script. Replace with
+    #                                  a sha256 hash of that script to drop 'unsafe-inline'.
+    #   'wasm-unsafe-eval' + CDN      — tesseract.js fetches its wasm core and language
+    #                                  data at runtime; confirm the exact origin in DevTools.
+    #
+    # add_header Content-Security-Policy "\
+    #   default-src 'self'; \
+    #   script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; \
+    #   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; \
+    #   font-src 'self' https://fonts.gstatic.com; \
+    #   img-src 'self' data: blob: https://*.tile.openstreetmap.org; \
+    #   connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com; \
+    #   worker-src 'self' blob:; \
+    #   frame-src https://www.youtube.com https://youtu.be https://player.vimeo.com; \
+    #   frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+
     # .NET backend running in Docker — see docker-compose.yml (127.0.0.1:5080 -> container:8080)
     location /api/ {
         proxy_pass http://127.0.0.1:5080/api/;
@@ -29,11 +65,9 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location /swagger/ {
-        proxy_pass http://127.0.0.1:5080/swagger/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+    # NOTE: no /swagger/ proxy — Swagger is Development-only (see Program.cs). Exposing the
+    # full API surface, every schema and every admin route to anonymous callers is not
+    # something a production deployment should do.
 
     location /health {
         proxy_pass http://127.0.0.1:5080/health;

@@ -7,14 +7,16 @@ import {
   useDeleteOrganization,
   useDeleteAdminUser,
 } from '../../core/services/adminQueries'
-import { VitalCard, Skeleton, ConfirmDialog } from '../../shared/components'
+import { VitalCard, Skeleton, ConfirmDialog, ErrorState } from '../../shared/components'
 import { useToast } from '../../core/context/ToastContext'
 import { PlanTypeLabels, type AdminOrganization } from '../../core/models'
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate()
-  const { data: organizations = [], isLoading: orgsLoading } = useAdminOrganizations()
-  const { data: users = [], isLoading: usersLoading } = useAdminUsers()
+  const { data: organizations = [], isLoading: orgsLoading, isError: orgsError, refetch: refetchOrgs } =
+    useAdminOrganizations()
+  const { data: users = [], isLoading: usersLoading, isError: usersError, refetch: refetchUsers } =
+    useAdminUsers()
   const deleteOrg = useDeleteOrganization()
   const deleteUser = useDeleteAdminUser()
   const { toast } = useToast()
@@ -116,6 +118,8 @@ export default function AdminDashboardPage() {
       >
         {orgsLoading ? (
           <SpinnerRow />
+        ) : orgsError ? (
+          <ErrorState message="Greška pri učitavanju organizacija." onRetry={refetchOrgs} />
         ) : organizations.length === 0 ? (
           <EmptyRow icon={<Building2 className="w-8 h-8 text-honey-300 dark:text-honey-500/40 mx-auto mb-2" />} text="Nema organizacija." />
         ) : filteredOrgs.length === 0 ? (
@@ -171,6 +175,8 @@ export default function AdminDashboardPage() {
       >
         {usersLoading ? (
           <SpinnerRow />
+        ) : usersError ? (
+          <ErrorState message="Greška pri učitavanju korisnika." onRetry={refetchUsers} />
         ) : users.length === 0 ? (
           <EmptyRow icon={<Users className="w-8 h-8 text-honey-300 dark:text-honey-500/40 mx-auto mb-2" />} text="Nema korisnika." />
         ) : filteredUsers.length === 0 ? (

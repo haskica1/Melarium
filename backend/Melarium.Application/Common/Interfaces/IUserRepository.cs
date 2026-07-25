@@ -1,4 +1,5 @@
 using Melarium.Domain.Entities;
+using Melarium.Domain.Enums;
 
 namespace Melarium.Application.Common.Interfaces;
 
@@ -6,7 +7,18 @@ namespace Melarium.Application.Common.Interfaces;
 public interface IUserRepository : IRepository<User>
 {
     Task<User?> GetByEmailAsync(string email);
+    /// <summary>Every user on the platform. SystemAdmin screens only — see the org-scoped overload below.</summary>
     Task<IEnumerable<User>> GetAllWithOrganizationAsync();
+
+    /// <summary>
+    /// One organisation's users, with the same includes as <see cref="GetAllWithOrganizationAsync"/>.
+    /// Org-scoped screens must use this: filtering the platform-wide list in memory grows with the
+    /// number of tenants rather than the caller's own data.
+    /// </summary>
+    Task<IEnumerable<User>> GetByOrganizationWithDetailsAsync(int organizationId);
+
+    /// <summary>Number of users holding the given role, platform-wide.</summary>
+    Task<int> CountByRoleAsync(UserRole role);
     Task<User?> GetByIdWithOrganizationAsync(int id);
     Task<User?> GetByIdWithAssignedBeehivesAsync(int id);
     Task<bool> IsUserAssignedToBeehiveAsync(int userId, int beehiveId);

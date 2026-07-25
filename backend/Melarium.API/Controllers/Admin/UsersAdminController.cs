@@ -1,6 +1,7 @@
 using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Admin;
 using Melarium.Application.Features.Admin.DTOs;
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,10 +17,17 @@ namespace Melarium.API.Controllers.Admin;
 public class UsersAdminController : ControllerBase
 {
     private readonly IAdminService _service;
+    private readonly IValidator<CreateAdminUserDto> _createValidator;
+    private readonly IValidator<UpdateAdminUserDto> _updateValidator;
 
-    public UsersAdminController(IAdminService service)
+    public UsersAdminController(
+        IAdminService service,
+        IValidator<CreateAdminUserDto> createValidator,
+        IValidator<UpdateAdminUserDto> updateValidator)
     {
         _service = service;
+        _createValidator = createValidator;
+        _updateValidator = updateValidator;
     }
 
     [HttpGet]
@@ -44,15 +52,24 @@ public class UsersAdminController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateUser([FromBody] CreateAdminUserDto dto)
     {
+        var validation = await _createValidator.ValidateAsync(dto);
+        if (!validation.IsValid)
+            return BadRequest(validation.ToDictionary());
+
         var created = await _service.CreateUserAsync(dto);
         return CreatedAtAction(nameof(GetUser), new { id = created.Id }, created);
     }
 
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateAdminUserDto dto)
     {
+        var validation = await _updateValidator.ValidateAsync(dto);
+        if (!validation.IsValid)
+            return BadRequest(validation.ToDictionary());
+
         var updated = await _service.UpdateUserAsync(id, dto);
         return Ok(updated);
     }

@@ -2,13 +2,14 @@ import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Loader2 } from 'lucide-react'
 import { CollapsibleSection } from '../../shared/components/CollapsibleSection'
+import { ErrorMessage } from '../../shared/components'
 import { useHarvests } from '../../core/services/harvestQueries'
 
 const fmtKg = (kg: number) => `${kg.toFixed(1).replace(/\.0$/, '')} kg`
 
 /** "Vrcanja" section for the apiary detail page — this apiary's harvests, newest first (SPEC-02). */
 export function ApiaryHarvestsSection({ apiaryId }: { apiaryId: number }) {
-  const { data: harvests = [], isLoading } = useHarvests({ apiaryId })
+  const { data: harvests = [], isLoading, isError } = useHarvests({ apiaryId })
 
   const totalKg = harvests.reduce((s, h) => s + h.totalKg, 0)
 
@@ -26,6 +27,8 @@ export function ApiaryHarvestsSection({ apiaryId }: { apiaryId: number }) {
     >
       {isLoading ? (
         <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-honey-500" /></div>
+      ) : isError ? (
+        <ErrorMessage message="Greška pri učitavanju vrcanja za ovaj pčelinjak." />
       ) : harvests.length === 0 ? (
         <p className="text-center py-6 text-sm text-gray-400 dark:text-slate-500">Još nema evidencije vrcanja za ovaj pčelinjak.</p>
       ) : (

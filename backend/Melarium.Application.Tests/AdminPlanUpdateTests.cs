@@ -1,4 +1,5 @@
 using Melarium.Application.Common.Interfaces;
+using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Admin;
 using Melarium.Application.Features.Admin.DTOs;
 using Melarium.Application.Features.Notifications;
@@ -18,7 +19,7 @@ public class AdminPlanUpdateTests
 
     public AdminPlanUpdateTests()
     {
-        _service = new AdminService(_uow, Substitute.For<INotificationService>());
+        _service = new AdminService(_uow, Substitute.For<INotificationService>(), new SessionRevoker(_uow));
     }
 
     [Fact]

@@ -32,6 +32,7 @@ public class UnitOfWork : IUnitOfWork
     private IApiaryMoveRepository? _apiaryMoves;
     private INotificationRepository? _notifications;
     private IRefreshTokenRepository? _refreshTokens;
+    private IUserTokenRepository? _userTokens;
     private IAdvisorConversationRepository? _advisorConversations;
     private ICalendarSettingsRepository? _calendarSettings;
 
@@ -96,6 +97,9 @@ public class UnitOfWork : IUnitOfWork
 
     public IRefreshTokenRepository RefreshTokens =>
         _refreshTokens ??= new RefreshTokenRepository(_context);
+
+    public IUserTokenRepository UserTokens =>
+        _userTokens ??= new UserTokenRepository(_context);
 
     public IAdvisorConversationRepository AdvisorConversations =>
         _advisorConversations ??= new AdvisorConversationRepository(_context);

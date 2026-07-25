@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import { Crosshair, MapPin, X } from 'lucide-react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { useDialogBehavior } from '../hooks/useDialogBehavior'
 
 // Fix Leaflet's broken default icons when bundled with Vite
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -41,6 +42,9 @@ function ClickHandler({ onPick }: { onPick: (ll: LatLng) => void }) {
 }
 
 export default function LocationPickerModal({ initialLat, initialLng, onConfirm, onClose }: Props) {
+  // Rendered only while open, so `open` is constant true here.
+  const { panelProps } = useDialogBehavior({ open: true, onClose })
+
   const hasInitial = initialLat != null && initialLng != null
   const [pin, setPin] = useState<LatLng | null>(
     hasInitial ? { lat: initialLat!, lng: initialLng! } : null
@@ -88,7 +92,9 @@ export default function LocationPickerModal({ initialLat, initialLng, onConfirm,
       onClick={e => e.stopPropagation()}
     >
       <div
-        className="relative flex flex-col w-full max-w-2xl mx-0 sm:mx-4 bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
+        {...panelProps}
+        aria-label="Odaberi lokaciju pčelinjaka"
+        className="relative flex flex-col w-full max-w-2xl mx-0 sm:mx-4 bg-white dark:bg-slate-900 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden outline-none"
         style={{ height: '85dvh', maxHeight: 640 }}
       >
         {/* Header */}

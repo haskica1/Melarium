@@ -13,7 +13,7 @@ import {
 import {
   LoadingSpinner,
   PageSkeleton,
-  ErrorMessage,
+  ErrorState,
   EmptyState,
   ConfirmDialog,
   VitalCard,
@@ -26,6 +26,7 @@ import { ApiaryMovesSection } from '../pastures/ApiaryMovesSection'
 import { useApiaryMoves } from '../../core/services/pastureQueries'
 import type { Beehive, DailyWeather } from '../../core/models'
 import { usePermissions } from '../../core/hooks/usePermissions'
+import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
 
 // ── WMO weather code → emoji + label ─────────────────────────────────────────
 
@@ -105,7 +106,7 @@ export default function ApiaryDetailPage() {
   const apiaryId = Number(id)
 
   const { canManageApiaries, canManageHives, canManageApiaryTodos, canEditDelete } = usePermissions()
-  const { data: apiary, isLoading, error } = useApiary(apiaryId)
+  const { data: apiary, isLoading, isError, refetch } = useApiary(apiaryId)
   const { data: weather, isLoading: weatherLoading } = useApiaryWeather(
     apiaryId,
     apiary?.hasLocation ?? false,
@@ -127,6 +128,7 @@ export default function ApiaryDetailPage() {
   const [qrAllOpen, setQrAllOpen] = useState(false)
   const [qrAllSize, setQrAllSize] = useState({ w: 60, h: 60 })
   const [qrAllLoading, setQrAllLoading] = useState(false)
+  const qrDialog = useDialogBehavior({ open: qrAllOpen, onClose: () => setQrAllOpen(false) })
 
   // QR codes are not part of the list payload — fetch them only when the user exports.
   const handleQrExport = async () => {
@@ -148,7 +150,7 @@ export default function ApiaryDetailPage() {
   }
 
   if (isLoading) return <PageSkeleton />
-  if (error) return <ErrorMessage message={error.message} />
+  if (isError) return <ErrorState message="Greška pri učitavanju pčelinjaka." onRetry={refetch} />
   if (!apiary) return null
 
   // Use local date (not UTC) — Open-Meteo returns dates in the location's timezone
@@ -563,7 +565,11 @@ export default function ApiaryDetailPage() {
       {qrAllOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setQrAllOpen(false)} />
-          <div className="relative bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl p-8 max-w-sm w-full animate-fade-in">
+          <div
+            {...qrDialog.panelProps}
+            aria-label="Preuzmi QR kodove"
+            className="relative bg-white dark:bg-slate-900 dark:border dark:border-slate-800 rounded-2xl shadow-2xl p-8 max-w-sm w-full animate-fade-in outline-none"
+          >
             <div className="text-center mb-4">
               <h2 className="font-display text-xl font-bold text-gray-800 dark:text-slate-100">Preuzmi QR kodove</h2>
               <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">{apiary.name}</p>

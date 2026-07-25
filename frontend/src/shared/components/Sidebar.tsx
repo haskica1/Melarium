@@ -6,11 +6,12 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 
+/** Subset of `usePermissions()` the nav needs — passed in so the item list stays a pure function. */
 export interface NavRoleFlags {
   isSystemAdmin: boolean
-  isOrgAdmin: boolean
-  isAdmin: boolean
   canSeeExpenses: boolean
+  canManageMembers: boolean
+  canSeePastures: boolean
 }
 
 export interface NavItemDef {
@@ -25,8 +26,8 @@ export function getNavItems(flags: NavRoleFlags): NavItemDef[] {
     flags.isSystemAdmin
       ? { to: '/admin', icon: <LayoutDashboard className="w-4 h-4" />, label: 'Kontrolna ploča', visible: true }
       : { to: '/apiaries', icon: <Home className="w-4 h-4" />, label: 'Pčelinjaci', visible: true },
-    { to: '/members', icon: <Users className="w-4 h-4" />, label: 'Članovi', visible: flags.isOrgAdmin || flags.isAdmin },
-    { to: '/pastures', icon: <Tent className="w-4 h-4" />, label: 'Pašnjaci', visible: flags.isOrgAdmin || flags.isSystemAdmin },
+    { to: '/members', icon: <Users className="w-4 h-4" />, label: 'Članovi', visible: flags.canManageMembers },
+    { to: '/pastures', icon: <Tent className="w-4 h-4" />, label: 'Pašnjaci', visible: flags.canSeePastures },
     { to: '/expenses', icon: <ReceiptText className="w-4 h-4" />, label: 'Troškovi', visible: flags.canSeeExpenses },
     { to: '/harvests', icon: <Droplets className="w-4 h-4" />, label: 'Vrcanja', visible: true },
     { to: '/treatments', icon: <Pill className="w-4 h-4" />, label: 'Tretmani', visible: true },

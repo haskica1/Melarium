@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Loader2 } from 'lucide-react'
 import { CollapsibleSection } from '../../shared/components/CollapsibleSection'
+import { ErrorMessage } from '../../shared/components'
 import { useTreatments } from '../../core/services/treatmentQueries'
 import { TreatmentStatus } from '../../core/models'
 
@@ -13,7 +14,7 @@ const STATUS_STYLE: Record<TreatmentStatus, string> = {
 
 /** "Tretmani" section for the apiary detail page — this apiary's treatments, newest first (SPEC-08). */
 export function ApiaryTreatmentsSection({ apiaryId }: { apiaryId: number }) {
-  const { data: treatments = [], isLoading } = useTreatments({ apiaryId })
+  const { data: treatments = [], isLoading, isError } = useTreatments({ apiaryId })
 
   const sorted = [...treatments].sort((a, b) => b.startDate.localeCompare(a.startDate))
 
@@ -31,6 +32,8 @@ export function ApiaryTreatmentsSection({ apiaryId }: { apiaryId: number }) {
     >
       {isLoading ? (
         <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-honey-500" /></div>
+      ) : isError ? (
+        <ErrorMessage message="Greška pri učitavanju tretmana za ovaj pčelinjak." />
       ) : sorted.length === 0 ? (
         <p className="text-center py-6 text-sm text-gray-400 dark:text-slate-500">Još nema evidencije tretmana za ovaj pčelinjak.</p>
       ) : (

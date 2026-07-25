@@ -94,8 +94,11 @@ export default function NotificationBell() {
         )}
       </button>
 
+      {/* On phones the bell is not at the screen edge, so anchoring the panel to the button
+          (right-0) pushes it off the left side. Pin it to the viewport below the header instead,
+          and only switch to button-anchored from `sm` up, where there is room. */}
       {open && (
-        <div className="absolute right-0 top-11 w-80 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 overflow-hidden animate-fade-in z-50">
+        <div className="fixed left-3 right-3 top-16 sm:absolute sm:left-auto sm:right-0 sm:top-11 sm:w-80 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 overflow-hidden animate-fade-in z-50">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-800">
             <span className="text-sm font-semibold text-gray-800 dark:text-slate-100">Obavještenja</span>

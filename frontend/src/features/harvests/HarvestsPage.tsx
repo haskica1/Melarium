@@ -5,7 +5,7 @@ import { Droplets, Loader2, PencilLine, Plus, Trash2, X } from 'lucide-react'
 import { useHarvests, useDeleteHarvest } from '../../core/services/harvestQueries'
 import { HoneyTypeLabels } from '../../core/models'
 import type { Harvest } from '../../core/models'
-import { VitalCard, VitalsSkeleton, ConfirmDialog, EmptyState } from '../../shared/components'
+import { VitalCard, VitalsSkeleton, ConfirmDialog, EmptyState, ErrorState } from '../../shared/components'
 import { usePermissions } from '../../core/hooks/usePermissions'
 import { useToast } from '../../core/context/ToastContext'
 
@@ -25,7 +25,7 @@ export default function HarvestsPage() {
   const beehiveId = Number(searchParams.get('beehiveId')) || undefined
 
   const [year, setYear] = useState<number>(CURRENT_YEAR)
-  const { data: harvests = [], isLoading } = useHarvests({ year, beehiveId })
+  const { data: harvests = [], isLoading, isError, refetch } = useHarvests({ year, beehiveId })
   const deleteHarvest = useDeleteHarvest()
 
   const [confirmTarget, setConfirmTarget] = useState<Harvest | null>(null)
@@ -118,7 +118,9 @@ export default function HarvestsPage() {
 
       {isLoading && <VitalsSkeleton />}
 
-      {!isLoading && harvests.length === 0 && (
+      {isError && <ErrorState message="Greška pri učitavanju vrcanja." onRetry={refetch} />}
+
+      {!isLoading && !isError && harvests.length === 0 && (
         <EmptyState
           title="Još nema evidencije vrcanja."
           description={`Za ${year}. godinu nema zabilježenih vrcanja.`}
