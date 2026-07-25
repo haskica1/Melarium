@@ -68,7 +68,8 @@ startup if a required value is missing.
 |---|---|---|---|
 | `ConnectionStrings:DefaultConnection` | PostgreSQL | `appsettings.Development.json` | `ConnectionStrings__DefaultConnection` |
 | `Jwt:Secret` | HS256 signing key (≥ 32 chars) | dev-only value in `appsettings.Development.json` | `Jwt__Secret` |
-| `Smtp:Password` | Gmail app password for notification email | user-secrets (optional — email is skipped if unset) | `Smtp__Password` |
+| `Smtp:Password` | Resend API key for notification email (username is the literal `resend`) | user-secrets (optional — email is skipped if unset) | `Smtp__Password` |
+| `Smtp:FromEmail` | Sender address — must be on a domain verified in Resend | default | `Smtp__FromEmail` |
 | `Groq:ApiKey` | Voice-note transcription/parsing | user-secrets (optional) | `Groq__ApiKey` |
 | `Bootstrap:SysAdminEmail` / `Bootstrap:SysAdminPassword` | Provisions the production SystemAdmin | not needed | `Bootstrap__SysAdminEmail`, `Bootstrap__SysAdminPassword` |
 | `AllowedOrigins` | CORS (comma-separated) | defaults include `localhost:5173` | `AllowedOrigins` |
@@ -79,7 +80,7 @@ Local secrets via user-secrets:
 ```bash
 cd backend/Melarium.API
 dotnet user-secrets set "Groq:ApiKey" "<key>"
-dotnet user-secrets set "Smtp:Password" "<gmail-app-password>"
+dotnet user-secrets set "Smtp:Password" "<resend-api-key>"
 ```
 
 **Production note:** demo accounts are locked (random password + revoked refresh tokens) on every

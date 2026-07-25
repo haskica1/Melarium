@@ -112,8 +112,9 @@ git clone https://github.com/haskica1/Melarium.git /opt/melarium
 cd /opt/melarium
 
 cp .env.example .env
-nano .env   # fill in POSTGRES_PASSWORD, DOMAIN, JWT_SECRET, SMTP_PASSWORD, GROQ_API_KEY,
-            # SYSADMIN_EMAIL, SYSADMIN_PASSWORD — see comments in the file
+nano .env   # fill in POSTGRES_PASSWORD, DOMAIN, JWT_SECRET, SMTP_PASSWORD,
+            # SMTP_FROM_EMAIL, GROQ_API_KEY, SYSADMIN_EMAIL, SYSADMIN_PASSWORD
+            # — see comments in the file
 ```
 
 Generate a JWT secret:
@@ -124,6 +125,35 @@ openssl rand -base64 48
 
 `.env` is git-ignored — it never gets committed (repo rule: no secrets in the repo, see
 `docs/CLAUDE.md`).
+
+### Email (Resend)
+
+Email delivery is best-effort — the app boots and runs fine without it, silently skipping
+sends (`EmailService.IsConfigured()`). But **registration and password reset depend on it**:
+with no SMTP configured, a new user never receives their verification link.
+
+1. Sign up at [resend.com](https://resend.com), then **Domains → Add Domain** → `melarium.app`.
+2. Resend prints the DNS records it needs — a DKIM `TXT`, an SPF `TXT`, and an `MX` for bounce
+   handling. Add them in the netcup CCP next to the `A`/`AAAA` records from step 1, then press
+   **Verify**. Usually done within minutes.
+3. **API Keys → Create** with *Sending access*. The key is shown once — copy it immediately.
+4. Fill in `.env`:
+
+   ```bash
+   SMTP_PASSWORD=re_xxxxxxxxxxxxxxxxxxxxxxxx
+   SMTP_FROM_EMAIL=noreply@melarium.app
+   ```
+
+The host (`smtp.resend.com`), port (`587`, STARTTLS) and username (the literal string
+`resend`) come from the `appsettings.json` defaults. Override them with `SMTP_HOST` /
+`SMTP_PORT` / `SMTP_USERNAME` only when switching to a different provider — `EmailService`
+is plain MailKit SMTP, so any provider works without a code change.
+
+Until the domain is verified, Resend only accepts `onboarding@resend.dev` as the sender.
+The free plan covers **100 emails/day, 3.000/month, one domain**, which realistically serves
+a few dozen active beekeepers: the daily agenda mails only users who actually have
+obligations that day, but alerts, the weekly summary and every verification/reset mail land
+in the same budget. Watch the Resend dashboard as the user base grows.
 
 ## 5. Start PostgreSQL + backend
 

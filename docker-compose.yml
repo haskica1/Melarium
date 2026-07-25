@@ -30,7 +30,12 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
       Jwt__Secret: ${JWT_SECRET}
+      Smtp__Host: ${SMTP_HOST:-smtp.resend.com}
+      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__Username: ${SMTP_USERNAME:-resend}
       Smtp__Password: ${SMTP_PASSWORD}
+      Smtp__FromEmail: ${SMTP_FROM_EMAIL:-noreply@melarium.app}
+      Smtp__FromName: ${SMTP_FROM_NAME:-Melarium}
       Groq__ApiKey: ${GROQ_API_KEY}
       Bootstrap__SysAdminEmail: ${SYSADMIN_EMAIL}
       Bootstrap__SysAdminPassword: ${SYSADMIN_PASSWORD}

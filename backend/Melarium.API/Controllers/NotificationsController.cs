@@ -64,11 +64,23 @@ public class NotificationsController : ControllerBase
         if (string.IsNullOrEmpty(emailClaim))
             return BadRequest("Could not determine email from token.");
 
-        await _email.SendAsync(
-            emailClaim,
-            "Test User",
-            "Melarium — SMTP Test",
-            "<h2>✅ SMTP is working!</h2><p>If you received this, email delivery is configured correctly.</p>");
+        // suppressErrors: false — a diagnostic endpoint that reports success on a failed send
+        // is worse than no endpoint. The rejection reason (unverified domain, bad API key) is
+        // the whole point, and only a SystemAdmin can get here.
+        try
+        {
+            await _email.SendAsync(
+                emailClaim,
+                "Test User",
+                "Melarium — SMTP Test",
+                "<h2>✅ SMTP is working!</h2><p>If you received this, email delivery is configured correctly.</p>",
+                suppressErrors: false);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway,
+                new { message = $"SMTP send failed: {ex.Message}" });
+        }
 
         return Ok(new { message = $"Test email sent to {emailClaim}." });
     }
