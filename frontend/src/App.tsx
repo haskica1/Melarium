@@ -46,6 +46,7 @@ import CalendarPage from './features/calendar/CalendarPage'
 import CalendarSettingsPage from './features/calendar/CalendarSettingsPage'
 import PlansPage from './features/plans/PlansPage'
 import UpsellModal from './shared/components/UpsellModal'
+import HistoryTracker from './shared/components/HistoryTracker'
 
 const APIARY_MANAGERS   = ['OrganizationAdmin', 'SystemAdmin']
 const HIVE_MANAGERS     = ['ApiaryAdmin', 'OrganizationAdmin', 'SystemAdmin']
@@ -57,6 +58,8 @@ export default function App() {
     <AuthProvider>
       <ToastProvider>
       <BrowserRouter>
+        {/* Records each visited entry so a form can tell where Back would land — see historyStack. */}
+        <HistoryTracker />
         <UpsellModal />
         <Routes>
           {/* Public routes */}

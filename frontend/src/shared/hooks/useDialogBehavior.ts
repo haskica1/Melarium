@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -24,11 +24,22 @@ export function useDialogBehavior({ open, onClose, initialFocusRef }: Options) {
   const panelRef = useRef<HTMLDivElement>(null)
   const previouslyFocused = useRef<HTMLElement | null>(null)
 
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
+  // The setup effect below must run exactly once per open — its teardown moves focus, so re-running
+  // it mid-typing steals the caret. Callers routinely pass a fresh `onClose` on every render (an
+  // inline arrow, or a handler declared in a component that re-renders as the user types in this
+  // very dialog), so the handler is read through a ref instead of being an effect dependency.
+  const latest = useRef({ onClose, initialFocusRef })
+  latest.current = { onClose, initialFocusRef }
+
+  useEffect(() => {
+    if (!open) return
+
+    previouslyFocused.current = document.activeElement as HTMLElement | null
+
+    function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.stopPropagation()
-        onClose()
+        latest.current.onClose()
         return
       }
 
@@ -54,14 +65,7 @@ export function useDialogBehavior({ open, onClose, initialFocusRef }: Options) {
         event.preventDefault()
         first.focus()
       }
-    },
-    [onClose],
-  )
-
-  useEffect(() => {
-    if (!open) return
-
-    previouslyFocused.current = document.activeElement as HTMLElement | null
+    }
 
     const { overflow } = document.body.style
     document.body.style.overflow = 'hidden'
@@ -69,16 +73,19 @@ export function useDialogBehavior({ open, onClose, initialFocusRef }: Options) {
 
     // One frame so the panel exists before we focus it.
     const focusTimer = window.setTimeout(() => {
-      ;(initialFocusRef?.current ?? panelRef.current)?.focus()
+      ;(latest.current.initialFocusRef?.current ?? panelRef.current)?.focus()
     }, 0)
 
     return () => {
       window.clearTimeout(focusTimer)
       document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = overflow
-      previouslyFocused.current?.focus?.()
+      // Skip a trigger that the dialog's own action removed from the page — focusing a detached
+      // node silently drops focus to <body> and loses the user's place.
+      const trigger = previouslyFocused.current
+      if (trigger?.isConnected) trigger.focus()
     }
-  }, [open, handleKeyDown, initialFocusRef])
+  }, [open])
 
   return {
     panelRef,

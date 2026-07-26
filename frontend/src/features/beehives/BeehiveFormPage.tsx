@@ -1,9 +1,10 @@
 import { useEffect } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { Loader2 } from 'lucide-react'
 import { useBeehive, useCreateBeehive, useUpdateBeehive } from '../../core/services/queries'
 import { LoadingSpinner, ErrorMessage, FormHeader } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import {
   BeehiveType,
   BeehiveTypeLabels,
@@ -18,7 +19,14 @@ export default function BeehiveFormPage() {
   const isEditing = Boolean(id)
   const beehiveId = Number(id)
   const preselectedApiaryId = Number(searchParams.get('apiaryId') ?? 0)
-  const navigate = useNavigate()
+
+  // Where Otkaži/back belongs when there is no history to pop (deep link into the form).
+  const backUrl = isEditing
+    ? `/beehives/${beehiveId}`
+    : preselectedApiaryId
+    ? `/apiaries/${preselectedApiaryId}`
+    : '/apiaries'
+  const { goBack, goAfterSave } = useFormNavigation(backUrl)
 
   const { data: beehive, isLoading } = useBeehive(beehiveId)
   const createMutation = useCreateBeehive(preselectedApiaryId)
@@ -63,28 +71,23 @@ export default function BeehiveFormPage() {
 
     if (isEditing) {
       await updateMutation.mutateAsync(payload)
-      navigate(`/beehives/${beehiveId}`)
+      goAfterSave(`/beehives/${beehiveId}`)
     } else {
       const created = await createMutation.mutateAsync(payload)
-      navigate(`/beehives/${created.id}`)
+      goAfterSave(`/beehives/${created.id}`)
     }
   }
 
   if (isEditing && isLoading) return <LoadingSpinner message="Učitavanje košnice…" />
 
   const mutationError = createMutation.error ?? updateMutation.error
-  const backUrl = isEditing
-    ? `/beehives/${beehiveId}`
-    : preselectedApiaryId
-    ? `/apiaries/${preselectedApiaryId}`
-    : '/apiaries'
 
   return (
     <div className="animate-fade-in max-w-lg mx-auto">
       <FormHeader
         icon="🐝"
         title={isEditing ? 'Uredi košnicu' : 'Nova košnica'}
-        onBack={() => navigate(backUrl)}
+        onBack={goBack}
         backLabel="Nazad"
       />
 
@@ -208,7 +211,7 @@ export default function BeehiveFormPage() {
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={() => navigate(backUrl)}
+              onClick={goBack}
               className="btn-secondary flex-1"
             >
               Otkaži

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Info } from 'lucide-react'
 import { format, addDays } from 'date-fns'
 import { useCreateDiet, useUpdateDiet, useDiet } from '../../core/services/queries'
 import { LoadingSpinner, ErrorMessage, FormHeader } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import {
   DietReason, DietReasonLabels,
   FoodType, FoodTypeLabels,
@@ -26,11 +27,14 @@ function calcEntryCount(duration: number, frequency: number): number {
 export default function DietFormPage() {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
 
   const isEdit = !!id
   const dietId = Number(id)
   const beehiveId = Number(searchParams.get('beehiveId'))
+
+  // Where Otkaži/back belongs when there is no history to pop (deep link into the form).
+  const backHref = isEdit ? `/feedings/${dietId}` : `/beehives/${beehiveId}`
+  const { goBack, goAfterSave } = useFormNavigation(backHref)
 
   const { data: existing, isLoading: loadingExisting } = useDiet(isEdit ? dietId : 0)
   const createMutation = useCreateDiet(isEdit ? existing?.beehiveId ?? beehiveId : beehiveId)
@@ -105,7 +109,7 @@ export default function DietFormPage() {
         customFoodType: foodType === FoodType.Custom ? customFood.trim() : undefined,
       }
       await updateMutation.mutateAsync(payload)
-      navigate(`/feedings/${dietId}`)
+      goAfterSave(`/feedings/${dietId}`)
     } else {
       const payload: CreateDietPayload = {
         name: name.trim(),
@@ -119,7 +123,7 @@ export default function DietFormPage() {
         beehiveId,
       }
       const created = await createMutation.mutateAsync(payload)
-      navigate(`/feedings/${created.id}`)
+      goAfterSave(`/feedings/${created.id}`)
     }
   }
 
@@ -128,17 +132,13 @@ export default function DietFormPage() {
   if (isEdit && loadingExisting) return <LoadingSpinner message="Učitavanje prehrane…" />
   if (isEdit && !existing && !loadingExisting) return <ErrorMessage message="Prehrana nije pronađena." />
 
-  const backHref = isEdit
-    ? `/feedings/${dietId}`
-    : `/beehives/${beehiveId}`
-
   return (
     <div className="animate-fade-in max-w-2xl mx-auto">
       <FormHeader
         icon="🌿"
         title={isEdit ? 'Uredi prehranu' : 'Nova prehrana'}
         subtitle={isEdit ? 'Ažuriraj program prehrane' : 'Kreiraj program prehrane'}
-        onBack={() => navigate(backHref)}
+        onBack={goBack}
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -272,7 +272,8 @@ export default function DietFormPage() {
 
         {/* Actions */}
         <div className="flex gap-3 justify-end pb-8">
-          <Link to={backHref} className="btn-secondary">Otkaži</Link>
+          {/* A button, not a Link — a Link would push the parent on top of the abandoned form. */}
+          <button type="button" onClick={goBack} className="btn-secondary">Otkaži</button>
           <button type="submit" className="btn-primary" disabled={isSaving}>
             {isSaving ? 'Čuvanje…' : isEdit ? 'Spremi promjene' : 'Kreiraj prehranu'}
           </button>

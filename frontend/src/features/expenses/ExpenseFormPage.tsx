@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
-import { useNavigate, useParams, useLocation } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { AlertCircle, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useExpense, useCreateExpense, useUpdateExpense } from '../../core/services/expenseQueries'
 import { ExpenseSource } from '../../core/models'
 import type { CreateExpenseItemPayload } from '../../core/models'
 import { FormHeader } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 
 interface FormValues {
   purchaseDate: string
@@ -33,7 +34,7 @@ export default function ExpenseFormPage() {
   const expenseId = id ? parseInt(id) : undefined
   const isEdit = expenseId !== undefined
 
-  const navigate = useNavigate()
+  const { goBack, goAfterSave } = useFormNavigation('/expenses')
   const location = useLocation()
   const prefilled = location.state as { items?: CreateExpenseItemPayload[]; source?: ExpenseSource } | null
 
@@ -137,7 +138,7 @@ export default function ExpenseFormPage() {
       })
     }
 
-    navigate('/expenses')
+    goAfterSave('/expenses')
   }
 
   if (isEdit && loadingExisting) {
@@ -153,7 +154,7 @@ export default function ExpenseFormPage() {
       <FormHeader
         icon="🧾"
         title={isEdit ? 'Uredi trošak' : 'Novi trošak'}
-        onBack={() => navigate('/expenses')}
+        onBack={goBack}
         backLabel="Nazad na troškove"
       />
 
@@ -295,7 +296,7 @@ export default function ExpenseFormPage() {
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={() => navigate('/expenses')}
+              onClick={goBack}
               className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
             >
               Otkaži

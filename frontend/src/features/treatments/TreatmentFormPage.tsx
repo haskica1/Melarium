@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { AlertCircle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 import { useApiaries, useBeehivesByApiary } from '../../core/services/queries'
 import { useTreatment, useCreateTreatment, useUpdateTreatment } from '../../core/services/treatmentQueries'
@@ -10,6 +10,7 @@ import {
 } from '../../core/models'
 import type { CreateTreatmentEntryPayload } from '../../core/models'
 import { ConfirmDialog, FormHeader, ErrorMessage } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import { useToast } from '../../core/context/ToastContext'
 import { TREATMENT_PRESETS } from './presets'
 
@@ -45,7 +46,7 @@ export default function TreatmentFormPage() {
   const treatmentId = id ? parseInt(id) : undefined
   const isEdit = treatmentId !== undefined
 
-  const navigate = useNavigate()
+  const { goBack, goAfterSave } = useFormNavigation('/treatments')
   const { toast } = useToast()
 
   const { data: apiaries = [], isError: apiariesError } = useApiaries()
@@ -149,7 +150,7 @@ export default function TreatmentFormPage() {
         await createTreatment.mutateAsync({ apiaryId, ...common })
         toast.success('Tretman zabilježen.')
       }
-      navigate('/treatments')
+      goAfterSave('/treatments')
     } catch (err: any) {
       const detail = err?.response?.data?.errors?.entries?.[0]
         ?? err?.response?.data?.detail
@@ -212,7 +213,7 @@ export default function TreatmentFormPage() {
       <FormHeader
         icon="💊"
         title={isEdit ? 'Uredi tretman' : 'Novi tretman'}
-        onBack={() => navigate('/treatments')}
+        onBack={goBack}
         backLabel="Nazad na tretmane"
       />
 
@@ -418,7 +419,7 @@ export default function TreatmentFormPage() {
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => navigate('/treatments')} className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
+            <button type="button" onClick={goBack} className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
               Otkaži
             </button>
             <button type="submit" disabled={isSaving || selectedCount === 0} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-honey-500 hover:bg-honey-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors">

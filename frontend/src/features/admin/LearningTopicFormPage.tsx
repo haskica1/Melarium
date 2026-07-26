@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { AlertCircle, Eye, Loader2, Paperclip, Pencil, Sparkles, Video } from 'lucide-react'
 import {
   useAdminLearningTopic,
@@ -9,6 +9,7 @@ import {
 } from '../../core/services/learningQueries'
 import { LearningCategory, LearningCategoryLabels, MonthLabels } from '../../core/models'
 import { FormHeader } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import { useToast } from '../../core/context/ToastContext'
 import { MarkdownArticle } from '../learning/MarkdownArticle'
 
@@ -19,7 +20,7 @@ export default function LearningTopicFormPage() {
   const topicId = id ? parseInt(id) : undefined
   const isEdit = topicId !== undefined
 
-  const navigate = useNavigate()
+  const { goBack, goAfterSave } = useFormNavigation('/admin/learning-topics')
   const { toast } = useToast()
 
   const { data: existing, isLoading: loadingExisting } = useAdminLearningTopic(topicId ?? 0)
@@ -99,7 +100,7 @@ export default function LearningTopicFormPage() {
         await createTopic.mutateAsync(payload)
         toast.success('Tema kreirana kao skica — objavite je s liste tema.')
       }
-      navigate('/admin/learning-topics')
+      goAfterSave('/admin/learning-topics')
     } catch (err: any) {
       const errors = err?.response?.data?.errors
       const first = errors ? (Object.values(errors)[0] as string[])?.[0] : undefined
@@ -124,7 +125,7 @@ export default function LearningTopicFormPage() {
       <FormHeader
         icon="🎓"
         title={isEdit ? 'Uredi temu' : 'Nova tema'}
-        onBack={() => navigate('/admin/learning-topics')}
+        onBack={goBack}
         backLabel="Nazad na teme"
       />
 
@@ -300,7 +301,7 @@ export default function LearningTopicFormPage() {
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => navigate('/admin/learning-topics')} className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
+            <button type="button" onClick={goBack} className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
               Otkaži
             </button>
             <button type="submit" disabled={isSaving} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-honey-500 hover:bg-honey-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors">

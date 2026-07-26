@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { Loader2, MapPin, X } from 'lucide-react'
 import { useApiary, useCreateApiary, useUpdateApiary } from '../../core/services/queries'
 import { LoadingSpinner, ErrorMessage, FormHeader } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import LocationPickerModal from '../../shared/components/LocationPickerModal'
 import type { CreateApiaryPayload } from '../../core/models'
 
@@ -11,7 +12,9 @@ export default function ApiaryFormPage() {
   const { id } = useParams<{ id?: string }>()
   const isEditing = Boolean(id)
   const apiaryId = Number(id)
-  const navigate = useNavigate()
+
+  // Where Otkaži/back belongs when there is no history to pop (deep link into the form).
+  const { goBack, goAfterSave } = useFormNavigation(isEditing ? `/apiaries/${apiaryId}` : '/apiaries')
 
   const { data: apiary, isLoading } = useApiary(apiaryId)
   const createMutation = useCreateApiary()
@@ -48,10 +51,10 @@ export default function ApiaryFormPage() {
     }
     if (isEditing) {
       await updateMutation.mutateAsync(payload)
-      navigate(`/apiaries/${apiaryId}`)
+      goAfterSave(`/apiaries/${apiaryId}`)
     } else {
       const created = await createMutation.mutateAsync(payload)
-      navigate(`/apiaries/${created.id}`)
+      goAfterSave(`/apiaries/${created.id}`)
     }
   }
 
@@ -64,8 +67,8 @@ export default function ApiaryFormPage() {
       <FormHeader
         icon="🏡"
         title={isEditing ? 'Uredi pčelinjak' : 'Novi pčelinjak'}
-        onBack={() => navigate(isEditing ? `/apiaries/${apiaryId}` : '/apiaries')}
-        backLabel="Nazad na pčelinjake"
+        onBack={goBack}
+        backLabel="Nazad"
       />
 
       <div className="card">
@@ -156,7 +159,7 @@ export default function ApiaryFormPage() {
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={() => navigate(isEditing ? `/apiaries/${apiaryId}` : '/apiaries')}
+              onClick={goBack}
               className="btn-secondary flex-1"
             >
               Otkaži

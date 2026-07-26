@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { Loader2 } from 'lucide-react'
 import {
@@ -11,6 +11,7 @@ import {
   useBeehivesByOrganization,
 } from '../../core/services/adminQueries'
 import { FormHeader, ErrorState, ErrorMessage } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 
 interface UserForm {
   firstName: string
@@ -26,7 +27,7 @@ export default function UserFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = !!id
   const userId = id ? parseInt(id) : 0
-  const navigate = useNavigate()
+  const { goBack, goAfterSave } = useFormNavigation('/admin')
 
   const { data: existing, isLoading: loadingExisting, isError: existingError, refetch: refetchExisting } =
     useAdminUser(userId)
@@ -106,7 +107,7 @@ export default function UserFormPage() {
           assignedBeehiveIds: needsHives ? selectedBeehiveIds : [],
         })
       }
-      navigate('/admin')
+      goAfterSave('/admin')
     } catch (e: any) {
       const detail = e?.response?.data?.detail ?? e?.message ?? 'An error occurred.'
       setError('root', { message: detail })
@@ -139,7 +140,7 @@ export default function UserFormPage() {
       <FormHeader
         icon="👤"
         title={isEdit ? 'Uredi korisnika' : 'Novi korisnik'}
-        onBack={() => navigate('/admin')}
+        onBack={goBack}
         backLabel="Nazad na kontrolnu ploču"
       />
 
@@ -321,7 +322,7 @@ export default function UserFormPage() {
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={() => navigate('/admin')}
+              onClick={goBack}
               className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200
                 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
             >

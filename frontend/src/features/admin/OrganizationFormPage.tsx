@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { Loader2 } from 'lucide-react'
 import {
@@ -9,6 +9,7 @@ import {
   useUpdateOrganizationPlan,
 } from '../../core/services/adminQueries'
 import { FormHeader } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import { useToast } from '../../core/context/ToastContext'
 import { PlanType, PlanTypeLabels } from '../../core/models'
 
@@ -27,7 +28,7 @@ export default function OrganizationFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit = !!id
   const orgId = id ? parseInt(id) : 0
-  const navigate = useNavigate()
+  const { goBack, goAfterSave } = useFormNavigation('/admin')
 
   const { data: existing, isLoading: loadingExisting } = useAdminOrganization(orgId)
   const createOrg = useCreateOrganization()
@@ -85,7 +86,7 @@ export default function OrganizationFormPage() {
       } else {
         await createOrg.mutateAsync(payload)
       }
-      navigate('/admin')
+      goAfterSave('/admin')
     } catch (e: any) {
       const detail = e?.response?.data?.detail ?? e?.message ?? 'An error occurred.'
       setError('root', { message: detail })
@@ -105,7 +106,7 @@ export default function OrganizationFormPage() {
       <FormHeader
         icon="🏢"
         title={isEdit ? 'Uredi organizaciju' : 'Nova organizacija'}
-        onBack={() => navigate('/admin')}
+        onBack={goBack}
         backLabel="Nazad na kontrolnu ploču"
       />
 
@@ -151,7 +152,7 @@ export default function OrganizationFormPage() {
           <div className="flex gap-3 pt-2">
             <button
               type="button"
-              onClick={() => navigate('/admin')}
+              onClick={goBack}
               className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200
                 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
             >

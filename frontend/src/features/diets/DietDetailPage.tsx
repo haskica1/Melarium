@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import {
   CheckCircle2, Circle, Pencil, Trash2, Copy,
   CalendarDays, Utensils, AlertTriangle, ChevronDown, ChevronUp,
@@ -15,6 +15,7 @@ import {
   ErrorMessage, ConfirmDialog, VitalCard, PageSkeleton,
 } from '../../shared/components'
 import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import { DietStatus, FeedingEntryStatus } from '../../core/models'
 import type { FeedingEntry } from '../../core/models'
 import { usePermissions } from '../../core/hooks/usePermissions'
@@ -171,11 +172,14 @@ function CompleteEarlyModal({
 
 export default function DietDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const dietId = Number(id)
 
   const { canEditDelete, isAssignedToHive } = usePermissions()
   const { data: diet, isLoading, error } = useDiet(dietId)
+
+  // Deleting the prehrana makes this page's history entry a dead end — leave via goAfterSave so
+  // Back can't return to a feeding that no longer exists.
+  const { goAfterSave } = useFormNavigation(diet ? `/beehives/${diet.beehiveId}` : '/apiaries')
   const deleteMutation   = useDeleteDiet(diet?.beehiveId ?? 0)
   const completeMutation = useCompleteEarlyDiet(dietId, diet?.beehiveId ?? 0)
   const entryMutation    = useCompleteFeedingEntry(dietId, diet?.beehiveId ?? 0)
@@ -200,7 +204,7 @@ export default function DietDetailPage() {
   async function handleDelete() {
     await deleteMutation.mutateAsync(dietId)
     if(diet == null) return;
-    navigate(`/beehives/${diet.beehiveId}`)
+    goAfterSave(`/beehives/${diet.beehiveId}`)
   }
 
   async function handleCompleteEarly(comment: string) {

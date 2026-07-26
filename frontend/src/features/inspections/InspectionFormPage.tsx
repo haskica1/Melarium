@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { Camera, CheckCircle2, Circle, ImagePlus, Loader2, Mic, Square, X } from 'lucide-react'
 import {
@@ -17,6 +17,7 @@ import { InspectionPhotoStrip } from './InspectionPhotos'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '../../core/services/queries'
 import { LoadingSpinner, ErrorMessage, FormHeader } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import { HoneyLevel, HoneyLevelLabels } from '../../core/models'
 import type { Beehive, CreateInspectionPayload, ParseVoiceResult } from '../../core/models'
 import { useVoiceInput } from '../../core/hooks/useVoiceInput'
@@ -42,7 +43,6 @@ export default function InspectionFormPage() {
   const inspectionId = Number(id)
   const beehiveId   = Number(searchParams.get('beehiveId') ?? 0)
   const outboxId    = searchParams.get('outboxId')
-  const navigate    = useNavigate()
 
   // Offline outbox (SPEC-07)
   const online = useOnlineStatus()
@@ -89,6 +89,7 @@ export default function InspectionFormPage() {
   const createMutation    = useCreateInspection(resolvedBeehiveId)
   const updateMutation    = useUpdateInspection(inspectionId, resolvedBeehiveId)
   const backUrl           = outboxId ? '/outbox' : `/beehives/${resolvedBeehiveId}`
+  const { goBack, goAfterSave } = useFormNavigation(backUrl)
 
   const {
     register,
@@ -271,13 +272,13 @@ export default function InspectionFormPage() {
       })
     }
     toast.success('Nema mreže — pregled je sačuvan lokalno i biće poslan automatski.')
-    navigate(backUrl)
+    goAfterSave(backUrl)
   }
 
   const onSubmit = async (data: CreateInspectionPayload) => {
     // Retry-only path (SPEC-05): the inspection is already saved, only photos are missing.
     if (savedInspectionId != null) {
-      if (await uploadPendingPhotos(savedInspectionId)) navigate(backUrl)
+      if (await uploadPendingPhotos(savedInspectionId)) goAfterSave(backUrl)
       return
     }
 
@@ -293,7 +294,7 @@ export default function InspectionFormPage() {
         setSavedInspectionId(inspectionId)
         if (!(await uploadPendingPhotos(inspectionId))) return
       }
-      navigate(backUrl)
+      goAfterSave(backUrl)
       return
     }
 
@@ -321,7 +322,7 @@ export default function InspectionFormPage() {
       setSavedInspectionId(created.id)
       if (!(await uploadPendingPhotos(created.id))) return
     }
-    navigate(backUrl)
+    goAfterSave(backUrl)
   }
 
   if (isEditing && isLoading) return <LoadingSpinner message="Učitavanje pregleda…" />
@@ -333,8 +334,8 @@ export default function InspectionFormPage() {
       <FormHeader
         icon="📋"
         title={isEditing ? 'Uredi pregled' : 'Zabilježi pregled'}
-        onBack={() => navigate(backUrl)}
-        backLabel="Nazad na košnicu"
+        onBack={goBack}
+        backLabel={outboxId ? 'Nazad na neposlano' : 'Nazad na košnicu'}
       />
 
       <div className="card">
@@ -703,7 +704,7 @@ export default function InspectionFormPage() {
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => navigate(backUrl)}
+                  onClick={goBack}
                   className="btn-secondary flex-1"
                 >
                   Otkaži

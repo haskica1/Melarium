@@ -4,6 +4,7 @@ import { AlertCircle, Camera, CheckCircle2, Loader2, Plus, ScanLine, Trash2, Upl
 import { ExpenseSource } from '../../core/models'
 import type { CreateExpenseItemPayload } from '../../core/models'
 import { FormHeader } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 
 // Tesseract.js is loaded lazily to avoid pulling the WASM bundle unless the user visits this page
 async function runOcr(imageFile: File): Promise<string> {
@@ -62,6 +63,7 @@ type Phase = 'capture' | 'processing' | 'review'
 
 export default function ReceiptScanPage() {
   const navigate = useNavigate()
+  const { goBack } = useFormNavigation('/expenses')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [phase, setPhase] = useState<Phase>('capture')
@@ -113,8 +115,12 @@ export default function ReceiptScanPage() {
       .filter(i => i.name.trim())
       .map((item, idx) => ({ ...item, sortOrder: idx }))
 
+    // Replace, not push: scanning is a step on the way to the expense form, and the OCR review it
+    // holds is component state that a Back press could not restore anyway — leaving the entry
+    // behind would only put an empty scanner between the saved expense and the expense list.
     navigate('/expenses/new', {
       state: { items: validItems, source: ExpenseSource.ReceiptScan },
+      replace: true,
     })
   }
 
@@ -124,7 +130,7 @@ export default function ReceiptScanPage() {
         icon="📷"
         title="Skeniraj račun"
         subtitle="Fotografirajte ili učitajte račun — stavke se automatski prepoznaju."
-        onBack={() => navigate('/expenses')}
+        onBack={goBack}
         backLabel="Nazad na troškove"
       />
 
@@ -305,7 +311,7 @@ export default function ReceiptScanPage() {
             <div className="flex gap-3 pt-2 border-t border-gray-100 dark:border-slate-800">
               <button
                 type="button"
-                onClick={() => navigate('/expenses')}
+                onClick={goBack}
                 className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Otkaži

@@ -13,6 +13,7 @@ import NotificationBell from './NotificationBell'
 import { CommandPalette } from './CommandPalette'
 import { Sidebar, getNavItems, type NavRoleFlags } from './Sidebar'
 import { ErrorBoundary } from './ErrorBoundary'
+import { canGoBack as hasHistoryBehind } from '../utils/historyStack'
 
 // Root/landing pages never show a back arrow, even if browser history technically allows it.
 const ROOT_PATHS = ['/apiaries', '/admin']
@@ -42,7 +43,7 @@ export default function Layout() {
   const navFlags: NavRoleFlags = { isSystemAdmin, canSeeExpenses, canManageMembers, canSeePastures }
 
   // navigate(-1) mirrors real browser back — re-evaluated on every route change via useLocation().
-  const canGoBack = !ROOT_PATHS.includes(pathname) && (window.history.state?.idx ?? 0) > 0
+  const canGoBack = !ROOT_PATHS.includes(pathname) && hasHistoryBehind()
 
   const avatarClass = isSystemAdmin
     ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'

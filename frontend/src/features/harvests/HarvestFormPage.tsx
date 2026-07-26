@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { AlertCircle, AlertTriangle, Loader2 } from 'lucide-react'
 import { useApiaries, useBeehivesByApiary } from '../../core/services/queries'
 import { useHarvest, useCreateHarvest, useUpdateHarvest } from '../../core/services/harvestQueries'
@@ -7,6 +7,7 @@ import { useTreatments } from '../../core/services/treatmentQueries'
 import { HoneyType, HoneyTypeLabels } from '../../core/models'
 import type { CreateHarvestEntryPayload } from '../../core/models'
 import { FormHeader, ErrorMessage } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import { useToast } from '../../core/context/ToastContext'
 
 const HONEY_TYPES = Object.values(HoneyType).filter(v => typeof v === 'number') as HoneyType[]
@@ -17,7 +18,7 @@ export default function HarvestFormPage() {
   const harvestId = id ? parseInt(id) : undefined
   const isEdit = harvestId !== undefined
 
-  const navigate = useNavigate()
+  const { goBack, goAfterSave } = useFormNavigation('/harvests')
   const { toast } = useToast()
 
   const { data: apiaries = [], isError: apiariesError } = useApiaries()
@@ -117,7 +118,7 @@ export default function HarvestFormPage() {
         await createHarvest.mutateAsync({ apiaryId, date, honeyType, pricePerKg: price, notes: notes.trim() || undefined, entries })
         toast.success('Vrcanje zabilježeno.')
       }
-      navigate('/harvests')
+      goAfterSave('/harvests')
     } catch (err: any) {
       const detail = err?.response?.data?.errors?.entries?.[0]
         ?? err?.response?.data?.detail
@@ -142,7 +143,7 @@ export default function HarvestFormPage() {
       <FormHeader
         icon="🍯"
         title={isEdit ? 'Uredi vrcanje' : 'Novo vrcanje'}
-        onBack={() => navigate('/harvests')}
+        onBack={goBack}
         backLabel="Nazad na vrcanja"
       />
 
@@ -277,7 +278,7 @@ export default function HarvestFormPage() {
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => navigate('/harvests')} className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
+            <button type="button" onClick={goBack} className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
               Otkaži
             </button>
             <button type="submit" disabled={isSaving || totalKg <= 0} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-honey-500 hover:bg-honey-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors">

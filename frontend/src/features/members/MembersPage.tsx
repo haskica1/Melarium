@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Users, Pencil, AlertCircle, Search, UserPlus, Loader2, Eye, EyeOff } from 'lucide-react'
 import { useOrgMembers, useAvailableApiaries, useAvailableBeehives, useCreateOrgMember } from '../../core/services/orgQueries'
@@ -58,13 +58,8 @@ export default function MembersPage() {
     setFormError(null)
   }
 
-  // Close modal on Escape
-  useEffect(() => {
-    if (!modalOpen) return
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') closeModal() }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [modalOpen])
+  // Escape, the focus trap and focus restore all come from <Modal> — this used to re-implement
+  // Escape on its own, which only duplicated what the shared dialog already does.
 
   function toggleBeehive(id: number) {
     setSelectedBeehiveIds(prev =>

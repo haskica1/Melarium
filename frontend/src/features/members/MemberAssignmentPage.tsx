@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { Loader2, AlertCircle } from 'lucide-react'
 import {
   useOrgMember,
@@ -10,11 +10,12 @@ import {
 } from '../../core/services/orgQueries'
 import { useAuth } from '../../core/context/AuthContext'
 import { FormHeader, ErrorState, ErrorMessage } from '../../shared/components'
+import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 
 export default function MemberAssignmentPage() {
   const { id } = useParams<{ id: string }>()
   const memberId = parseInt(id ?? '0')
-  const navigate = useNavigate()
+  const { goBack, goAfterSave } = useFormNavigation('/members')
   const { user } = useAuth()
 
   const isOrgAdmin = user?.role === 'OrganizationAdmin'
@@ -50,7 +51,7 @@ export default function MemberAssignmentPage() {
     setError(null)
     try {
       await updateBeehives.mutateAsync({ beehiveIds: selectedBeehiveIds })
-      navigate('/members')
+      goAfterSave('/members')
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? e?.message ?? 'Greška pri ažuriranju dodjela.')
     }
@@ -60,7 +61,7 @@ export default function MemberAssignmentPage() {
     setError(null)
     try {
       await updateApiary.mutateAsync({ apiaryId: selectedApiaryId ? parseInt(selectedApiaryId) : null })
-      navigate('/members')
+      goAfterSave('/members')
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? e?.message ?? 'Greška pri ažuriranju dodjele pčelinjaka.')
     }
@@ -97,7 +98,7 @@ export default function MemberAssignmentPage() {
         icon="🔗"
         title={`${member.firstName} ${member.lastName}`}
         subtitle={member.email}
-        onBack={() => navigate('/members')}
+        onBack={goBack}
         backLabel="Nazad na Članove"
       />
 
@@ -161,7 +162,7 @@ export default function MemberAssignmentPage() {
             <div className="flex gap-3 pt-4">
               <button
                 type="button"
-                onClick={() => navigate('/members')}
+                onClick={goBack}
                 className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Otkaži
@@ -204,7 +205,7 @@ export default function MemberAssignmentPage() {
             <div className="flex gap-3 pt-4">
               <button
                 type="button"
-                onClick={() => navigate('/members')}
+                onClick={goBack}
                 className="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
               >
                 Otkaži

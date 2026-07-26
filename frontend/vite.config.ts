@@ -56,7 +56,11 @@ export default defineConfig({
       // Proxy API calls to the LOCAL .NET backend during development.
       // Pointing this at the deployed backend would make local dev mutate production data;
       // to test against production deliberately, set VITE_API_URL instead.
-      '/api': {
+      //
+      // Anchored regex, not the plain '/api' prefix: a string key matches every path *starting*
+      // with it, so '/apiaries' — the app's landing route — was proxied to the backend and a
+      // reload there answered 500 instead of loading the SPA.
+      '^/api/': {
         target: 'http://localhost:62648',
         changeOrigin: true,
         secure: false
