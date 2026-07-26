@@ -1,5 +1,16 @@
 # One-off data migration — old production → current production
 
+> **Status: done.** Rehearsed on a restored dump and then run against production on
+> **2026-07-26**. All of it landed: 2 organizations, 3 users, 2 apiaries, 13 beehives,
+> 9 inspections, 6 queens, 6 diets, 30 feeding entries, 2 todos, 10 learning topics,
+> 0 treatments. QR codes were regenerated afterwards and the staging schema dropped.
+>
+> These scripts are kept for the audit trail, not for re-use. `02_import.sql` aborts on
+> its e-mail pre-flight check if run again, so a second run cannot duplicate the data —
+> but do not reach for it as a template without re-reading the whole file first. The id
+> mapping was exported to `~/melarium-id_map.csv` on the VPS before cleanup; the
+> pre-import dump is `~/melarium-before-import.dump`.
+
 Imports a **subset** of the old Melarium database (delivered as CSV exports of its
 tables) into the live database. Only two organizations and their data are carried
 over; everything else in the export is test/demo data and is deliberately left

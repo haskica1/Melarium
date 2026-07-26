@@ -5,10 +5,14 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- .ico fallback for the browsers and bookmark bars that ignore an SVG icon -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#d97706" />
     <meta name="description" content="Melarium — vođenje pčelinjaka: pregledi, ishrana, tretmani, vrcanja i statistike na jednom mjestu." />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- Safari pinned tab: a silhouette Safari recolours itself, hence the `color` -->
+    <link rel="mask-icon" href="/masked-icon.svg" color="#f59e0b" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
     <!-- Google Fonts: Playfair Display + DM Sans -->

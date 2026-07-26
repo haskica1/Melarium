@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Melarium">
+  <!-- Melarium mark.
+       The idea: the bee's abdomen tapers into a drop of honey. Everything else is
+       built around that — a comb cell holding the bee, a lattice of comb behind it,
+       and a few capped cells for depth.
+       The bee is tilted 12° so it reads as flying rather than pinned in a specimen
+       box. The wings are kept small and tucked against the thorax on purpose: an
+       earlier pass swept them out past the cell edge, which looked good at 512 px
+       and fell apart at 16, where two bright cream shapes outweighed the body and
+       the bee turned into a pair of white blobs. The dark body has to stay the
+       heaviest thing in the frame for the mark to survive being shrunk.
+       Contrast of amber on wax brown is about 7:1, so it holds up in a light or a
+       dark browser tab.
+       This file is the source of truth; the PNGs and the .ico beside it are
+       rasterised from it with headless Chrome. -->
+  <defs>
+    <linearGradient id="amber" x1="90" y1="60" x2="420" y2="450" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fcd34d" />
+      <stop offset="1" stop-color="#f59e0b" />
+    </linearGradient>
+
+    <!-- Honeycomb lattice. Pointy-top hexagons of circumradius 56: horizontal centre
+         spacing is 56*sqrt(3) = 97, vertical period is 3*56 = 168. Drawing the four
+         tile corners plus the middle cell makes the tile repeat seamlessly. -->
+    <pattern id="comb" width="97" height="168" patternUnits="userSpaceOnUse">
+      <g fill="none" stroke="#fcd34d" stroke-opacity="0.15" stroke-width="7">
+        <path d="M0,-56 L-48.5,-28 L-48.5,28 L0,56 L48.5,28 L48.5,-28 Z" />
+        <path d="M97,-56 L48.5,-28 L48.5,28 L97,56 L145.5,28 L145.5,-28 Z" />
+        <path d="M48.5,28 L0,56 L0,112 L48.5,140 L97,112 L97,56 Z" />
+        <path d="M0,112 L-48.5,140 L-48.5,196 L0,224 L48.5,196 L48.5,140 Z" />
+        <path d="M97,112 L48.5,140 L48.5,196 L97,224 L145.5,196 L145.5,140 Z" />
+      </g>
+    </pattern>
+
+    <!-- Keeps the abdomen bands inside the drop so they narrow as it tapers. -->
+    <clipPath id="abdomen">
+      <path d="M256,240 C304,240 324,282 324,322 C324,364 296,394 256,410
+               C216,394 188,364 188,322 C188,282 208,240 256,240 Z" />
+    </clipPath>
+  </defs>
+
+  <!-- Flat background rather than a gradient: a full-canvas diagonal ramp pushed the
+       512px PNG past 160 kB because almost every pixel became a unique colour. -->
+  <rect width="512" height="512" rx="104" fill="#54230a" />
+
+  <!-- Capped cells. Placed off the lattice's own centres, asymmetrically, so the comb
+       looks worked rather than printed. -->
+  <g fill="#fcd34d" fill-opacity="0.13">
+    <path d="M48.5,28 L0,56 L0,112 L48.5,140 L97,112 L97,56 Z" />
+    <path d="M436.5,196 L388,224 L388,280 L436.5,308 L485,280 L485,224 Z" />
+    <path d="M145.5,364 L97,392 L97,448 L145.5,476 L194,448 L194,392 Z" />
+  </g>
+
+  <rect width="512" height="512" rx="104" fill="url(#comb)" />
+
+  <!-- The comb cell. At 16 px the bee collapses into a dark core and this hexagon is
+       what the eye actually resolves, so it fills most of the canvas. -->
+  <polygon points="256,66 91.5,161 91.5,351 256,446 420.5,351 420.5,161" fill="url(#amber)" />
+
+  <!-- Rotated about the bee's own centroid, so tilting it does not shunt it off the
+       centre of the cell. -->
+  <g transform="rotate(-12 256 260)">
+    <!-- antennae, kept short enough to stay inside the cell once tilted -->
+    <g stroke="#451a03" stroke-width="11" stroke-linecap="round" fill="none">
+      <path d="M240,142 C230,126 224,118 218,111" />
+      <path d="M272,142 C282,126 288,118 294,111" />
+    </g>
+    <circle cx="216" cy="110" r="10" fill="#451a03" />
+    <circle cx="296" cy="110" r="10" fill="#451a03" />
+
+    <!-- wings, behind the body -->
+    <g fill="#fffbeb" fill-opacity="0.9">
+      <path d="M236,222 C214,194 176,168 152,178 C130,187 142,222 172,238 C198,252 228,246 236,222 Z" />
+      <path d="M276,222 C298,194 336,168 360,178 C382,187 370,222 340,238 C314,252 284,246 276,222 Z" />
+    </g>
+
+    <g fill="#451a03">
+      <circle cx="256" cy="166" r="42" />
+      <ellipse cx="256" cy="216" rx="50" ry="34" />
+      <!-- abdomen: a honey drop, widest above centre and tapering to a point -->
+      <path d="M256,240 C304,240 324,282 324,322 C324,364 296,394 256,410
+               C216,394 188,364 188,322 C188,282 208,240 256,240 Z" />
+    </g>
+
+    <g clip-path="url(#abdomen)" fill="url(#amber)">
+      <rect x="182" y="276" width="148" height="24" />
+      <rect x="182" y="316" width="148" height="24" />
+      <rect x="182" y="356" width="148" height="22" />
+    </g>
+  </g>
+</svg>
