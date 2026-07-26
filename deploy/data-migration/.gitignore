@@ -1,0 +1,7 @@
+# The CSV exports from the old production database must never be committed:
+# they contain real e-mail addresses and BCrypt password hashes.
+# Copy them to the server out-of-band (scp), not through git.
+*.csv
+*.dump
+*.sql.gz
+id_map.csv
