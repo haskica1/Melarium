@@ -82,7 +82,7 @@ function TodoForm({ initial, assignableUsers, onSave, onCancel, isSaving, showCo
         </div>
 
         {/* Priority + Due date */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="form-label" htmlFor="todo-priority">Prioritet</label>
             <select
@@ -162,7 +162,7 @@ function TodoForm({ initial, assignableUsers, onSave, onCancel, isSaving, showCo
             {isSaving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
-              <><Check className="w-4 h-4" /> {initial ? 'Spremi promjene' : 'Dodaj zadatak'}</>
+              <><Check className="w-4 h-4" /> {initial ? 'Spremi' : 'Dodaj'}</>
             )}
           </button>
         </div>

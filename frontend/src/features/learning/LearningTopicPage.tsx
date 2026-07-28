@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Loader2, Paperclip, Pause, Play, Square, Volume2 } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { CheckCircle2, Loader2, Paperclip, Pause, Play, Square, Volume2 } from 'lucide-react'
 import { useLearningTopic, useMarkTopicRead } from '../../core/services/learningQueries'
 import { MonthLabels } from '../../core/models'
 import { useSpeech } from '../../core/hooks/useSpeech'
@@ -46,13 +46,6 @@ export default function LearningTopicPage() {
 
   return (
     <div className="max-w-3xl mx-auto animate-fade-in space-y-5">
-      <Link
-        to="/learning"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 dark:text-slate-400 hover:text-honey-600 dark:hover:text-honey-400 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" /> Nazad na edukaciju
-      </Link>
-
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none px-6 sm:px-8 py-7">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 flex-wrap">

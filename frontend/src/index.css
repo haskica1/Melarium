@@ -31,6 +31,18 @@
   h1, h2, h3 {
     font-family: 'Playfair Display', Georgia, serif;
   }
+
+  /* iOS Safari paints native date/time controls at an internal minimum width that ignores
+     `width: 100%`/`min-width: 0` — the box itself measures correctly (confirmed in Chromium) but
+     WebKit still paints past it on narrow containers. `-webkit-min-logical-width` is Apple's own
+     override for exactly this; unsupported elsewhere, so it's a no-op on every other browser. */
+  input[type='date'],
+  input[type='time'],
+  input[type='datetime-local'],
+  input[type='month'] {
+    min-width: 0;
+    -webkit-min-logical-width: 100%;
+  }
 }
 
 @layer components {

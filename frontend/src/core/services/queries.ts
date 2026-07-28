@@ -8,6 +8,7 @@ import { dietService } from '../services/dietService'
 import { statsService } from '../services/statsService'
 import { calendarService } from '../services/calendarService'
 import type {
+  Beehive,
   CreateApiaryPayload,
   UpdateApiaryPayload,
   CreateBeehivePayload,
@@ -115,6 +116,9 @@ export const useCreateBeehive = (apiaryId: number) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.apiary(apiaryId) })
       qc.invalidateQueries({ queryKey: queryKeys.beehivesByApiary(apiaryId) })
+      // The apiaries list carries each apiary's beehiveCount — without this the Pčelinjaci
+      // dashboard kept showing the old count until a manual refresh.
+      qc.invalidateQueries({ queryKey: queryKeys.apiaries })
     },
   })
 }
@@ -136,6 +140,7 @@ export const useDeleteBeehive = (apiaryId: number) => {
     mutationFn: (id: number) => beehiveService.delete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.apiary(apiaryId) })
+      qc.invalidateQueries({ queryKey: queryKeys.apiaries })
     },
   })
 }
@@ -149,6 +154,15 @@ export const useInspectionsByBeehive = (beehiveId: number) =>
     enabled: !!beehiveId,
   })
 
+// Inspection mutations only know beehiveId, but the parent apiary caches its own copy of each
+// beehive's inspectionCount (used by ApiaryDetailPage's vitals and the Košnice grid) — without
+// this, that page kept showing stale counts until a manual refresh. The beehive's apiaryId is
+// immutable, so reading it out of whatever is already cached is safe even if slightly stale.
+const invalidateParentApiary = (qc: ReturnType<typeof useQueryClient>, beehiveId: number) => {
+  const apiaryId = qc.getQueryData<Beehive>(queryKeys.beehive(beehiveId))?.apiaryId
+  if (apiaryId) qc.invalidateQueries({ queryKey: queryKeys.apiary(apiaryId) })
+}
+
 export const useCreateInspection = (beehiveId: number) => {
   const qc = useQueryClient()
   return useMutation({
@@ -156,6 +170,7 @@ export const useCreateInspection = (beehiveId: number) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.beehive(beehiveId) })
       qc.invalidateQueries({ queryKey: queryKeys.inspectionsByHive(beehiveId) })
+      invalidateParentApiary(qc, beehiveId)
     },
   })
 }
@@ -167,6 +182,7 @@ export const useUpdateInspection = (id: number, beehiveId: number) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.inspectionsByHive(beehiveId) })
       qc.invalidateQueries({ queryKey: queryKeys.beehive(beehiveId) })
+      invalidateParentApiary(qc, beehiveId)
     },
   })
 }
@@ -178,6 +194,7 @@ export const useDeleteInspection = (beehiveId: number) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.inspectionsByHive(beehiveId) })
       qc.invalidateQueries({ queryKey: queryKeys.beehive(beehiveId) })
+      invalidateParentApiary(qc, beehiveId)
     },
   })
 }

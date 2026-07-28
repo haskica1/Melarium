@@ -140,8 +140,6 @@ export default function UserFormPage() {
       <FormHeader
         icon="👤"
         title={isEdit ? 'Uredi korisnika' : 'Novi korisnik'}
-        onBack={goBack}
-        backLabel="Nazad na kontrolnu ploču"
       />
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-none border border-honey-100 dark:border-slate-800 px-8 py-8">
@@ -336,7 +334,7 @@ export default function UserFormPage() {
                 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
             >
               {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {isEdit ? 'Spremi promjene' : 'Napravi korisnika'}
+              Spremi
             </button>
           </div>
         </form>

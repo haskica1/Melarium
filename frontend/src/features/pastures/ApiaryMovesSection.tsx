@@ -65,71 +65,75 @@ export function ApiaryMovesSection({ apiaryId, canManage, hasHomeLocation }: Api
   }
 
   return (
-    <CollapsibleSection
-      title="Selidbe"
-      icon="⛺"
-      count={moves.length}
-      defaultOpen={false}
-      action={canManage ? (
-        <div className="flex items-center gap-3">
-          {isAway && !hasHomeLocation && (
+    <>
+      <CollapsibleSection
+        title="Selidbe"
+        icon="⛺"
+        count={moves.length}
+        defaultOpen={false}
+        action={canManage ? (
+          <div className="flex items-center gap-3">
+            {isAway && !hasHomeLocation && (
+              <button
+                onClick={() => setHomePickerOpen(true)}
+                className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 hover:underline font-medium"
+                title="Matična lokacija nije poznata — postavite je da biste mogli koristiti 'Vrati na matičnu lokaciju'"
+              >
+                <MapPin className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Postavi matičnu lokaciju</span><span className="sm:hidden">Matična lok.</span>
+              </button>
+            )}
             <button
-              onClick={() => setHomePickerOpen(true)}
-              className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-slate-400 hover:underline font-medium"
-              title="Matična lokacija nije poznata — postavite je da biste mogli koristiti 'Vrati na matičnu lokaciju'"
+              onClick={() => setMoveModalOpen(true)}
+              className="inline-flex items-center gap-1 text-xs text-honey-600 dark:text-honey-400 hover:underline font-medium"
             >
-              <MapPin className="w-3.5 h-3.5" /> Postavi matičnu lokaciju
+              <Truck className="w-3.5 h-3.5" /> Preseli
             </button>
-          )}
-          <button
-            onClick={() => setMoveModalOpen(true)}
-            className="inline-flex items-center gap-1 text-xs text-honey-600 dark:text-honey-400 hover:underline font-medium"
-          >
-            <Truck className="w-3.5 h-3.5" /> Preseli
-          </button>
-        </div>
-      ) : undefined}
-    >
-      {isLoading ? (
-        <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-honey-500" /></div>
-      ) : isError ? (
-        <ErrorMessage message="Greška pri učitavanju selidbi." />
-      ) : moves.length === 0 ? (
-        <p className="text-center py-6 text-sm text-gray-400 dark:text-slate-500">
-          Pčelinjak je na matičnoj lokaciji — još nema zabilježenih selidbi.
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {moves.map(m => (
-            <div key={m.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-slate-800/60">
-              <span className="text-sm text-gray-500 dark:text-slate-400 w-20 shrink-0">
-                {format(new Date(m.movedAt), 'dd.MM.yyyy')}
-              </span>
-              <span className="flex items-center gap-1.5 text-sm min-w-0 flex-wrap">
-                <span className="text-gray-500 dark:text-slate-400">{m.fromPastureName ?? 'Matična lokacija'}</span>
-                <ArrowRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <span className="font-medium text-gray-800 dark:text-slate-100">{m.toPastureName}</span>
-              </span>
-              {m.certificateNumber && (
-                <span className="hidden sm:flex items-center gap-1 text-xs text-gray-400 dark:text-slate-500 shrink-0" title="Broj veterinarske svjedodžbe">
-                  <FileCheck2 className="w-3.5 h-3.5" /> {m.certificateNumber}
+          </div>
+        ) : undefined}
+      >
+        {isLoading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-honey-500" /></div>
+        ) : isError ? (
+          <ErrorMessage message="Greška pri učitavanju selidbi." />
+        ) : moves.length === 0 ? (
+          <p className="text-center py-6 text-sm text-gray-400 dark:text-slate-500">
+            Pčelinjak je na matičnoj lokaciji — još nema zabilježenih selidbi.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {moves.map(m => (
+              <div key={m.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-slate-800/60">
+                <span className="text-sm text-gray-500 dark:text-slate-400 w-20 shrink-0">
+                  {format(new Date(m.movedAt), 'dd.MM.yyyy')}
                 </span>
-              )}
-              {canManage && m.id === latest?.id && (
-                <button
-                  onClick={() => setConfirmTarget(m)}
-                  className="ml-auto p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
-                  aria-label="Obriši selidbu"
-                  title="Obriši (samo posljednja selidba)"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+                <span className="flex items-center gap-1.5 text-sm min-w-0 flex-wrap">
+                  <span className="text-gray-500 dark:text-slate-400">{m.fromPastureName ?? 'Matična lokacija'}</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  <span className="font-medium text-gray-800 dark:text-slate-100">{m.toPastureName}</span>
+                </span>
+                {m.certificateNumber && (
+                  <span className="hidden sm:flex items-center gap-1 text-xs text-gray-400 dark:text-slate-500 shrink-0" title="Broj veterinarske svjedodžbe">
+                    <FileCheck2 className="w-3.5 h-3.5" /> {m.certificateNumber}
+                  </span>
+                )}
+                {canManage && m.id === latest?.id && (
+                  <button
+                    onClick={() => setConfirmTarget(m)}
+                    className="ml-auto p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
+                    aria-label="Obriši selidbu"
+                    title="Obriši (samo posljednja selidba)"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CollapsibleSection>
 
+      {/* Rendered outside the collapsible body on purpose — it stays collapsed by default, so a
+          modal nested inside it would never mount while the section is closed. */}
       {moveModalOpen && (
         <MoveApiaryModal
           apiaryId={apiaryId}
@@ -157,7 +161,7 @@ export function ApiaryMovesSection({ apiaryId, canManage, hasHomeLocation }: Api
         onCancel={() => setConfirmTarget(null)}
         isLoading={isDeleting}
       />
-    </CollapsibleSection>
+    </>
   )
 }
 
@@ -177,7 +181,6 @@ function MoveApiaryModal({ apiaryId, currentPastureId, canReturnHome, onClose }:
 
   const [toPastureId, setToPastureId] = useState<number>(0)
   const [movedAt, setMovedAt] = useState<string>(today())
-  const [certificateNumber, setCertificateNumber] = useState('')
   const [notes, setNotes] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -202,7 +205,7 @@ function MoveApiaryModal({ apiaryId, currentPastureId, canReturnHome, onClose }:
       await createMove.mutateAsync({
         toPastureId,
         movedAt,
-        certificateNumber: certificateNumber.trim() || null,
+        certificateNumber: null,
         notes: notes.trim() || null,
       })
       toast.success('Selidba zabilježena — lokacija pčelinjaka je ažurirana.')
@@ -282,11 +285,6 @@ function MoveApiaryModal({ apiaryId, currentPastureId, canReturnHome, onClose }:
           <div>
             <label className={labelClass}>Datum selidbe <span className="text-red-500">*</span></label>
             <input type="date" value={movedAt} max={today()} onChange={e => setMovedAt(e.target.value)} className={inputClass} />
-          </div>
-
-          <div>
-            <label className={labelClass}>Broj veterinarske svjedodžbe</label>
-            <input type="text" maxLength={50} placeholder="zakonski se očekuje pri selidbi" value={certificateNumber} onChange={e => setCertificateNumber(e.target.value)} className={inputClass} />
           </div>
 
           <div>

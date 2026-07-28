@@ -156,10 +156,10 @@ function CompleteEarlyModal({
         {err && <p className="form-error mt-1">{err}</p>}
 
         <div className="flex gap-3 mt-4">
-          <button onClick={onCancel} className="btn-secondary flex-1" disabled={isLoading}>
+          <button onClick={onCancel} className="btn-secondary flex-1 text-sm py-2" disabled={isLoading}>
             Otkaži
           </button>
-          <button onClick={submit} className="btn-primary flex-1 bg-red-500 hover:bg-red-600" disabled={isLoading}>
+          <button onClick={submit} className="btn-primary flex-1 text-sm py-2 bg-red-500 hover:bg-red-600" disabled={isLoading}>
             {isLoading ? 'Zaustavljam…' : 'Zaustavi prehranu'}
           </button>
         </div>

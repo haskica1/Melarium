@@ -39,7 +39,10 @@ public class OrgManagementService : IOrgManagementService
         // organisation's member list got slower as *other* tenants signed up.
         var users = await _uow.Users.GetByOrganizationWithDetailsAsync(orgId);
         return users
-            .Where(u => u.Role is UserRole.Beekeeper or UserRole.ApiaryAdmin)
+            // OrganizationAdmin included so co-admins of the org are visible too (read-only here —
+            // GetMemberAsync below still refuses to open the assignments screen for them, since an
+            // org admin has nothing to assign).
+            .Where(u => u.Role is UserRole.Beekeeper or UserRole.ApiaryAdmin or UserRole.OrganizationAdmin)
             .Select(MapMember)
             .ToList();
     }

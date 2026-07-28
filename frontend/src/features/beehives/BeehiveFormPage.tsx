@@ -87,8 +87,6 @@ export default function BeehiveFormPage() {
       <FormHeader
         icon="🐝"
         title={isEditing ? 'Uredi košnicu' : 'Nova košnica'}
-        onBack={goBack}
-        backLabel="Nazad"
       />
 
       <div className="card">
@@ -220,9 +218,9 @@ export default function BeehiveFormPage() {
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : isEditing ? (
-                'Spremi promjene'
+                'Spremi'
               ) : (
-                'Napravi košnicu'
+                'Napravi'
               )}
             </button>
           </div>

@@ -81,9 +81,10 @@ export default function ExpensesPage() {
             <button
               onClick={() => navigate('/expenses/scan')}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-honey-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-white dark:hover:bg-slate-700 transition-colors"
+              title="Skeniraj račun"
             >
               <Camera className="w-4 h-4" />
-              <span className="hidden sm:inline">Skeniraj</span> račun
+              <span className="hidden sm:inline">Skeniraj račun</span>
             </button>
             <button
               onClick={() => navigate('/expenses/new')}
@@ -225,13 +226,13 @@ function ExpenseCard({ expense, isDeleting, onEdit, onDelete }: ExpenseCardProps
           </span>
         </div>
         <div className="flex items-center gap-3 mt-0.5 text-sm text-gray-500 dark:text-slate-400">
-          <span>{format(new Date(expense.purchaseDate), 'dd.MM.yyyy')}</span>
-          <span>·</span>
-          <span>{expense.itemCount} {expense.itemCount === 1 ? 'stavka' : 'stavki'}</span>
+          <span className="shrink-0">{format(new Date(expense.purchaseDate), 'dd.MM.yyyy')}</span>
+          <span className="shrink-0">·</span>
+          <span className="shrink-0">{expense.itemCount} {expense.itemCount === 1 ? 'stavka' : 'stavki'}</span>
           {expense.notes && (
             <>
-              <span>·</span>
-              <span className="truncate">{expense.notes}</span>
+              <span className="shrink-0">·</span>
+              <span className="truncate min-w-0">{expense.notes}</span>
             </>
           )}
         </div>

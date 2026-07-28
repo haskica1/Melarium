@@ -295,15 +295,23 @@ export default function ApiaryDetailPage() {
             count={apiary.beehiveCount}
             action={
               (beehives.length > 0 || canManageHives) ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   {beehives.length > 0 && (
-                    <button onClick={() => setQrAllOpen(true)} className="btn-secondary text-sm">
-                      <Download className="w-4 h-4" /> QR kodovi
+                    <button
+                      onClick={() => setQrAllOpen(true)}
+                      className="btn-secondary text-sm !px-2.5 sm:!px-4"
+                      title="QR kodovi"
+                    >
+                      <Download className="w-4 h-4" /> <span className="hidden sm:inline">QR kodovi</span>
                     </button>
                   )}
                   {canManageHives && (
-                    <Link to={`/beehives/new?apiaryId=${apiaryId}`} className="btn-primary text-sm">
-                      <Plus className="w-4 h-4" /> Dodaj košnicu
+                    <Link
+                      to={`/beehives/new?apiaryId=${apiaryId}`}
+                      className="btn-primary text-sm !px-2.5 sm:!px-4"
+                      title="Dodaj košnicu"
+                    >
+                      <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Dodaj košnicu</span>
                     </Link>
                   )}
                 </div>

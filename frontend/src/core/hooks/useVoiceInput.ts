@@ -50,6 +50,9 @@ export function useVoiceInput(): UseVoiceInputReturn {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rec.onresult = (event: any) => {
+      // A result means recognition recovered from any earlier transient error (e.g. a network
+      // blip) — clear the warning so it doesn't linger once live text is flowing again.
+      setErrorMessage(null)
       let interim = ''
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const t = event.results[i][0].transcript
@@ -78,8 +81,15 @@ export function useVoiceInput(): UseVoiceInputReturn {
           langIdxRef.current++
         }
       } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
-        // non-fatal — audio recording continues unaffected
+        // Non-fatal for the recording itself (MediaRecorder keeps running independently), but this
+        // used to only console.warn — on a flaky mobile connection (very common in the field) the
+        // live transcript would just silently stay blank with no indication why. 'network' is by
+        // far the most common real-world case here, since Chrome's SpeechRecognition streams audio
+        // to a remote server to transcribe it live.
         console.warn('SpeechRecognition error:', e.error)
+        setErrorMessage(
+          'Prikaz teksta uživo nije uspio (slaba mreža?) — snimak će ipak biti obrađen kad završite snimanje.',
+        )
       }
     }
 

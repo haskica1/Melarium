@@ -125,8 +125,6 @@ export default function LearningTopicFormPage() {
       <FormHeader
         icon="🎓"
         title={isEdit ? 'Uredi temu' : 'Nova tema'}
-        onBack={goBack}
-        backLabel="Nazad na teme"
       />
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-none border border-honey-100 dark:border-slate-800 px-8 py-8">
@@ -306,7 +304,7 @@ export default function LearningTopicFormPage() {
             </button>
             <button type="submit" disabled={isSaving} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-honey-500 hover:bg-honey-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors">
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isEdit ? 'Spremi promjene' : 'Sačuvaj temu'}
+              {isEdit ? 'Spremi' : 'Sačuvaj temu'}
             </button>
           </div>
         </form>

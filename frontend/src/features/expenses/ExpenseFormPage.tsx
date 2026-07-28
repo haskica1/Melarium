@@ -154,11 +154,9 @@ export default function ExpenseFormPage() {
       <FormHeader
         icon="🧾"
         title={isEdit ? 'Uredi trošak' : 'Novi trošak'}
-        onBack={goBack}
-        backLabel="Nazad na troškove"
       />
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-none border border-honey-100 dark:border-slate-800 px-8 py-8">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-none border border-honey-100 dark:border-slate-800 px-4 py-6 sm:px-8 sm:py-8">
         {error && (
           <div className="flex items-start gap-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 rounded-xl px-4 py-3 text-sm mb-5">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -168,7 +166,7 @@ export default function ExpenseFormPage() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Date + Currency row */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
                 Datum kupovine <span className="text-red-500">*</span>
@@ -307,7 +305,7 @@ export default function ExpenseFormPage() {
               className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-honey-500 hover:bg-honey-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors"
             >
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isEdit ? 'Spremi promjene' : 'Sačuvaj trošak'}
+              {isEdit ? 'Spremi' : 'Sačuvaj trošak'}
             </button>
           </div>
         </form>

@@ -138,7 +138,6 @@ export default function DietFormPage() {
         icon="🌿"
         title={isEdit ? 'Uredi prehranu' : 'Nova prehrana'}
         subtitle={isEdit ? 'Ažuriraj program prehrane' : 'Kreiraj program prehrane'}
-        onBack={goBack}
       />
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -201,7 +200,7 @@ export default function DietFormPage() {
         <div className="card space-y-4">
           <h3 className="font-semibold text-gray-700 dark:text-slate-200 text-sm uppercase tracking-wide">Raspored</h3>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="form-label">Trajanje (dani) *</label>
               <input
@@ -271,11 +270,11 @@ export default function DietFormPage() {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-3 justify-end pb-8">
+        <div className="flex gap-3 pb-8">
           {/* A button, not a Link — a Link would push the parent on top of the abandoned form. */}
-          <button type="button" onClick={goBack} className="btn-secondary">Otkaži</button>
-          <button type="submit" className="btn-primary" disabled={isSaving}>
-            {isSaving ? 'Čuvanje…' : isEdit ? 'Spremi promjene' : 'Kreiraj prehranu'}
+          <button type="button" onClick={goBack} className="btn-secondary flex-1">Otkaži</button>
+          <button type="submit" className="btn-primary flex-1" disabled={isSaving}>
+            {isSaving ? 'Čuvanje…' : isEdit ? 'Spremi' : 'Kreiraj prehranu'}
           </button>
         </div>
       </form>

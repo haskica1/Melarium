@@ -340,7 +340,7 @@ export function QueenSection({ beehiveId, canManage }: { beehiveId: number; canM
               </div>
 
               {editTarget !== 'new' && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="form-label text-xs">Status</label>
                     <select
@@ -406,7 +406,7 @@ export function QueenSection({ beehiveId, canManage }: { beehiveId: number; canM
 
               <div className="flex gap-3 pt-1">
                 <button onClick={() => setEditTarget(null)} className="btn-secondary flex-1 text-sm py-2">
-                  Odustani
+                  Otkaži
                 </button>
                 <button
                   onClick={handleSubmit}

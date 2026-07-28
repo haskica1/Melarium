@@ -213,11 +213,9 @@ export default function TreatmentFormPage() {
       <FormHeader
         icon="💊"
         title={isEdit ? 'Uredi tretman' : 'Novi tretman'}
-        onBack={goBack}
-        backLabel="Nazad na tretmane"
       />
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-none border border-honey-100 dark:border-slate-800 px-8 py-8">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-none border border-honey-100 dark:border-slate-800 px-4 py-6 sm:px-8 sm:py-8">
         {formError && (
           <div className="flex items-start gap-2 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-700 dark:text-red-300 rounded-xl px-4 py-3 text-sm mb-5">
             <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -247,7 +245,7 @@ export default function TreatmentFormPage() {
           </div>
 
           {/* Apiary + purpose */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>
                 Pčelinjak <span className="text-red-500">*</span>
@@ -271,7 +269,7 @@ export default function TreatmentFormPage() {
           </div>
 
           {/* Preparat + doza (bitno) */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelClass}>
                 Preparat <span className="text-red-500">*</span>
@@ -287,7 +285,7 @@ export default function TreatmentFormPage() {
           </div>
 
           {/* Dates + karenca */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className={labelClass}>
                 Početak <span className="text-red-500">*</span>
@@ -382,7 +380,7 @@ export default function TreatmentFormPage() {
 
             {showAdvanced && (
               <div className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClass}>Aktivna tvar</label>
                     <select value={substance} onChange={e => setSubstance(Number(e.target.value))} className={inputClass}>
@@ -397,7 +395,7 @@ export default function TreatmentFormPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={labelClass}>LOT broj</label>
                     <input type="text" placeholder="broj serije s pakovanja" value={batchNumber} onChange={e => setBatchNumber(e.target.value)} className={inputClass} />
@@ -424,7 +422,7 @@ export default function TreatmentFormPage() {
             </button>
             <button type="submit" disabled={isSaving || selectedCount === 0} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-honey-500 hover:bg-honey-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors">
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isEdit ? 'Spremi promjene' : 'Sačuvaj tretman'}
+              {isEdit ? 'Spremi' : 'Sačuvaj tretman'}
             </button>
           </div>
         </form>

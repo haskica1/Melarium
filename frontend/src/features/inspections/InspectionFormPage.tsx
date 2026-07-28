@@ -334,8 +334,6 @@ export default function InspectionFormPage() {
       <FormHeader
         icon="📋"
         title={isEditing ? 'Uredi pregled' : 'Zabilježi pregled'}
-        onBack={goBack}
-        backLabel={outboxId ? 'Nazad na neposlano' : 'Nazad na košnicu'}
       />
 
       <div className="card">
@@ -500,7 +498,7 @@ export default function InspectionFormPage() {
                         className="flex-1 flex items-center justify-center gap-2 btn-primary"
                       >
                         <Circle className="w-3.5 h-3.5 fill-current" />
-                        Počni snimanje
+                        Počni
                       </button>
                     )}
                   </div>
@@ -715,9 +713,9 @@ export default function InspectionFormPage() {
                   ) : savedInspectionId != null ? (
                     'Pošalji fotografije'
                   ) : isEditing ? (
-                    'Spremi promjene'
+                    'Spremi'
                   ) : (
-                    'Zabilježi pregled'
+                    'Dodaj'
                   )}
                 </button>
               </div>

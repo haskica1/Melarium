@@ -98,8 +98,6 @@ export default function MemberAssignmentPage() {
         icon="🔗"
         title={`${member.firstName} ${member.lastName}`}
         subtitle={member.email}
-        onBack={goBack}
-        backLabel="Nazad na Članove"
       />
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-none border border-honey-100 dark:border-slate-800 px-8 py-8 space-y-6">

@@ -67,8 +67,6 @@ export default function ApiaryFormPage() {
       <FormHeader
         icon="🏡"
         title={isEditing ? 'Uredi pčelinjak' : 'Novi pčelinjak'}
-        onBack={goBack}
-        backLabel="Nazad"
       />
 
       <div className="card">
@@ -168,9 +166,9 @@ export default function ApiaryFormPage() {
               {isSubmitting ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : isEditing ? (
-                'Spremi promjene'
+                'Spremi'
               ) : (
-                'Napravi pčelinjak'
+                'Napravi'
               )}
             </button>
           </div>

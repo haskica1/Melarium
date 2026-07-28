@@ -107,7 +107,10 @@ export default function MembersPage() {
   // ── Derived vitals ──────────────────────────────────────────────────────────
   const adminCount = members.filter(m => m.role === 'ApiaryAdmin').length
   const userCount  = members.filter(m => m.role === 'Beekeeper').length
-  const assignedCount = members.filter(m =>
+  // Org admins have nothing to assign (they already have full org access) — counting them as
+  // "unassigned" would understate this vital, so they're excluded from both sides of the ratio.
+  const assignable = members.filter(m => m.role !== 'OrganizationAdmin')
+  const assignedCount = assignable.filter(m =>
     m.role === 'ApiaryAdmin' ? !!m.apiaryName : m.assignedBeehiveNames.length > 0,
   ).length
 
@@ -122,7 +125,7 @@ export default function MembersPage() {
   }, [members, query])
 
   const roleLabel = (role: string) =>
-    role === 'ApiaryAdmin' ? 'Admin' : 'Korisnik'
+    role === 'OrganizationAdmin' ? 'Org Admin' : role === 'ApiaryAdmin' ? 'Admin' : 'Korisnik'
 
   return (
     <div className="animate-fade-in space-y-6">
@@ -230,13 +233,17 @@ export default function MembersPage() {
                         </td>
                         <td className="px-4 py-3 text-gray-500 dark:text-slate-400 hidden sm:table-cell">{member.email}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                            ${member.role === 'ApiaryAdmin' ? 'bg-honey-100 text-honey-700 dark:bg-honey-500/15 dark:text-honey-300' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            member.role === 'OrganizationAdmin' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'
+                            : member.role === 'ApiaryAdmin' ? 'bg-honey-100 text-honey-700 dark:bg-honey-500/15 dark:text-honey-300'
+                            : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300'}`}>
                             {roleLabel(member.role)}
                           </span>
                         </td>
                         <td className="px-4 py-3 hidden md:table-cell">
-                          {member.role === 'ApiaryAdmin' ? (
+                          {member.role === 'OrganizationAdmin' ? (
+                            <span className="text-gray-400 dark:text-slate-500 text-xs italic">Puni pristup organizaciji</span>
+                          ) : member.role === 'ApiaryAdmin' ? (
                             <span className="text-gray-500 dark:text-slate-400 text-xs">
                               {member.apiaryName
                                 ? <span className="text-honey-700 dark:text-honey-400 font-medium">{member.apiaryName}</span>
@@ -251,13 +258,16 @@ export default function MembersPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <button
-                            onClick={() => navigate(`/members/${member.id}/assignments`)}
-                            className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
-                            title="Uredi dodjele"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </button>
+                          {/* Org admins have nothing to assign — the assignments page rejects the role server-side. */}
+                          {member.role !== 'OrganizationAdmin' && (
+                            <button
+                              onClick={() => navigate(`/members/${member.id}/assignments`)}
+                              className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
+                              title="Uredi dodjele"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

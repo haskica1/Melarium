@@ -1,19 +1,32 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { Flower2, Loader2, MapPin, PencilLine, Plus, Tent, Trash2, X } from 'lucide-react'
+import { ChevronRight, Flower2, Home, Loader2, MapPin, PencilLine, Plus, Tent, Trash2, X } from 'lucide-react'
 import {
   usePastures,
   useCreatePasture,
   useUpdatePasture,
   useDeletePasture,
 } from '../../core/services/pastureQueries'
+import { useApiaries } from '../../core/services/queries'
 import type { Pasture, SavePasturePayload } from '../../core/models'
 import { ConfirmDialog, EmptyState, ErrorState, VitalsSkeleton } from '../../shared/components'
 import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
 import LocationPickerModal from '../../shared/components/LocationPickerModal'
 import { usePermissions } from '../../core/hooks/usePermissions'
 import { useToast } from '../../core/context/ToastContext'
+
+// Amber house-shaped marker for apiaries, so they read as visually distinct from the default blue
+// pasture pins at a glance — no separate image asset, just a styled div.
+const apiaryIcon = L.divIcon({
+  html: '<div style="background:#f59e0b;width:26px;height:26px;border-radius:9999px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,0.4);border:2px solid white;font-size:14px;line-height:1">🏡</div>',
+  className: '',
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
+  popupAnchor: [0, -13],
+})
 
 /** Auto-fits the map so every pasture marker is visible; re-fits only when the coordinates change. */
 function FitBounds({ points }: { points: [number, number][] }) {
@@ -33,6 +46,7 @@ export default function PasturesPage() {
   const { toast } = useToast()
 
   const { data: pastures = [], isLoading, isError, refetch } = usePastures()
+  const { data: apiaries = [] } = useApiaries()
   const createPasture = useCreatePasture()
   const updatePasture = useUpdatePasture()
   const deletePasture = useDeletePasture()
@@ -43,6 +57,8 @@ export default function PasturesPage() {
 
   const located = pastures.filter(p => p.latitude != null && p.longitude != null)
   const occupied = pastures.filter(p => p.apiariesOnPasture > 0).length
+  // Stationary apiaries (never migrated) otherwise have no presence at all on this page.
+  const locatedApiaries = apiaries.filter(a => a.latitude != null && a.longitude != null)
 
   async function handleSave(payload: SavePasturePayload) {
     if (formTarget === 'new') {
@@ -118,10 +134,10 @@ export default function PasturesPage() {
       {/* `isolate` contains Leaflet's internal z-indexed panes/controls (up to ~800) inside their own
           stacking context — otherwise they leak above later-in-DOM but lower-z-index elements like
           the "new pasture" modal (z-50). */}
-      {!isLoading && located.length > 0 && (
+      {!isLoading && (located.length > 0 || locatedApiaries.length > 0) && (
         <div className="relative isolate rounded-2xl overflow-hidden border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none">
           <MapContainer
-            center={[located[0].latitude!, located[0].longitude!]}
+            center={located[0] ? [located[0].latitude!, located[0].longitude!] : [locatedApiaries[0].latitude!, locatedApiaries[0].longitude!]}
             zoom={9}
             style={{ height: 320, width: '100%' }}
             scrollWheelZoom={false}
@@ -130,9 +146,12 @@ export default function PasturesPage() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <FitBounds points={located.map(p => [p.latitude!, p.longitude!] as [number, number])} />
+            <FitBounds points={[
+              ...located.map(p => [p.latitude!, p.longitude!] as [number, number]),
+              ...locatedApiaries.map(a => [a.latitude!, a.longitude!] as [number, number]),
+            ]} />
             {located.map(p => (
-              <Marker key={p.id} position={[p.latitude!, p.longitude!]}>
+              <Marker key={`pasture-${p.id}`} position={[p.latitude!, p.longitude!]}>
                 <Popup>
                   <strong>{p.name}</strong>
                   {p.floraNotes && <><br />{p.floraNotes}</>}
@@ -140,7 +159,51 @@ export default function PasturesPage() {
                 </Popup>
               </Marker>
             ))}
+            {locatedApiaries.map(a => (
+              <Marker key={`apiary-${a.id}`} position={[a.latitude!, a.longitude!]} icon={apiaryIcon}>
+                <Popup>
+                  <strong>🏡 {a.name}</strong>
+                  <br />{a.beehiveCount} {a.beehiveCount === 1 ? 'košnica' : 'košnica'}
+                </Popup>
+              </Marker>
+            ))}
           </MapContainer>
+          {locatedApiaries.length > 0 && (
+            <div className="absolute bottom-2 left-2 z-[1000] flex items-center gap-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur rounded-lg px-2.5 py-1.5 text-[11px] text-gray-600 dark:text-slate-300 shadow-sm">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[#3388ff] inline-block" /> Pašnjak</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block" /> Pčelinjak</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Current apiary locations — stationary apiaries that never migrate otherwise have no
+          presence on this page at all, and the map alone is easy to miss on a phone. */}
+      {!isLoading && locatedApiaries.length > 0 && (
+        <div>
+          <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 px-1 mb-3">
+            Trenutne lokacije pčelinjaka
+          </h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {locatedApiaries.map(a => (
+              <Link
+                key={a.id}
+                to={`/apiaries/${a.id}`}
+                className="bg-white dark:bg-slate-900 rounded-2xl border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none px-5 py-4 flex items-center gap-3 hover:border-honey-300 dark:hover:border-honey-500/40 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
+                  <Home className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="font-semibold text-gray-900 dark:text-slate-100 truncate block">{a.name}</span>
+                  <p className="mt-0.5 text-xs text-gray-400 dark:text-slate-500">
+                    {a.beehiveCount} {a.beehiveCount === 1 ? 'košnica' : 'košnica'} · {a.latitude!.toFixed(4)}, {a.longitude!.toFixed(4)}
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 shrink-0" />
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 
@@ -338,7 +401,7 @@ function PastureFormModal({ pasture, isSaving, onSave, onClose }: PastureFormMod
             </button>
             <button type="submit" disabled={isSaving} className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-honey-500 hover:bg-honey-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors">
               {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-              {pasture ? 'Spremi promjene' : 'Sačuvaj pašnjak'}
+              {pasture ? 'Spremi' : 'Sačuvaj pašnjak'}
             </button>
           </div>
         </form>

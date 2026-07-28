@@ -130,8 +130,6 @@ export default function ReceiptScanPage() {
         icon="📷"
         title="Skeniraj račun"
         subtitle="Fotografirajte ili učitajte račun — stavke se automatski prepoznaju."
-        onBack={goBack}
-        backLabel="Nazad na troškove"
       />
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-none border border-honey-100 dark:border-slate-800 px-8 py-8 space-y-6">
