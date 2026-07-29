@@ -260,8 +260,8 @@ export function TodoSection({
 
   const addAction = effectiveCanCreate && !showAddForm
     ? (
-      <button onClick={() => setShowAddForm(true)} className="btn-primary text-sm">
-        <Plus className="w-4 h-4" /> Dodaj zadatak
+      <button onClick={() => setShowAddForm(true)} className="btn-primary text-sm !px-2.5 sm:!px-4" title="Dodaj zadatak">
+        <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Dodaj zadatak</span>
       </button>
     ) : null
 

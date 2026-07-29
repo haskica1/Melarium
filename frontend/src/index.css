@@ -34,14 +34,20 @@
 
   /* iOS Safari paints native date/time controls at an internal minimum width that ignores
      `width: 100%`/`min-width: 0` — the box itself measures correctly (confirmed in Chromium) but
-     WebKit still paints past it on narrow containers. `-webkit-min-logical-width` is Apple's own
-     override for exactly this; unsupported elsewhere, so it's a no-op on every other browser. */
+     WebKit still paints past it, spilling the value past the card edge regardless of how much
+     width the input is actually given. `-webkit-min-logical-width: 100%` (tried previously) maps
+     to a min-width in WebKit's writing-mode implementation and doesn't reliably resolve against
+     the immediate container, so it's dropped here. `-webkit-appearance: none` instead removes
+     WebKit's native sizing algorithm for the control entirely — the box then obeys ordinary
+     width/box-sizing rules like any other input, and the picker still opens on tap. */
   input[type='date'],
   input[type='time'],
   input[type='datetime-local'],
   input[type='month'] {
     min-width: 0;
-    -webkit-min-logical-width: 100%;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
   }
 }
 
@@ -54,7 +60,7 @@
 
   /* Primary button */
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2.5 bg-honey-600 hover:bg-honey-700
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-honey-600 hover:bg-honey-700
            text-white font-medium rounded-xl transition-colors shadow-honey
            focus:outline-none focus:ring-2 focus:ring-honey-500 focus:ring-offset-2
            dark:focus:ring-offset-slate-950 dark:shadow-none
@@ -63,7 +69,7 @@
 
   /* Secondary / outline button */
   .btn-secondary {
-    @apply inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-honey-50
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-honey-50
            text-honey-700 font-medium rounded-xl border border-honey-300 transition-colors
            focus:outline-none focus:ring-2 focus:ring-honey-400 focus:ring-offset-2
            dark:bg-slate-800 dark:text-honey-300 dark:border-slate-700
@@ -72,7 +78,7 @@
 
   /* Danger button */
   .btn-danger {
-    @apply inline-flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600
            text-white font-medium rounded-xl transition-colors
            focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2
            dark:focus:ring-offset-slate-950;

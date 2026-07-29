@@ -236,13 +236,13 @@ export default function ApiaryDetailPage() {
 
             <div className="flex gap-2 shrink-0">
               {apiary.hasLocation && (
-                <a href={mapUrl} target="_blank" rel="noreferrer" className="btn-secondary text-sm">
-                  <MapPin className="w-4 h-4" /> Karta
+                <a href={mapUrl} target="_blank" rel="noreferrer" className="btn-secondary text-sm !px-2.5 sm:!px-4" title="Karta">
+                  <MapPin className="w-4 h-4" /> <span className="hidden sm:inline">Karta</span>
                 </a>
               )}
               {canManageApiaries && (
-                <Link to={`/apiaries/${apiaryId}/edit`} className="btn-secondary text-sm">
-                  <Pencil className="w-4 h-4" /> Uredi
+                <Link to={`/apiaries/${apiaryId}/edit`} className="btn-secondary text-sm !px-2.5 sm:!px-4" title="Uredi">
+                  <Pencil className="w-4 h-4" /> <span className="hidden sm:inline">Uredi</span>
                 </Link>
               )}
             </div>
@@ -322,13 +322,6 @@ export default function ApiaryDetailPage() {
               <EmptyState
                 title="Nema košnica"
                 description="Dodajte vašu prvu košnicu u ovaj pčelinjak."
-                action={
-                  canManageHives ? (
-                    <Link to={`/beehives/new?apiaryId=${apiaryId}`} className="btn-primary text-sm">
-                      <Plus className="w-4 h-4" /> Dodaj košnicu
-                    </Link>
-                  ) : undefined
-                }
               />
             ) : (
               <>
@@ -403,7 +396,17 @@ export default function ApiaryDetailPage() {
             icon="🌤️"
             action={
               apiary.hasLocation
-                ? <a href={mapUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-honey-600 dark:text-honey-400 hover:underline font-medium"><MapPin className="w-3 h-3" />Vidi na mapi</a>
+                ? (
+                  <a
+                    href={mapUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Vidi na mapi"
+                    className="btn-secondary text-sm !px-2.5 sm:!px-4"
+                  >
+                    <MapPin className="w-4 h-4" /> <span className="hidden sm:inline">Vidi na mapi</span>
+                  </a>
+                )
                 : undefined
             }
           >
@@ -518,8 +521,6 @@ export default function ApiaryDetailPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <DetailTile icon="📅" label="Osnovan" value={format(new Date(apiary.createdAt), 'dd MMM yyyy')} />
-              <DetailTile icon="🐝" label="Košnice" value={String(apiary.beehiveCount)} />
-              <DetailTile icon="📋" label="Pregledi" value={String(totalInspections)} />
               <DetailTile
                 icon="📍"
                 label="Lokacija"

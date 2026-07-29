@@ -95,8 +95,8 @@ export default function ApiaryListPage() {
           </div>
 
           {canManageApiaries && (
-            <Link to="/apiaries/new" className="btn-primary text-sm shrink-0">
-              <Plus className="w-4 h-4" /> Novi pčelinjak
+            <Link to="/apiaries/new" className="btn-primary text-sm shrink-0 !px-2.5 sm:!px-4" title="Novi pčelinjak">
+              <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novi pčelinjak</span>
             </Link>
           )}
         </div>
