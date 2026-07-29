@@ -32,20 +32,31 @@
     font-family: 'Playfair Display', Georgia, serif;
   }
 
-  /* iOS Safari paints native date/time controls at an internal minimum width that ignores
-     `width: 100%`/`min-width: 0` — the box itself measures correctly (confirmed in Chromium) but
-     WebKit still paints past it, spilling the value past the card edge regardless of how much
-     width the input is actually given. `-webkit-min-logical-width: 100%` (tried previously) maps
-     to a min-width in WebKit's writing-mode implementation and doesn't reliably resolve against
-     the immediate container, so it's dropped here. `-webkit-appearance: none` instead removes
-     WebKit's native sizing algorithm for the control entirely — the box then obeys ordinary
-     width/box-sizing rules like any other input, and the picker still opens on tap. */
+  /* iOS Safari native date/time controls, third pass. Two earlier attempts here didn't hold up
+     under real-device retesting (2026-07-29): `-webkit-min-logical-width: 100%` didn't stop the
+     control painting past its own box, and `-webkit-appearance: none` alone didn't either — iOS
+     is known to only partially honour appearance overrides on `date`/`time` inputs (unlike
+     `select`/checkboxes, where it fully works), so it can keep using its own internal width *and*
+     stop sizing the box the normal way, which also explains the empty-value input looking too
+     short: with no value, WebKit's own height for the placeholder segments disagreed with the
+     line-height/padding math every other `.form-input` uses.
+     This version stops trying to make WebKit size the control correctly and instead constrains
+     the box from outside: an explicit `height` (matching a plain `.form-input` text field exactly,
+     so empty vs filled and date vs select/text all line up) plus `overflow: hidden` so
+     whatever WebKit renders internally is clipped at the input's own border rather than spilling
+     past the card, regardless of container width. Still unverified on a real device — there's no
+     iOS/WebKit available in this environment, only Chromium. */
   input[type='date'],
   input[type='time'],
   input[type='datetime-local'],
   input[type='month'] {
     min-width: 0;
+    width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
+    height: 2.625rem;
+    line-height: 1.25rem;
+    overflow: hidden;
     -webkit-appearance: none;
     appearance: none;
   }

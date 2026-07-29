@@ -78,16 +78,16 @@ export default function ApiaryListPage() {
                       bg-gradient-to-br from-honey-100 via-white to-honey-50
                       dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 shadow-card dark:shadow-none">
         <div className="absolute inset-0 bg-honeycomb opacity-60 dark:opacity-100 pointer-events-none" />
-        <div className="relative p-5 sm:p-7 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="relative p-5 sm:p-7 flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
             <div className="w-14 h-14 shrink-0 rounded-2xl bg-white/70 dark:bg-slate-800 border border-honey-200 dark:border-slate-700 flex items-center justify-center text-3xl shadow-honey dark:shadow-none">
               🏡
             </div>
             <div className="min-w-0">
-              <h1 className="font-display text-2xl sm:text-3xl font-bold text-gray-900 dark:text-slate-50">
+              <h1 className="font-display text-2xl sm:text-3xl font-bold text-gray-900 dark:text-slate-50 truncate">
                 Moji pčelinjaci
               </h1>
-              <p className="mt-0.5 text-sm text-gray-600 dark:text-slate-400">
+              <p className="mt-0.5 text-sm text-gray-600 dark:text-slate-400 truncate">
                 {apiaries.length} {apiaries.length === 1 ? 'pčelinjak' : 'pčelinjaka'}
                 {apiaries.length > 0 && <> · {totalBeehives} {totalBeehives === 1 ? 'košnica' : 'košnica'} ukupno</>}
               </p>
@@ -95,7 +95,7 @@ export default function ApiaryListPage() {
           </div>
 
           {canManageApiaries && (
-            <Link to="/apiaries/new" className="btn-primary text-sm shrink-0 !px-2.5 sm:!px-4" title="Novi pčelinjak">
+            <Link to="/apiaries/new" className="btn-primary text-sm shrink-0 !p-2.5 sm:!px-4 sm:!py-2.5" title="Novi pčelinjak">
               <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Novi pčelinjak</span>
             </Link>
           )}
