@@ -6,22 +6,30 @@
  * JPEG fixes both and cuts the mobile upload.
  */
 
-/** Longest edge of the re-encoded image — ample for reading a number painted on a hive. */
-const MAX_EDGE = 1600
+/** Longest edge of a scanned frame — ample for reading a number painted on a hive. */
+const SCAN_MAX_EDGE = 1600
 
-/** Byte budget, kept clear of the backend's ~3 MB ceiling. */
-const MAX_BYTES = 2 * 1024 * 1024
+/** Byte budget for a scan, kept clear of the backend's ~3 MB ceiling. */
+const SCAN_MAX_BYTES = 2 * 1024 * 1024
 
-/** Tried in order until one lands under MAX_BYTES. */
+/**
+ * An inspection photo is looked at by a human and by the frame-analysis model, so it keeps more
+ * detail than a scan does. Bounds stay under the 8 MB the upload endpoint accepts.
+ */
+const PHOTO_MAX_EDGE = 2400
+const PHOTO_MAX_BYTES = 6 * 1024 * 1024
+
+/** Tried in order until one lands under the byte budget. */
 const QUALITY_STEPS = [0.85, 0.7, 0.55, 0.4]
 
-async function decode(image: Blob): Promise<ImageBitmap | HTMLImageElement> {
-  // `imageOrientation` applies the EXIF rotation phone cameras write — without it a portrait shot
-  // lands sideways on the canvas and the painted number becomes unreadable to both OCR passes.
-  if (typeof createImageBitmap === 'function')
-    return createImageBitmap(image, { imageOrientation: 'from-image' })
+/**
+ * What the upload endpoint stores as-is. The server re-derives this from the header bytes, so this
+ * list has to match its sniffer (InspectionPhotoService.DetectContentType).
+ */
+const DIRECTLY_UPLOADABLE = ['image/jpeg', 'image/png', 'image/webp']
 
-  // Pre-Safari-15 fallback. Browsers honour EXIF for <img> since ~2020, so orientation still holds.
+/** Browsers honour EXIF orientation for <img> since ~2020, so this path keeps rotation correct. */
+async function decodeViaImageElement(image: Blob): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(image)
   try {
     const el = new Image()
@@ -36,6 +44,33 @@ async function decode(image: Blob): Promise<ImageBitmap | HTMLImageElement> {
   }
 }
 
+async function decode(image: Blob): Promise<ImageBitmap | HTMLImageElement> {
+  // `imageOrientation` applies the EXIF rotation phone cameras write — without it a portrait shot
+  // lands sideways on the canvas and the painted number becomes unreadable to both OCR passes.
+  //
+  // Detecting the *function* is not enough, and that is what broke scanning on iPhone: Safari 15–16
+  // ship `createImageBitmap`, but their `ImageBitmapOptions.imageOrientation` still carries the
+  // original enum ("none" | "flipY"). "from-image" was added to the spec later, so passing it is an
+  // invalid enum value and WebKit rejects the call with a TypeError. The rejection escaped to
+  // `downscaleForScan`'s outer catch, which returns the image untouched — so on iOS the resize was
+  // skipped entirely and the full 12 MP original went on to Tesseract and to the vision endpoint,
+  // which refuses anything past its base64 cap. Hence "skeniranje ne radi na iPhonu".
+  //
+  // The <img> fallback below handles both that and HEIC (iOS decodes HEIC natively; the canvas
+  // re-encode then hands every consumer a plain JPEG).
+  if (typeof createImageBitmap === 'function') {
+    try {
+      // Must be awaited here: returning the promise would move the rejection out of this try.
+      return await createImageBitmap(image, { imageOrientation: 'from-image' })
+    } catch {
+      // Fall through. Not retried without the option — the default is "none", which drops EXIF
+      // rotation and would land portrait photos sideways.
+    }
+  }
+
+  return decodeViaImageElement(image)
+}
+
 const sourceSize = (source: ImageBitmap | HTMLImageElement) =>
   'naturalWidth' in source
     ? { width: source.naturalWidth, height: source.naturalHeight }
@@ -45,12 +80,11 @@ const toJpeg = (canvas: HTMLCanvasElement, quality: number) =>
   new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', quality))
 
 /**
- * Re-encodes `image` as a JPEG bounded to {@link MAX_EDGE} px on its longest side and
- * {@link MAX_BYTES}, preserving EXIF orientation. Falls back to the original blob when the browser
- * cannot decode or re-encode it, so a failure here degrades to today's behaviour rather than
- * blocking the scan.
+ * Re-encodes `image` as a JPEG bounded to `maxEdge` px on its longest side and `maxBytes`,
+ * preserving EXIF orientation. Falls back to the original blob when the browser cannot decode or
+ * re-encode it, so a failure here degrades rather than blocking the caller.
  */
-export async function downscaleForScan(image: Blob): Promise<Blob> {
+async function reencodeAsJpeg(image: Blob, maxEdge: number, maxBytes: number): Promise<Blob> {
   let source: ImageBitmap | HTMLImageElement
   try {
     source = await decode(image)
@@ -62,7 +96,7 @@ export async function downscaleForScan(image: Blob): Promise<Blob> {
     const { width, height } = sourceSize(source)
     if (!width || !height) return image
 
-    const scale = Math.min(1, MAX_EDGE / Math.max(width, height))
+    const scale = Math.min(1, maxEdge / Math.max(width, height))
     const canvas = document.createElement('canvas')
     canvas.width = Math.max(1, Math.round(width * scale))
     canvas.height = Math.max(1, Math.round(height * scale))
@@ -79,7 +113,7 @@ export async function downscaleForScan(image: Blob): Promise<Blob> {
     for (const quality of QUALITY_STEPS) {
       encoded = await toJpeg(canvas, quality)
       if (!encoded) break
-      if (encoded.size <= MAX_BYTES) return encoded
+      if (encoded.size <= maxBytes) return encoded
     }
 
     // Still over budget at the lowest quality — send the smallest render we managed rather than the
@@ -88,4 +122,35 @@ export async function downscaleForScan(image: Blob): Promise<Blob> {
   } finally {
     if ('close' in source) source.close()
   }
+}
+
+/** Bounded JPEG for the hive-number scan (on-device OCR + the vision endpoint). */
+export const downscaleForScan = (image: Blob): Promise<Blob> =>
+  reencodeAsJpeg(image, SCAN_MAX_EDGE, SCAN_MAX_BYTES)
+
+/**
+ * Makes a picked file uploadable as an inspection photo.
+ *
+ * An iPhone stores camera shots as HEIC. Safari transcodes to JPEG when the photo comes from the
+ * Photo Library, but hands over the raw `.heic` when it is picked through Files/iCloud Drive — and
+ * neither the client check nor the server's header sniffer accepts HEIC, so the attachment was
+ * refused with "nije podržan format". Safari decodes HEIC natively, so a canvas round-trip turns it
+ * into an ordinary JPEG.
+ *
+ * Files that are already in an accepted format are returned **untouched** — re-encoding them would
+ * strip the EXIF the app deliberately preserves (see the note under the picker: photos are stored
+ * in their original form, including capture location).
+ */
+export async function normalizePhotoForUpload(file: File): Promise<File> {
+  if (DIRECTLY_UPLOADABLE.includes(file.type)) return file
+
+  const converted = await reencodeAsJpeg(file, PHOTO_MAX_EDGE, PHOTO_MAX_BYTES)
+  // reencodeAsJpeg hands back the input untouched when it cannot decode it; passing that through
+  // unchanged lets the existing validation produce its normal "unsupported format" message.
+  if (converted === file) return file
+
+  return new File([converted], file.name.replace(/\.[^.]+$/, '') + '.jpg', {
+    type: 'image/jpeg',
+    lastModified: file.lastModified,
+  })
 }

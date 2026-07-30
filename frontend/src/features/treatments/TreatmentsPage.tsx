@@ -109,8 +109,8 @@ export default function TreatmentsPage() {
               {YEARS.map(y => <option key={y} value={y}>{y}.</option>)}
             </select>
             {canEditDelete && (
-              <button onClick={() => navigate('/treatments/new')} className="btn-primary text-sm">
-                <Plus className="w-4 h-4" /> Dodaj tretman
+              <button onClick={() => navigate('/treatments/new')} className="btn-primary text-sm" title="Dodaj tretman" aria-label="Dodaj tretman">
+                <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Dodaj tretman</span>
               </button>
             )}
           </div>

@@ -32,6 +32,7 @@ import {
   type OutboxItem,
 } from '../../core/offline/outbox'
 import { isNetworkError } from '../../core/offline/syncOutbox'
+import { normalizePhotoForUpload } from '../../shared/utils/imageDownscale'
 
 const voiceChipCls =
   'text-xs font-medium px-2.5 py-1 rounded-full bg-honey-100 text-honey-700 dark:bg-honey-500/15 dark:text-honey-300'
@@ -232,14 +233,23 @@ export default function InspectionFormPage() {
   const remainingPhotoSlots =
     MAX_PHOTOS_PER_INSPECTION - (existingPhotos?.length ?? 0) - pendingPhotos.length
 
-  const handleAddFiles = (list: FileList | null) => {
-    if (!list?.length) return
+  const handleAddFiles = async (picked: File[]) => {
+    if (!picked.length) return
     const accepted: { file: File; preview: string }[] = []
     let slots = remainingPhotoSlots
-    for (const file of Array.from(list)) {
+    for (const original of picked) {
       if (slots <= 0) {
         toast.error(`Pregled može imati najviše ${MAX_PHOTOS_PER_INSPECTION} fotografija.`)
         break
+      }
+      // An iPhone hands over HEIC when the photo comes from Files rather than the Photo Library,
+      // and neither this check nor the server accepts it — convert before validating.
+      let file = original
+      try {
+        file = await normalizePhotoForUpload(original)
+      } catch {
+        toast.error(`"${original.name}" nije moguće pripremiti za slanje.`)
+        continue
       }
       const err = validatePhotoFile(file)
       if (err) { toast.error(err); continue }
@@ -431,7 +441,7 @@ export default function InspectionFormPage() {
                     Snimi ponovo
                   </button>
                   <button type="button" onClick={handleCloseVoice} className="btn-primary flex-1">
-                    Uredu — pregledaj formu
+                    Spremi
                   </button>
                 </div>
               </div>
@@ -491,7 +501,7 @@ export default function InspectionFormPage() {
               <div className="space-y-5">
                 <div className="rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 px-4 py-5">
                   <p className="text-sm text-gray-700 dark:text-slate-200">
-                    Pritisnite <strong>Počni snimanje</strong> i ispričajte pregled svojim riječima.
+                    Pritisnite <strong>Počni</strong> i ispričajte pregled svojim riječima.
                   </p>
                   <p className="mt-2.5 text-sm italic text-gray-500 dark:text-slate-400">
                     „Pregledao sam košnicu danas, leglo je zdravo, matica se vidi, med je na visokom
@@ -519,7 +529,7 @@ export default function InspectionFormPage() {
                     className="flex-1 flex items-center justify-center gap-2 btn-primary"
                   >
                     <Circle className="w-3.5 h-3.5 fill-current" />
-                    {parseError ? 'Snimi ponovo' : 'Počni snimanje'}
+                    Počni
                   </button>
                 </div>
               </div>
@@ -658,13 +668,19 @@ export default function InspectionFormPage() {
                 )}
 
                 <div className="flex gap-2">
+                  {/* The FileList is snapshotted before the input is cleared — handleAddFiles is
+                      async now, and resetting `value` empties the live FileList it would read. */}
                   <input
                     ref={cameraInputRef}
                     type="file"
                     accept="image/*"
                     capture="environment"
                     className="hidden"
-                    onChange={e => { handleAddFiles(e.target.files); e.target.value = '' }}
+                    onChange={e => {
+                      const files = Array.from(e.target.files ?? [])
+                      e.target.value = ''
+                      void handleAddFiles(files)
+                    }}
                   />
                   <input
                     ref={galleryInputRef}
@@ -672,7 +688,11 @@ export default function InspectionFormPage() {
                     accept="image/*"
                     multiple
                     className="hidden"
-                    onChange={e => { handleAddFiles(e.target.files); e.target.value = '' }}
+                    onChange={e => {
+                      const files = Array.from(e.target.files ?? [])
+                      e.target.value = ''
+                      void handleAddFiles(files)
+                    }}
                   />
                   <button
                     type="button"

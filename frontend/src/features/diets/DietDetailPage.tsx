@@ -160,7 +160,7 @@ function CompleteEarlyModal({
             Otkaži
           </button>
           <button onClick={submit} className="btn-primary flex-1 text-sm py-2 bg-red-500 hover:bg-red-600" disabled={isLoading}>
-            {isLoading ? 'Zaustavljam…' : 'Zaustavi prehranu'}
+            {isLoading ? 'Zaustavljam…' : 'Zaustavi'}
           </button>
         </div>
       </div>

@@ -5,6 +5,21 @@ import { ExpenseSource } from '../../core/models'
 import type { CreateExpenseItemPayload } from '../../core/models'
 import { FormHeader } from '../../shared/components'
 import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
+import { decimalInputProps, parseDecimal, sanitizeDecimal } from '../../shared/utils/decimalInput'
+
+/**
+ * Rows are edited as strings, not numbers. A controlled `value={number}` cannot hold the
+ * intermediate states of typing a decimal ("1," / "1."), so each keystroke was parsed back to a
+ * number and the separator was wiped out before the next one arrived — decimals were untypeable
+ * here on every platform, not just iOS. Parsed once, on confirm.
+ */
+interface ReviewRow {
+  name: string
+  quantity: string
+  unit: string
+  unitPrice: string
+  totalPrice: string
+}
 
 // Tesseract.js is loaded lazily to avoid pulling the WASM bundle unless the user visits this page
 async function runOcr(imageFile: File): Promise<string> {
@@ -69,7 +84,7 @@ export default function ReceiptScanPage() {
   const [phase, setPhase] = useState<Phase>('capture')
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [ocrError, setOcrError] = useState<string | null>(null)
-  const [reviewItems, setReviewItems] = useState<CreateExpenseItemPayload[]>([])
+  const [reviewItems, setReviewItems] = useState<ReviewRow[]>([])
 
   async function handleFileSelected(file: File) {
     setOcrError(null)
@@ -82,19 +97,19 @@ export default function ReceiptScanPage() {
 
       if (parsed.length === 0) {
         // No items found — start with one empty row so the user can fill in manually
-        setReviewItems([emptyItem(0)])
+        setReviewItems([emptyRow()])
       } else {
-        setReviewItems(parsed)
+        setReviewItems(parsed.map(toRow))
       }
       setPhase('review')
     } catch {
       setOcrError('OCR nije uspio. Možete ručno dodati stavke.')
-      setReviewItems([emptyItem(0)])
+      setReviewItems([emptyRow()])
       setPhase('review')
     }
   }
 
-  function updateItem(index: number, field: keyof CreateExpenseItemPayload, value: string | number | undefined) {
+  function updateItem(index: number, field: keyof ReviewRow, value: string) {
     setReviewItems(prev => {
       const next = [...prev]
       next[index] = { ...next[index], [field]: value }
@@ -103,7 +118,7 @@ export default function ReceiptScanPage() {
   }
 
   function addItem() {
-    setReviewItems(prev => [...prev, emptyItem(prev.length)])
+    setReviewItems(prev => [...prev, emptyRow()])
   }
 
   function removeItem(index: number) {
@@ -111,9 +126,16 @@ export default function ReceiptScanPage() {
   }
 
   function handleConfirm() {
-    const validItems = reviewItems
+    const validItems: CreateExpenseItemPayload[] = reviewItems
       .filter(i => i.name.trim())
-      .map((item, idx) => ({ ...item, sortOrder: idx }))
+      .map((item, idx) => ({
+        name: item.name.trim(),
+        quantity: parseDecimal(item.quantity) || 0,
+        unit: item.unit.trim() || undefined,
+        unitPrice: parseDecimal(item.unitPrice) || 0,
+        totalPrice: parseDecimal(item.totalPrice) || 0,
+        sortOrder: idx,
+      }))
 
     // Replace, not push: scanning is a step on the way to the expense form, and the OCR review it
     // holds is component state that a Back press could not restore anyway — leaving the entry
@@ -254,34 +276,28 @@ export default function ReceiptScanPage() {
                     className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-1 focus:ring-honey-100 transition-all"
                   />
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    {...decimalInputProps}
                     value={item.quantity}
-                    onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                    onChange={e => updateItem(index, 'quantity', sanitizeDecimal(e.target.value))}
                     className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-1 focus:ring-honey-100 transition-all"
                   />
                   <input
                     type="text"
-                    value={item.unit ?? ''}
-                    onChange={e => updateItem(index, 'unit', e.target.value || undefined)}
+                    value={item.unit}
+                    onChange={e => updateItem(index, 'unit', e.target.value)}
                     placeholder="kg"
                     className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-1 focus:ring-honey-100 transition-all"
                   />
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    {...decimalInputProps}
                     value={item.unitPrice}
-                    onChange={e => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
+                    onChange={e => updateItem(index, 'unitPrice', sanitizeDecimal(e.target.value))}
                     className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-1 focus:ring-honey-100 transition-all"
                   />
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    {...decimalInputProps}
                     value={item.totalPrice}
-                    onChange={e => updateItem(index, 'totalPrice', parseFloat(e.target.value) || 0)}
+                    onChange={e => updateItem(index, 'totalPrice', sanitizeDecimal(e.target.value))}
                     className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-1 focus:ring-honey-100 transition-all"
                   />
                   <button
@@ -330,6 +346,18 @@ export default function ReceiptScanPage() {
   )
 }
 
-function emptyItem(sortOrder: number): CreateExpenseItemPayload {
-  return { name: '', quantity: 1, unit: undefined, unitPrice: 0, totalPrice: 0, sortOrder }
+function emptyRow(): ReviewRow {
+  return { name: '', quantity: '1', unit: '', unitPrice: '', totalPrice: '' }
+}
+
+/** OCR result → editable row. Zeros stay blank so the user types into an empty box, not over a "0". */
+function toRow(item: CreateExpenseItemPayload): ReviewRow {
+  const num = (v: number) => (v ? String(v) : '')
+  return {
+    name: item.name,
+    quantity: num(item.quantity),
+    unit: item.unit ?? '',
+    unitPrice: num(item.unitPrice),
+    totalPrice: num(item.totalPrice),
+  }
 }

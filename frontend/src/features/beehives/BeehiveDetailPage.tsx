@@ -108,8 +108,8 @@ export default function BeehiveDetailPage() {
     : `Prije ${lastInspDays} dana`
 
   const addInspectionBtn = (
-    <Link to={`/inspections/new?beehiveId=${beehiveId}`} className="btn-primary text-sm">
-      <Plus className="w-4 h-4" /> Dodaj pregled
+    <Link to={`/inspections/new?beehiveId=${beehiveId}`} className="btn-primary text-sm" title="Dodaj pregled" aria-label="Dodaj pregled">
+      <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Dodaj pregled</span>
     </Link>
   )
 
@@ -221,11 +221,6 @@ export default function BeehiveDetailPage() {
               <EmptyState
                 title="Nema pregleda"
                 description="Zabilježite vaš prvi pregled za ovu košnicu."
-                action={
-                  <Link to={`/inspections/new?beehiveId=${beehiveId}`} className="btn-primary text-sm">
-                    <Plus className="w-4 h-4" /> Zabilježi pregled
-                  </Link>
-                }
               />
             ) : (
               <div className="relative pl-1">

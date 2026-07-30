@@ -97,9 +97,9 @@ export default function HarvestsPage() {
               {YEARS.map(y => <option key={y} value={y}>{y}.</option>)}
             </select>
             {canEditDelete && (
-              <button onClick={() => navigate('/harvests/new')} className="btn-primary text-sm">
+              <button onClick={() => navigate('/harvests/new')} className="btn-primary text-sm" title="Dodaj vrcanje" aria-label="Dodaj vrcanje">
                 <Plus className="w-4 h-4" />
-                Dodaj vrcanje
+                <span className="hidden sm:inline">Dodaj vrcanje</span>
               </button>
             )}
           </div>

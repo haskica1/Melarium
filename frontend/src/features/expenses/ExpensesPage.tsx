@@ -89,9 +89,11 @@ export default function ExpensesPage() {
             <button
               onClick={() => navigate('/expenses/new')}
               className="btn-primary text-sm"
+              title="Dodaj trošak"
+              aria-label="Dodaj trošak"
             >
               <Plus className="w-4 h-4" />
-              Dodaj trošak
+              <span className="hidden sm:inline">Dodaj trošak</span>
             </button>
           </div>
         </div>

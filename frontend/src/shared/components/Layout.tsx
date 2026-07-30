@@ -172,16 +172,6 @@ export default function Layout() {
                 <HelpButton onClick={help.openHelp} showDot={help.showDot} />
               )}
 
-              {/* Dark mode toggle */}
-              <button
-                onClick={toggleTheme}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-                aria-label={isDark ? 'Prebaci na svjetlu temu' : 'Prebaci na tamnu temu'}
-                title={isDark ? 'Svjetla tema' : 'Tamna tema'}
-              >
-                {isDark ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
-              </button>
-
               {/* Offline outbox badge (SPEC-07) */}
               {outboxItems.length > 0 && (
                 <Link
@@ -239,6 +229,14 @@ export default function Layout() {
                       <Settings className="w-4 h-4" />
                       Uredi profil
                     </button>
+                    {/* Theme toggle — moved off the header into the menu to declutter the toolbar */}
+                    <button
+                      onClick={toggleTheme}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                      {isDark ? 'Svjetla tema' : 'Tamna tema'}
+                    </button>
                     {/* Plan (SPEC-09) */}
                     <button
                       onClick={() => { setProfileOpen(false); navigate('/plans') }}
@@ -285,13 +283,6 @@ export default function Layout() {
               {/* Smart alerts (frost, overdue inspections, end of karenca) are the reason to open
                   the app in the field — the bell has to be reachable on a phone, not just desktop. */}
               <NotificationBell />
-              <button
-                onClick={toggleTheme}
-                className="p-2 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-honey-100 dark:hover:bg-slate-800 transition-colors"
-                aria-label={isDark ? 'Prebaci na svjetlu temu' : 'Prebaci na tamnu temu'}
-              >
-                {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
               <button
                 className="p-2 rounded-lg text-gray-600 dark:text-slate-300 hover:bg-honey-100 dark:hover:bg-slate-800 transition-colors"
                 onClick={() => setMobileOpen(v => !v)}
@@ -352,6 +343,15 @@ export default function Layout() {
                   >
                     <Settings className="w-4 h-4 text-honey-600 dark:text-honey-400" />
                     Uredi profil
+                  </button>
+                  <button
+                    onClick={toggleTheme}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    {isDark
+                      ? <Sun className="w-4 h-4 text-honey-600 dark:text-honey-400" />
+                      : <Moon className="w-4 h-4 text-honey-600 dark:text-honey-400" />}
+                    {isDark ? 'Svjetla tema' : 'Tamna tema'}
                   </button>
                   <button
                     onClick={() => { setMobileOpen(false); setFeedbackOpen(true) }}

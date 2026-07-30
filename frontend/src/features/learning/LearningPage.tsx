@@ -90,6 +90,13 @@ export default function LearningPage() {
         />
       )}
 
+      {!isLoading && !isError && topics.length > 0 && filtered.length === 0 && (
+        <EmptyState
+          title="Ova kategorija nema tema."
+          description="Odaberite drugu kategoriju ili pogledajte sve teme."
+        />
+      )}
+
       {!isLoading && aktuelno.length > 0 && (
         <section className="space-y-3">
           <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 px-1">

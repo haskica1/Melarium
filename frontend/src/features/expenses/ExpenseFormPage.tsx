@@ -7,6 +7,7 @@ import { ExpenseSource } from '../../core/models'
 import type { CreateExpenseItemPayload } from '../../core/models'
 import { FormHeader } from '../../shared/components'
 import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
+import { decimalInputProps, parseDecimal, sanitizeDecimal } from '../../shared/utils/decimalInput'
 
 interface FormValues {
   purchaseDate: string
@@ -92,14 +93,14 @@ export default function ExpenseFormPage() {
   // stale until a new row was added or the page reloaded.
   const watchedItems = useWatch({ control, name: 'items' })
   const grandTotal = (watchedItems ?? []).reduce(
-    (sum, it) => sum + (parseFloat(it?.totalPrice) || 0),
+    (sum, it) => sum + (parseDecimal(it?.totalPrice) || 0),
     0,
   )
 
   // When both quantity and unit price are known, fill the row's line total automatically.
   const recomputeRow = (index: number) => {
-    const q = parseFloat(getValues(`items.${index}.quantity`)) || 0
-    const u = parseFloat(getValues(`items.${index}.unitPrice`)) || 0
+    const q = parseDecimal(getValues(`items.${index}.quantity`)) || 0
+    const u = parseDecimal(getValues(`items.${index}.unitPrice`)) || 0
     if (q > 0 && u > 0) setValue(`items.${index}.totalPrice`, (q * u).toFixed(2))
   }
 
@@ -109,10 +110,10 @@ export default function ExpenseFormPage() {
   async function onSubmit(values: FormValues) {
     const items: CreateExpenseItemPayload[] = values.items.map((item, i) => ({
       name: item.name.trim(),
-      quantity: parseFloat(item.quantity) || 0,
+      quantity: parseDecimal(item.quantity) || 0,
       unit: item.unit.trim() || undefined,
-      unitPrice: parseFloat(item.unitPrice) || 0,
-      totalPrice: parseFloat(item.totalPrice) || 0,
+      unitPrice: parseDecimal(item.unitPrice) || 0,
+      totalPrice: parseDecimal(item.totalPrice) || 0,
       sortOrder: i,
     }))
 
@@ -228,6 +229,7 @@ export default function ExpenseFormPage() {
               {fields.map((field, index) => {
                 const qtyReg   = register(`items.${index}.quantity`, { required: true })
                 const priceReg = register(`items.${index}.unitPrice`)
+                const totalReg = register(`items.${index}.totalPrice`)
                 return (
                   <div
                     key={field.id}
@@ -241,9 +243,13 @@ export default function ExpenseFormPage() {
                     <div>
                       <label className={itemLabelCls}>Količina</label>
                       <input
-                        type="number" step="0.01" min="0" inputMode="decimal" placeholder="25"
+                        {...decimalInputProps} placeholder="25"
                         {...qtyReg}
-                        onChange={e => { qtyReg.onChange(e); recomputeRow(index) }}
+                        onChange={e => {
+                          e.target.value = sanitizeDecimal(e.target.value)
+                          qtyReg.onChange(e)
+                          recomputeRow(index)
+                        }}
                         className={itemInputCls}
                       />
                     </div>
@@ -254,15 +260,27 @@ export default function ExpenseFormPage() {
                     <div>
                       <label className={itemLabelCls}>Jed. cijena</label>
                       <input
-                        type="number" step="0.01" min="0" inputMode="decimal" placeholder="1.60"
+                        {...decimalInputProps} placeholder="1,60"
                         {...priceReg}
-                        onChange={e => { priceReg.onChange(e); recomputeRow(index) }}
+                        onChange={e => {
+                          e.target.value = sanitizeDecimal(e.target.value)
+                          priceReg.onChange(e)
+                          recomputeRow(index)
+                        }}
                         className={itemInputCls}
                       />
                     </div>
                     <div>
                       <label className={itemLabelCls}>Ukupno</label>
-                      <input type="number" step="0.01" min="0" inputMode="decimal" placeholder="40.00" {...register(`items.${index}.totalPrice`)} className={itemInputCls} />
+                      <input
+                        {...decimalInputProps} placeholder="40,00"
+                        {...totalReg}
+                        onChange={e => {
+                          e.target.value = sanitizeDecimal(e.target.value)
+                          totalReg.onChange(e)
+                        }}
+                        className={itemInputCls}
+                      />
                     </div>
                     <div className="col-span-2 sm:col-span-1 flex justify-end sm:block">
                       <button

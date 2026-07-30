@@ -89,7 +89,11 @@ export default function DietSection({ beehiveId }: { beehiveId: number }) {
   const visibleFinished = showAll ? finished : finished.slice(0, 2)
 
   const addAction = canManageThisDiet
-    ? <Link to={`/feedings/new?beehiveId=${beehiveId}`} className="btn-primary text-sm"><Plus className="w-4 h-4" /> Dodaj prehranu</Link>
+    ? (
+      <Link to={`/feedings/new?beehiveId=${beehiveId}`} className="btn-primary text-sm" title="Dodaj prehranu" aria-label="Dodaj prehranu">
+        <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Dodaj prehranu</span>
+      </Link>
+    )
     : null
 
   return (
@@ -112,14 +116,6 @@ export default function DietSection({ beehiveId }: { beehiveId: number }) {
               ? 'Napravite program prehrane za ovu košnicu.'
               : 'Još nema zakazanih programa prehrane.'}
           </p>
-          {canManageThisDiet && (
-            <Link
-              to={`/feedings/new?beehiveId=${beehiveId}`}
-              className="btn-primary text-sm mt-4 inline-flex"
-            >
-              <Plus className="w-4 h-4" /> Dodaj prvu prehranu
-            </Link>
-          )}
         </div>
       ) : (
         <>

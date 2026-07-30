@@ -9,6 +9,7 @@ import type { CreateHarvestEntryPayload } from '../../core/models'
 import { FormHeader, ErrorMessage } from '../../shared/components'
 import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import { useToast } from '../../core/context/ToastContext'
+import { decimalInputProps, parseDecimal, sanitizeDecimal } from '../../shared/utils/decimalInput'
 
 const HONEY_TYPES = Object.values(HoneyType).filter(v => typeof v === 'number') as HoneyType[]
 const today = () => new Date().toISOString().split('T')[0]
@@ -59,7 +60,7 @@ export default function HarvestFormPage() {
   const isSaving = createHarvest.isPending || updateHarvest.isPending
 
   const totalKg = useMemo(
-    () => Object.values(qty).reduce((sum, v) => sum + (parseFloat(v) || 0), 0),
+    () => Object.values(qty).reduce((sum, v) => sum + (parseDecimal(v) || 0), 0),
     [qty],
   )
 
@@ -69,7 +70,7 @@ export default function HarvestFormPage() {
   const karencaWarnings = useMemo(() => {
     if (!apiaryId || !date) return []
     const selectedNames = new Set(
-      hives.filter(h => (parseFloat(qty[h.id] ?? '') || 0) > 0).map(h => h.name),
+      hives.filter(h => (parseDecimal(qty[h.id] ?? '') || 0) > 0).map(h => h.name),
     )
     if (selectedNames.size === 0) return []
 
@@ -92,7 +93,7 @@ export default function HarvestFormPage() {
 
   function buildEntries(): CreateHarvestEntryPayload[] {
     return hives
-      .map(h => ({ hive: h, kg: parseFloat(qty[h.id] ?? '') }))
+      .map(h => ({ hive: h, kg: parseDecimal(qty[h.id] ?? '') }))
       .filter(r => !isNaN(r.kg) && r.kg > 0)
       .map(r => ({
         beehiveId: r.hive.id,
@@ -109,7 +110,9 @@ export default function HarvestFormPage() {
     const entries = buildEntries()
     if (entries.length === 0) { setFormError('Unesite količinu meda za barem jednu košnicu.'); return }
 
-    const price = pricePerKg.trim() ? parseFloat(pricePerKg) : null
+    // `|| null` would turn a deliberate 0 into "not specified" — only an unparseable value is null.
+    const parsedPrice = parseDecimal(pricePerKg)
+    const price = isNaN(parsedPrice) ? null : parsedPrice
     try {
       if (isEdit && harvestId) {
         await updateHarvest.mutateAsync({ date, honeyType, pricePerKg: price, notes: notes.trim() || undefined, entries })
@@ -197,7 +200,13 @@ export default function HarvestFormPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Cijena po kg (KM)</label>
-              <input type="number" step="0.01" min="0" placeholder="npr. 12.00" value={pricePerKg} onChange={e => setPricePerKg(e.target.value)} className={inputClass} />
+              <input
+                {...decimalInputProps}
+                placeholder="npr. 12,00"
+                value={pricePerKg}
+                onChange={e => setPricePerKg(sanitizeDecimal(e.target.value))}
+                className={inputClass}
+              />
             </div>
           </div>
 
@@ -264,10 +273,10 @@ export default function HarvestFormPage() {
                       <div className="grid grid-cols-2 gap-2 sm:w-1/2">
                         <label className="relative block">
                           <input
-                            type="number" step="0.01" min="0" inputMode="decimal" placeholder="—"
+                            {...decimalInputProps} placeholder="—"
                             aria-label={`Prinos u kilogramima — ${hive.name}`}
                             value={qty[hive.id] ?? ''}
-                            onChange={e => setQty(prev => ({ ...prev, [hive.id]: e.target.value }))}
+                            onChange={e => setQty(prev => ({ ...prev, [hive.id]: sanitizeDecimal(e.target.value) }))}
                             className="w-full min-w-0 pl-3 pr-9 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-base sm:text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-1 focus:ring-honey-100 transition-all"
                           />
                           <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-slate-500 pointer-events-none">kg</span>
