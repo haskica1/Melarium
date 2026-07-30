@@ -189,6 +189,35 @@ public static class BsLabels
         _                                  => c.ToString(),
     };
 
+    public static string Label(FeedbackType t) => t switch
+    {
+        FeedbackType.Bug            => "Prijava problema",
+        FeedbackType.Complaint      => "Žalba",
+        FeedbackType.Compliment     => "Pohvala",
+        FeedbackType.FeatureRequest => "Prijedlog",
+        FeedbackType.Question       => "Pitanje",
+        FeedbackType.Other          => "Ostalo",
+        _                           => t.ToString(),
+    };
+
+    public static string Label(FeedbackSeverity s) => s switch
+    {
+        FeedbackSeverity.Low      => "Nizak",
+        FeedbackSeverity.Medium   => "Srednji",
+        FeedbackSeverity.High     => "Visok",
+        FeedbackSeverity.Critical => "Kritičan",
+        _                         => s.ToString(),
+    };
+
+    public static string Label(FeedbackStatus s) => s switch
+    {
+        FeedbackStatus.New       => "Novo",
+        FeedbackStatus.InReview  => "U razmatranju",
+        FeedbackStatus.Resolved  => "Riješeno",
+        FeedbackStatus.Dismissed => "Odbijeno",
+        _                        => s.ToString(),
+    };
+
     private static readonly string[] MonthsShort =
         { "jan", "feb", "mar", "apr", "maj", "jun", "jul", "avg", "sep", "okt", "nov", "dec" };
 

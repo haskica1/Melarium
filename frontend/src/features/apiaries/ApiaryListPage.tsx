@@ -16,6 +16,8 @@ import {
 } from '../../shared/components'
 import type { Apiary } from '../../core/models'
 import { usePermissions } from '../../core/hooks/usePermissions'
+import { useHelpTrigger } from '../../core/help/HelpContext'
+import FirstStepsCard from '../../shared/components/FirstStepsCard'
 
 type SortKey = 'name' | 'hives' | 'newest'
 
@@ -29,7 +31,8 @@ export default function ApiaryListPage() {
   const navigate = useNavigate()
   const { data, isLoading, error } = useApiaries()
   const deleteMutation = useDeleteApiary()
-  const { canManageApiaries } = usePermissions()
+  const { canManageApiaries, canManageHives } = usePermissions()
+  const { openHelp } = useHelpTrigger()
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
   const [query, setQuery] = useState('')
@@ -102,18 +105,21 @@ export default function ApiaryListPage() {
         </div>
       </div>
 
+      {/* ── First steps (SPEC-14) — removes itself once the first three are done ── */}
+      <FirstStepsCard apiaries={apiaries} />
+
       {apiaries.length === 0 ? (
-        <EmptyState
-          title="Nema pčelinjaka"
-          description="Napravite vaš prvi pčelinjak da počnete upravljati košnicama."
-          action={
-            canManageApiaries ? (
-              <Link to="/apiaries/new" className="btn-primary text-sm">
-                <Plus className="w-4 h-4" /> Napravi pčelinjak
-              </Link>
-            ) : undefined
-          }
-        />
+        /* FirstStepsCard above already tells anyone who can create things exactly what to do next,
+           so the generic "Nema pčelinjaka / Napravi pčelinjak" block would just repeat it. It stays
+           for users who cannot create anything — for them the empty list is an assignment problem,
+           which is what the help panel explains. */
+        !canManageApiaries && !canManageHives && (
+          <EmptyState
+            title="Nema pčelinjaka"
+            description="Još vam nije dodijeljena ni jedna košnica, pa je lista prazna."
+            onHelp={openHelp}
+          />
+        )
       ) : (
         <>
           {/* ── Overview vitals ─────────────────────────────────────────────── */}

@@ -30,6 +30,8 @@
 | 10 | [Apiary Migration](SPEC-10-apiary-migration.md) | Pašnjaci i selidbe: registar pašnjaka, historija selidbi, prinos po pašnjaku | M | — | ✅ Implemented (2026-07-04) |
 | 11 | [Calendar Sync](SPEC-11-calendar-sync.md) | Sinhronizacija obaveza (hranjenja, todo, izvedeni rokovi) u vanjski kalendar (ICS feed univerzalno + nativni Google/MS OAuth) + dnevni podsjetnik u 8h | L | — (reuse 04/08/09) | 🔨 Faza A (2026-07-13) · B/C planirane |
 | 12 | [Apiary Feeding](SPEC-12-apiary-feeding.md) | Prehrana na nivou pčelinjaka: jedan program → odabir košnica (kao tretmani), oznaka "aktivna prehrana" na košnici, ukida kopiranje | M/L | — (mijenja 01/04/11) | 📋 Planned |
+| 13 | [User Feedback](SPEC-13-user-feedback.md) | Prijava problema i povratne informacije (bug/žalba/pohvala/prijedlog/pitanje) → in-app notifikacija SystemAdminima + jedan email na konfigurisanu adresu + admin dashboard za trijažu | M | — (reuse ADR-021 queue, ADR-027 storage) | ✅ Implemented (2026-07-30) |
+| 14 | [In-App Help](SPEC-14-in-app-help.md) | Kontekstualna pomoć po stranici (info ikona + panel), uvodni flow za nove korisnike i izvedena "Prvi koraci" lista | M | — (soft-link 06) | ✅ Implemented (2026-07-30) |
 
 **Recommended order = index order.** Rationale:
 
@@ -47,6 +49,11 @@
 - **SPEC-12** was added 2026-07-25. It is the only spec so far that **changes an existing shipped
   feature's data model** rather than adding one, and it runs a migration over live production data —
   so it is not a "slot it anywhere" item like 08 or 10. Its Phases A and B must deploy together.
+- **SPEC-13/14** were added 2026-07-30 and are the two **user-facing product specs**, not
+  infrastructure: 13 opens a feedback channel from customers back to SystemAdmin, 14 explains the app
+  to new users. Both are additive and low-risk (13 = one new table, no existing consumer touched; 14 =
+  frontend-only, no schema at all), so unlike SPEC-12 they can ship independently and in either order.
+  14's bulk cost is **writing Bosnian help copy**, not code.
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD

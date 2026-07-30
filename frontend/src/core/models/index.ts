@@ -1174,3 +1174,113 @@ export interface MyPlan {
   planNotes?: string | null
   usage: PlanUsage
 }
+
+// ── User feedback (SPEC-13) ─────────────────────────────────────────────────────
+
+export enum FeedbackType {
+  Bug            = 1,
+  Complaint      = 2,
+  Compliment     = 3,
+  FeatureRequest = 4,
+  Question       = 5,
+  Other          = 6,
+}
+
+export const FeedbackTypeLabels: Record<FeedbackType, string> = {
+  [FeedbackType.Bug]:            'Prijava problema',
+  [FeedbackType.Complaint]:      'Žalba',
+  [FeedbackType.Compliment]:     'Pohvala',
+  [FeedbackType.FeatureRequest]: 'Prijedlog',
+  [FeedbackType.Question]:       'Pitanje',
+  [FeedbackType.Other]:          'Ostalo',
+}
+
+/** One-line hint under each option in the form, so people pick the right category. */
+export const FeedbackTypeHints: Record<FeedbackType, string> = {
+  [FeedbackType.Bug]:            'Nešto ne radi kako treba ili prikazuje grešku',
+  [FeedbackType.Complaint]:      'Radi, ali vam otežava posao',
+  [FeedbackType.Compliment]:     'Nešto vam se posebno svidjelo',
+  [FeedbackType.FeatureRequest]: 'Ideja za nešto novo ili bolje',
+  [FeedbackType.Question]:       'Ne znate kako nešto funkcioniše',
+  [FeedbackType.Other]:          'Sve ostalo',
+}
+
+export const FeedbackTypeEmojis: Record<FeedbackType, string> = {
+  [FeedbackType.Bug]:            '🐞',
+  [FeedbackType.Complaint]:      '😕',
+  [FeedbackType.Compliment]:     '💛',
+  [FeedbackType.FeatureRequest]: '💡',
+  [FeedbackType.Question]:       '❓',
+  [FeedbackType.Other]:          '✉️',
+}
+
+export enum FeedbackSeverity {
+  Low      = 1,
+  Medium   = 2,
+  High     = 3,
+  Critical = 4,
+}
+
+export const FeedbackSeverityLabels: Record<FeedbackSeverity, string> = {
+  [FeedbackSeverity.Low]:      'Nizak',
+  [FeedbackSeverity.Medium]:   'Srednji',
+  [FeedbackSeverity.High]:     'Visok',
+  [FeedbackSeverity.Critical]: 'Kritičan',
+}
+
+export enum FeedbackStatus {
+  New       = 1,
+  InReview  = 2,
+  Resolved  = 3,
+  Dismissed = 4,
+}
+
+export const FeedbackStatusLabels: Record<FeedbackStatus, string> = {
+  [FeedbackStatus.New]:       'Novo',
+  [FeedbackStatus.InReview]:  'U razmatranju',
+  [FeedbackStatus.Resolved]:  'Riješeno',
+  [FeedbackStatus.Dismissed]: 'Odbijeno',
+}
+
+export interface Feedback {
+  id: number
+  type: FeedbackType
+  typeName: string
+  severity?: FeedbackSeverity | null
+  severityName?: string | null
+  subject: string
+  message: string
+  pageContext?: string | null
+  hasScreenshot: boolean
+  status: FeedbackStatus
+  statusName: string
+  adminResponse?: string | null
+  respondedAt?: string | null
+  createdAt: string
+}
+
+export interface AdminFeedback extends Feedback {
+  userAgent?: string | null
+  userId?: number | null
+  submitterName?: string | null
+  submitterEmail?: string | null
+  organizationName?: string | null
+}
+
+export interface CreateFeedbackPayload {
+  type: FeedbackType
+  severity?: FeedbackSeverity | null
+  subject: string
+  message: string
+  pageContext?: string | null
+  userAgent?: string | null
+}
+
+export interface UpdateFeedbackStatusPayload {
+  status: FeedbackStatus
+  adminResponse?: string | null
+}
+
+export interface FeedbackSummary {
+  newCount: number
+}

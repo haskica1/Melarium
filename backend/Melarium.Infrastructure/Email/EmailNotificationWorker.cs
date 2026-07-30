@@ -51,20 +51,39 @@ public sealed class EmailNotificationWorker : BackgroundService
             catch (Exception ex)
             {
                 // Email is best-effort — never let one failure kill the worker loop.
-                _logger.LogError(ex, "Failed to send notification email to user {UserId}", item.UserId);
+                _logger.LogError(
+                    ex,
+                    "Failed to send notification email (user {UserId}, address set: {HasAddress})",
+                    item.UserId,
+                    item.ToEmail is { Length: > 0 });
             }
         }
     }
 
     private async Task SendAsync(QueuedEmail item)
     {
+        // An explicit address wins: operator mail (new feedback) targets a configured destination
+        // that need not correspond to a user account, so there is nothing to look up.
+        if (item.ToEmail is { Length: > 0 } toEmail)
+        {
+            var toName = item.ToName is { Length: > 0 } n ? n : toEmail;
+            await _email.SendAsync(toEmail, toName, $"Melarium — {item.Title}", BuildHtml(toName, item));
+            return;
+        }
+
+        if (item.UserId is not int userId)
+        {
+            _logger.LogWarning("Email skipped — queued item has neither a recipient address nor a user id");
+            return;
+        }
+
         using var scope = _scopeFactory.CreateScope();
         var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
-        var user = await uow.Users.GetByIdAsync(item.UserId);
+        var user = await uow.Users.GetByIdAsync(userId);
         if (user == null)
         {
-            _logger.LogWarning("Notification email skipped — user {UserId} no longer exists", item.UserId);
+            _logger.LogWarning("Notification email skipped — user {UserId} no longer exists", userId);
             return;
         }
 

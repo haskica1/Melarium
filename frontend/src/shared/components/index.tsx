@@ -1,4 +1,4 @@
-import { AlertTriangle, Loader2, PackageOpen, RotateCw } from 'lucide-react'
+import { AlertTriangle, CircleHelp, Loader2, PackageOpen, RotateCw } from 'lucide-react'
 import { useRef } from 'react'
 import { Modal } from './Modal'
 
@@ -107,9 +107,14 @@ interface EmptyStateProps {
   title: string
   description?: string
   action?: React.ReactNode
+  /**
+   * Opens the page's help panel. An empty page is exactly the moment a new user is lost, so this is
+   * where offering the explanation pays off most (SPEC-14).
+   */
+  onHelp?: () => void
 }
 
-export function EmptyState({ title, description, action }: EmptyStateProps) {
+export function EmptyState({ title, description, action, onHelp }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 gap-4 text-center animate-fade-in">
       <div className="w-16 h-16 bg-honey-100 dark:bg-honey-500/15 rounded-full flex items-center justify-center">
@@ -120,6 +125,15 @@ export function EmptyState({ title, description, action }: EmptyStateProps) {
         {description && <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">{description}</p>}
       </div>
       {action && <div className="mt-2">{action}</div>}
+      {onHelp && (
+        <button
+          onClick={onHelp}
+          className="flex items-center gap-1.5 text-sm font-medium text-honey-700 dark:text-honey-300 hover:underline"
+        >
+          <CircleHelp className="w-4 h-4" />
+          Kako ovo funkcioniše?
+        </button>
+      )}
     </div>
   )
 }

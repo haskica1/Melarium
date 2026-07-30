@@ -7,6 +7,7 @@ import { HoneyTypeLabels } from '../../core/models'
 import type { Harvest } from '../../core/models'
 import { VitalCard, VitalsSkeleton, ConfirmDialog, EmptyState, ErrorState } from '../../shared/components'
 import { usePermissions } from '../../core/hooks/usePermissions'
+import { useHelpTrigger } from '../../core/help/HelpContext'
 import { useToast } from '../../core/context/ToastContext'
 
 const CURRENT_YEAR = new Date().getFullYear()
@@ -19,6 +20,7 @@ function fmtKg(kg: number): string {
 export default function HarvestsPage() {
   const navigate = useNavigate()
   const { canEditDelete } = usePermissions()
+  const { openHelp } = useHelpTrigger()
   const { toast } = useToast()
 
   const [searchParams, setSearchParams] = useSearchParams()
@@ -130,6 +132,7 @@ export default function HarvestsPage() {
               Dodaj vrcanje
             </button>
           ) : undefined}
+          onHelp={openHelp}
         />
       )}
 

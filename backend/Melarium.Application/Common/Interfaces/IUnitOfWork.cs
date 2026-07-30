@@ -27,6 +27,7 @@ public interface IUnitOfWork : IDisposable
     IUserTokenRepository UserTokens { get; }
     IAdvisorConversationRepository AdvisorConversations { get; }
     ICalendarSettingsRepository CalendarSettings { get; }
+    IFeedbackRepository Feedbacks { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

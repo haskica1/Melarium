@@ -314,6 +314,37 @@ Bosnian message and **nothing persisted**. Reuses `Groq:ApiKey`.
 
 ---
 
+### Feedback (SPEC-13)
+
+Any authenticated role — `/api/feedback`:
+
+| Method | Path | Returns |
+|---|---|---|
+| POST | `/feedback` | `201 + FeedbackDto` — `{ type, severity?, subject, message, pageContext?, userAgent? }`; `feedback` policy 3/min |
+| GET | `/feedback/mine` | `FeedbackDto[]` (own only, newest first) |
+| GET | `/feedback/mine/{id}` | `FeedbackDto` — **404** for another user's row, never 403 |
+| POST | `/feedback/{id}/screenshot` | `200 + FeedbackDto` — multipart `file`, own row, 5 MB cap, JPEG/PNG/WebP by **header bytes**; `422` if one is already attached |
+| GET | `/feedback/{id}/screenshot` | Image stream, `private, max-age=86400` — submitter or SystemAdmin |
+
+SystemAdmin only — `/api/admin/feedback`:
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/admin/feedback?type=&status=` | `AdminFeedbackDto[]` (newest first; submitter + org included) |
+| GET | `/admin/feedback/summary` | `{ newCount }` — nav badge |
+| GET | `/admin/feedback/{id}` | `AdminFeedbackDto` |
+| PUT | `/admin/feedback/{id}/status` | `AdminFeedbackDto` — `{ status, adminResponse? }`; notifies the submitter when either changed |
+| DELETE | `/admin/feedback/{id}` | `204` (spam/test cleanup — not a legal register) |
+
+**Notification split:** submitting fires an **in-app-only** broadcast to every SystemAdmin
+(`NotifyManyInAppAsync`) plus **one** e-mail to the configured `Feedback:NotifyEmail` address — not one
+e-mail per admin. A status change or reply notifies the submitter with bell **and** e-mail. Saving never
+depends on either succeeding. Unset `Feedback:NotifyEmail` → e-mail silently skipped and logged.
+
+**No endpoints for in-app help (SPEC-14)** — its content is a static frontend registry, by design.
+
+---
+
 ## Enum Reference
 
 ```
@@ -321,6 +352,10 @@ BeehiveType:     Langstroth | DadantBlatt | Warré | TopBar | Other
 BeehiveMaterial: Wood | Plastic | Polystyrene
 HoneyType:       Acacia | Linden | Chestnut | Sunflower | Meadow | Forest | Rapeseed | Other  (BsLabels: Bagrem, Lipa, …)
 NotificationType: … | InspectionOverdue=10 | HoneyLevelDrop=11 | FrostWarning=12 | OldQueen=13 | WeeklySummary=14
+                  | FeedbackSubmitted=21 (in-app only) | FeedbackStatusUpdated=22
+FeedbackType:     Bug | Complaint | Compliment | FeatureRequest | Question | Other  (BsLabels: Prijava problema, Žalba, Pohvala, Prijedlog, Pitanje, Ostalo)
+FeedbackSeverity: Low | Medium | High | Critical
+FeedbackStatus:   New | InReview | Resolved | Dismissed  (BsLabels: Novo, U razmatranju, Riješeno, Odbijeno)
 HoneyLevel:      Low | Medium | High
 TodoPriority:    Low | Medium | High
 DietStatus:      NotStarted | InProgress | Completed | StoppedEarly

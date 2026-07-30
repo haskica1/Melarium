@@ -41,6 +41,7 @@ public class MelariumDbContext : DbContext
     public DbSet<AdvisorConversation> AdvisorConversations => Set<AdvisorConversation>();
     public DbSet<AdvisorMessage> AdvisorMessages => Set<AdvisorMessage>();
     public DbSet<CalendarSettings> CalendarSettings => Set<CalendarSettings>();
+    public DbSet<Feedback> Feedbacks => Set<Feedback>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

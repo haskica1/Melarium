@@ -39,6 +39,9 @@ services:
       Groq__ApiKey: ${GROQ_API_KEY}
       Bootstrap__SysAdminEmail: ${SYSADMIN_EMAIL}
       Bootstrap__SysAdminPassword: ${SYSADMIN_PASSWORD}
+      # Where new-feedback mail goes (SPEC-13). Empty = feedback still saves and SystemAdmins still
+      # get the in-app notification, only the e-mail is skipped.
+      Feedback__NotifyEmail: ${FEEDBACK_NOTIFY_EMAIL:-}
       AllowedOrigins: "https://${DOMAIN}"
       FrontendUrl: "https://${DOMAIN}"
       App__PublicBaseUrl: "https://${DOMAIN}"

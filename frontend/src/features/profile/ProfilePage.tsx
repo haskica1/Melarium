@@ -6,6 +6,9 @@ import { Check, Eye, EyeOff, KeyRound, Mail, MailWarning, User } from 'lucide-re
 import { useAuth } from '../../core/context/AuthContext'
 import { profileService } from '../../core/services/profileService'
 import type { UpdateProfilePayload } from '../../core/services/profileService'
+import FeedbackFormModal from '../../shared/components/FeedbackFormModal'
+import MyFeedbackSection from './MyFeedbackSection'
+import HelpPreferenceSection from './HelpPreferenceSection'
 import clsx from 'clsx'
 
 interface ProfileForm {
@@ -25,6 +28,7 @@ export default function ProfilePage() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [saved, setSaved] = useState(false)
   const [resent, setResent] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   // Verification state is not part of the cached auth session — read it from the API.
   const { data: profile } = useQuery({
@@ -315,6 +319,15 @@ export default function ProfilePage() {
           </button>
         </div>
       </form>
+
+      {/* ── Help preference (SPEC-14) + my feedback (SPEC-13) ────────────────────
+           Both sit outside the profile form — neither submits it. */}
+      <div className="mt-6 space-y-6">
+        <HelpPreferenceSection />
+        <MyFeedbackSection onNew={() => setFeedbackOpen(true)} />
+      </div>
+
+      <FeedbackFormModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   )
 }

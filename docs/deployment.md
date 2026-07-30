@@ -250,6 +250,25 @@ chmod +x deploy/deploy.sh   # once
 This pulls the latest commit, rebuilds and restarts the `api` container, rebuilds the
 frontend, syncs it to `/var/www/melarium/frontend`, and reloads nginx.
 
+### One-time: feedback notification address (SPEC-13)
+
+The feedback feature mails one fixed operations address rather than every SystemAdmin's own address.
+Add the variable to `.env` on the server **before** the deploy that first includes SPEC-13:
+
+```bash
+cd /opt/melarium
+echo 'FEEDBACK_NOTIFY_EMAIL=you@example.com' >> .env   # use the address you actually read
+docker compose up -d api                               # recreate so the container picks it up
+```
+
+`docker-compose.yml` passes it as `Feedback__NotifyEmail`. If it is left empty the app still works:
+submissions are saved and every SystemAdmin gets the in-app bell notification — only the e-mail is
+skipped, and the skip is logged. Verify with:
+
+```bash
+docker compose exec api printenv Feedback__NotifyEmail
+```
+
 ### One-time: uploads volume ownership (non-root container)
 
 The API container now runs as the unprivileged user `1654` instead of root. A **newly created**

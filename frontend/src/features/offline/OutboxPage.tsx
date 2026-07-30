@@ -7,11 +7,13 @@ import { useAuth } from '../../core/context/AuthContext'
 import { useToast } from '../../core/context/ToastContext'
 import { useOnlineStatus } from '../../core/hooks/useOnlineStatus'
 import { useOutbox } from '../../core/hooks/useOutbox'
+import { useHelpTrigger } from '../../core/help/HelpContext'
 import { removeOutboxItem, type OutboxItem } from '../../core/offline/outbox'
 import { flushOutbox } from '../../core/offline/syncOutbox'
 import { ConfirmDialog, EmptyState } from '../../shared/components'
 
 export default function OutboxPage() {
+  const { openHelp } = useHelpTrigger()
   const navigate = useNavigate()
   const { user } = useAuth()
   const { toast } = useToast()
@@ -91,6 +93,7 @@ export default function OutboxPage() {
         <EmptyState
           title="Nema neposlanih pregleda."
           description="Sve što zabilježite bez mreže pojaviće se ovdje i biće poslano automatski."
+          onHelp={openHelp}
         />
       ) : (
         <div className="space-y-3">

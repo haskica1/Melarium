@@ -14,6 +14,7 @@ using Melarium.Application.Features.Stats;
 using Melarium.Application.Features.Beehives;
 using Melarium.Application.Features.Diets;
 using Melarium.Application.Features.Expenses;
+using Melarium.Application.Features.Feedbacks;
 using Melarium.Application.Features.Harvests;
 using Melarium.Application.Features.Inspections;
 using Melarium.Application.Features.Learning;
@@ -79,6 +80,7 @@ public static class DependencyInjection
         services.AddScoped<IApiaryMoveService, ApiaryMoveService>();
         services.AddScoped<IAdvisorService, AdvisorService>();
         services.AddScoped<IAlertRuleService, AlertRuleService>();
+        services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddSingleton<IQrCodeService, QrCodeService>();
 
         return services;

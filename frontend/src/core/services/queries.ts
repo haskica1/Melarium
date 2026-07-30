@@ -423,11 +423,12 @@ export const useCompleteFeedingEntry = (dietId: number, beehiveId: number) => {
 
 // ── Stats Hook ────────────────────────────────────────────────────────────────
 
-export const useStats = () =>
+export const useStats = (options: { enabled?: boolean } = {}) =>
   useQuery({
     queryKey: queryKeys.stats,
     queryFn:  statsService.get,
     staleTime: 1000 * 60 * 5,
+    enabled: options.enabled ?? true,
   })
 
 // ── Calendar Hook ─────────────────────────────────────────────────────────────

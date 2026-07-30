@@ -40,7 +40,7 @@ public class NotificationService : INotificationService
 
         // Email goes through the background worker so SMTP latency/failures never
         // affect the request that produced the notification.
-        _emailQueue.Enqueue(new QueuedEmail(userId, title, message));
+        _emailQueue.Enqueue(QueuedEmail.ForUser(userId, title, message));
     }
 
     public async Task NotifyManyInAppAsync(

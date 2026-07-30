@@ -179,7 +179,7 @@ public class AuthService : IAuthService
         var raw = await IssueUserTokenAsync(
             user.Id, UserTokenPurpose.PasswordReset, GetHours("Auth:PasswordResetTokenHours", 2));
 
-        _emailQueue.Enqueue(new QueuedEmail(
+        _emailQueue.Enqueue(QueuedEmail.ForUser(
             user.Id,
             "Zahtjev za promjenu lozinke",
             "Primili smo zahtjev za promjenu lozinke na vašem računu. Link vrijedi ograničeno vrijeme i "
@@ -267,7 +267,7 @@ public class AuthService : IAuthService
         var raw = await IssueUserTokenAsync(
             user.Id, UserTokenPurpose.EmailVerification, GetHours("Auth:EmailVerificationTokenHours", 48));
 
-        _emailQueue.Enqueue(new QueuedEmail(
+        _emailQueue.Enqueue(QueuedEmail.ForUser(
             user.Id,
             "Potvrdite vašu e-poštu",
             "Da biste primali obavijesti i mogli vratiti pristup računu ako zaboravite lozinku, "

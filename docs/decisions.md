@@ -431,3 +431,90 @@ hand. Separately, a password change left every existing refresh token valid for 
   calendar feed (ADR-011 scope), not a credential that can change a password.
 - 404/400 on unknown address in forgot-password — rejected (account enumeration).
 - Blocking login for unverified accounts — deferred; see the grandfathering rationale above.
+
+---
+
+## ADR-030: Feedback Splits Its Two Delivery Channels; `QueuedEmail` Gains an Explicit Recipient (SPEC-13)
+
+**Status:** Accepted (2026-07-30)
+
+**Context:** User feedback has to reach the operator. The existing notification path
+(`NotificationService.NotifyAsync`) welds the two channels together: it persists an in-app
+notification *and* enqueues an e-mail for the same user id. `QueuedEmail` carried only a `UserId`, and
+`EmailNotificationWorker` always resolved the address by loading that user — so there was no way to mail
+an address that isn't an account, and no way to notify N admins in-app while sending one e-mail.
+
+**Decision:**
+- **In-app to every SystemAdmin, e-mail to one configured address.** New feedback broadcasts via the
+  existing e-mail-free `NotifyManyInAppAsync` (recipients from a new
+  `IUserRepository.GetSystemAdminIdsAsync()`), and separately enqueues **one** message to
+  `Feedback:NotifyEmail`. A reply to the submitter still uses `NotifyAsync` — there the coupling is
+  exactly what is wanted.
+- **`QueuedEmail` gains a second addressing mode:** `UserId` becomes `int?` and optional
+  `ToEmail`/`ToName` are added, with `ForUser(...)` / `ForAddress(...)` factories so the intent is
+  visible at the call site. The worker prefers an explicit address, else resolves by `UserId`, else logs
+  and skips. Delivery stays on the background queue.
+- **Feedback is not tenant-scoped**, so it does **not** go through `IAccessGuard`: authorization is the
+  flat SystemAdmin-vs-owner split the other `api/admin/*` controllers already use. Reading another
+  user's row returns **404, not 403**.
+- Notification failure never fails the submission — the row is saved first and both channels are wrapped.
+
+**Why:**
+- **One address over one-per-admin:** adding a second SystemAdmin should not multiply the operator's
+  inbox, and the destination is an operations address that need not correspond to an account.
+- **Extending `QueuedEmail` over calling `IEmailService` directly:** a direct call would put SMTP back
+  on the request path, which is precisely what ADR-021 removed. Three existing call sites were moved to
+  `ForUser` with no behaviour change.
+- **404 over 403 on someone else's feedback:** a 403 confirms the row exists, turning by-id reads into an
+  existence oracle. Same reasoning as the forgot-password 204 in ADR-029.
+- **Silent skip when unconfigured:** mirrors `EmailService`'s existing behaviour for missing SMTP, so a
+  missing env var degrades to "no e-mail", never a failed submission. It is logged.
+
+**Alternatives considered:**
+- `NotifyAsync` per SystemAdmin — rejected: an e-mail per admin, which is the option explicitly not wanted.
+- A separate `IOperatorMailer` service — rejected: a second delivery mechanism to keep correct, for what
+  is one optional field on the existing queue item.
+- Screenshot as part of the create payload — rejected: a mixed multipart+JSON endpoint for what the
+  inspection-photo flow already solves as a second request. The report is saved even if the upload fails.
+
+---
+
+## ADR-031: In-App Help Is a Static Code Registry, Not Content in the Database (SPEC-14)
+
+**Status:** Accepted (2026-07-30)
+
+**Context:** New users had no explanation of what any page does. The app already has a DB-backed CMS for
+admin-authored content — Learning Topics (SPEC-06) — so the obvious move was another table plus an admin
+editor.
+
+**Decision:** Per-page help content lives in a **typed registry in the frontend**
+(`core/help/helpContent.ts`), lazily imported as its own chunk. No entity, no endpoint, no migration.
+Edukacija remains the DB-backed CMS for long-form beekeeping knowledge, and the help panel links to it by
+**category, never by topic id**. The icon is rendered **once** from `Layout` and resolved by route via
+`matchPath`; a route with no entry renders no icon. Onboarding progress ("Prvi koraci") is **derived from
+existing data**, never stored.
+
+**Why:**
+- **Content that describes a UI is documentation of code.** When a page changes, its help text must change
+  in the same commit or it starts lying. A database copy has no mechanism to notice the UI moved — and the
+  failure mode is silent and user-facing.
+- **It works offline.** This is a PWA used in fields with no signal; DB-backed help would need a request.
+- **One icon, not thirty.** Around thirty routes would each need an edit, and any page whose author forgot
+  would silently have no help — the exact inconsistency the feature exists to remove.
+- **Derived onboarding state** follows ADR-028's computed-effective-plan reasoning: it avoids the "we
+  forgot to flip the flag" class of bug, and it is correct in cases a flag gets wrong (a user added to an
+  organisation that already has apiaries is not told to create their first one). It also means the card
+  disappears on its own, with no dismissal state to store.
+- **Editing without a deploy is the one real loss**, and it is small here: the person who writes the help
+  text is the person who runs the deploy.
+
+**Alternatives considered:**
+- Table + SystemAdmin editor — rejected above; the cost is entity + migration + repository + service +
+  two controllers + admin CRUD UI, to buy an ability that mostly matters to someone who deploys anyway.
+- Interactive product tours with element highlighting — rejected: a real dependency, and every DOM change
+  can break a tour anchor. The panel plus the derived checklist covers the need at a fraction of the cost.
+- Per-page icons added to each page component — rejected; see "one icon, not thirty".
+
+**Known limit (Phase C):** the "seen"/"don't auto-open" flags live in `localStorage` keyed by e-mail, so
+they are per browser — the same user gets the first-run experience again on their phone. Moving them to
+the account is one small table and one endpoint, deliberately deferred until it proves to matter.

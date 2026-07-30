@@ -260,6 +260,18 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
             }));
 
+    // Feedback submission (SPEC-13). Same reasoning and budget as auth-email: every accepted
+    // request puts a message in the operator's inbox, so this bounds abuse, not usability.
+    options.AddPolicy("feedback", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+
     // Photo AI analysis sends multi-MB images to the paid Groq vision model — tighter cap (SPEC-05).
     options.AddPolicy("photo-analyze", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(

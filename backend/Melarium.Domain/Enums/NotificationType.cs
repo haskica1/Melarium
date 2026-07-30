@@ -34,4 +34,10 @@ public enum NotificationType
 
     // ── Account security — password reset/change; the user's cue that it wasn't them ──
     PasswordChanged        = 20,
+
+    // ── User feedback (SPEC-13) ──
+    // FeedbackSubmitted is in-app only for SystemAdmins (the email goes to Feedback:NotifyEmail
+    // instead, so it is sent once rather than once per admin).
+    FeedbackSubmitted      = 21,
+    FeedbackStatusUpdated  = 22,
 }

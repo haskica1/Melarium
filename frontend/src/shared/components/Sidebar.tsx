@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   BarChart2, Bot, CalendarDays, ChevronsLeft, ChevronsRight, Droplets, GraduationCap, Home,
-  LayoutDashboard, Pill, ReceiptText, Tent, Users,
+  LayoutDashboard, MessageSquareHeart, Pill, ReceiptText, Tent, Users,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -12,12 +12,16 @@ export interface NavRoleFlags {
   canSeeExpenses: boolean
   canManageMembers: boolean
   canSeePastures: boolean
+  /** Untriaged feedback count (SPEC-13) — SystemAdmin only, 0/undefined hides the badge. */
+  feedbackNewCount?: number
 }
 
 export interface NavItemDef {
   to: string
   icon: React.ReactNode
   label: string
+  /** Rendered as a count pill on the item when > 0. */
+  badge?: number
 }
 
 /** Single source of truth for main nav — consumed by both the desktop Sidebar and the mobile panel. */
@@ -35,6 +39,13 @@ export function getNavItems(flags: NavRoleFlags): NavItemDef[] {
     { to: '/learning', icon: <GraduationCap className="w-4 h-4" />, label: 'Edukacija', visible: true },
     { to: '/calendar', icon: <CalendarDays className="w-4 h-4" />, label: 'Kalendar', visible: true },
     { to: '/stats', icon: <BarChart2 className="w-4 h-4" />, label: 'Statistike', visible: true },
+    {
+      to: '/admin/feedback',
+      icon: <MessageSquareHeart className="w-4 h-4" />,
+      label: 'Povratne informacije',
+      badge: flags.feedbackNewCount,
+      visible: flags.isSystemAdmin,
+    },
   ]
   return items.filter(i => i.visible)
 }
@@ -77,7 +88,7 @@ export function Sidebar({ flags }: SidebarProps) {
             to={item.to}
             title={expanded ? undefined : item.label}
             className={({ isActive }) => clsx(
-              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+              'relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
               !expanded && 'justify-center',
               isActive
                 ? 'bg-honey-100 dark:bg-honey-500/15 text-honey-800 dark:text-honey-300'
@@ -86,6 +97,17 @@ export function Sidebar({ flags }: SidebarProps) {
           >
             {item.icon}
             {expanded && <span className="truncate">{item.label}</span>}
+            {!!item.badge && item.badge > 0 && (
+              <span
+                className={clsx(
+                  'min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold',
+                  'flex items-center justify-center px-1 shrink-0',
+                  expanded ? 'ml-auto' : 'absolute top-1 right-1',
+                )}
+              >
+                {item.badge > 99 ? '99+' : item.badge}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

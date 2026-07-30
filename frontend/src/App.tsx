@@ -36,6 +36,7 @@ import OutboxPage from './features/offline/OutboxPage'
 import PasturesPage from './features/pastures/PasturesPage'
 import LearningTopicsAdminPage from './features/admin/LearningTopicsAdminPage'
 import LearningTopicFormPage from './features/admin/LearningTopicFormPage'
+import FeedbackAdminPage from './features/admin/FeedbackAdminPage'
 import AdvisorPage from './features/advisor/AdvisorPage'
 import SmartRedirect from './shared/components/SmartRedirect'
 import NotFoundPage from './shared/components/NotFoundPage'
@@ -173,6 +174,7 @@ export default function App() {
                 <Route path="admin/learning-topics"             element={<LearningTopicsAdminPage />} />
                 <Route path="admin/learning-topics/new"         element={<LearningTopicFormPage />} />
                 <Route path="admin/learning-topics/:id/edit"    element={<LearningTopicFormPage />} />
+                <Route path="admin/feedback"                    element={<FeedbackAdminPage />} />
               </Route>
             </Route>
           </Route>

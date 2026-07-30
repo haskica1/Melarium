@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { CheckCircle2, GraduationCap, Paperclip, Video } from 'lucide-react'
 import { useLearningTopics } from '../../core/services/learningQueries'
 import { LearningCategory, LearningCategoryLabels, MonthLabels } from '../../core/models'
@@ -16,7 +16,14 @@ const MONTH_LOCATIVE = [
 
 export default function LearningPage() {
   const { data: topics = [], isLoading, isError, refetch } = useLearningTopics()
-  const [category, setCategory] = useState<LearningCategory | 0>(0)
+
+  // Seeded from ?category= so the in-app help panel can deep-link to a category (SPEC-14).
+  // Only the initial value — the chips below own the filter from then on.
+  const [searchParams] = useSearchParams()
+  const [category, setCategory] = useState<LearningCategory | 0>(() => {
+    const raw = Number(searchParams.get('category'))
+    return CATEGORIES.includes(raw) ? (raw as LearningCategory) : 0
+  })
 
   const currentMonth = new Date().getMonth() + 1
 

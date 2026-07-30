@@ -197,8 +197,40 @@
   call (`llama-3.3-70b-versatile`) → Bosnian bullet report delivered as `WeeklySummary` to OrgAdmins +
   ApiaryAdmins; AI failure skips silently. New config block `Alerts:*`. See `docs/features/smart-alerts.md`.
 
+### Feedback (Povratne informacije, SPEC-13)
+- Any signed-in user submits bug/žalba/pohvala/prijedlog/pitanje/ostalo via a header-reachable modal;
+  `PageContext` + `UserAgent` captured client-side, optional screenshot (5 MB, type from header bytes,
+  reuses `IFileStorage`). Rate limit `feedback` 3/min
+- **Notification split:** in-app bell to **every** SystemAdmin (`NotifyManyInAppAsync`, no e-mail) plus
+  **one** e-mail to `Feedback:NotifyEmail` — so a second SystemAdmin doesn't multiply the mail. Status
+  change/reply notifies the submitter with bell **and** e-mail
+- `QueuedEmail` gained a second addressing mode for this (`UserId` now `int?` + `ToEmail`/`ToName`,
+  factories `ForUser`/`ForAddress`); `EmailNotificationWorker` prefers an explicit address. SMTP stays
+  off the request path (ADR-021 unchanged)
+- Not tenant-scoped → **no `IAccessGuard`**; flat SystemAdmin-vs-owner split like other `api/admin/*`.
+  Another user's row returns **404, never 403**
+- UI: `FeedbackFormModal`, "Moje povratne informacije" on `ProfilePage`, `FeedbackAdminPage`
+  (`/admin/feedback`) + nav item with untriaged badge. See `features/feedback.md`
+
+### In-app help & onboarding (SPEC-14)
+- **Frontend only — no entity, no endpoint, no migration.** Help content is a static typed registry
+  (`core/help/helpContent.ts`), lazily imported as its own chunk; it describes the UI, so it changes in
+  the same commit as the UI. Edukacija (SPEC-06) stays the DB-backed CMS for long-form content, and the
+  panel links to it **by category, never by topic id**
+- One icon rendered from `Layout` and resolved by route (`matchPath`, most-specific-first); a route with
+  no entry renders no icon. `HelpProvider`/`useHelpTrigger` let pages open it — `EmptyState` gained an
+  optional `onHelp`
+- Welcome flow once per (user, browser); its state lives in `useHelp` so it holds back the per-page
+  auto-open (otherwise two dialogs stacked on a new user's first screen). "Preskoči uvod" pre-marks the
+  three auto-open pages, which is the grandfathering for existing users
+- "Prvi koraci" checklist is **derived from data** (apiary → hive → inspection), never stored, and
+  removes itself when done — ADR-028's computed-state reasoning
+- `?` opens help (ignored while typing). Preference toggle on `ProfilePage`. Flags in `localStorage`
+  keyed by e-mail. See `features/help-onboarding.md`
+
 ### Profile
 - `GET/PUT /api/profile` — name/email + password change
+- "Moje povratne informacije" (SPEC-13) + help preference toggle (SPEC-14) sections
 
 ---
 
@@ -212,8 +244,8 @@
 | Mapping | AutoMapper per-feature profiles; manual mapping where DTOs have computed fields (Diets, Admin) |
 | Error handling | `GlobalExceptionMiddleware` → Problem-Details-style JSON; **exception details only in Development** |
 | Auth | JWT Bearer HS256, 30 min access + 14 d refresh rotation |
-| Secrets | **Not in the repo.** Env vars in production (`Jwt__Secret`, `Smtp__Password`, `Groq__ApiKey`, `ConnectionStrings__DefaultConnection`, `Bootstrap__*`); `appsettings.Development.json` / user-secrets locally |
-| Rate limiting | Fixed-window per IP: login/register 5/min, refresh 20/min, parse-voice 10/min |
+| Secrets | **Not in the repo.** Env vars in production (`Jwt__Secret`, `Smtp__Password`, `Groq__ApiKey`, `ConnectionStrings__DefaultConnection`, `Bootstrap__*`, `Feedback__NotifyEmail`); `appsettings.Development.json` / user-secrets locally |
+| Rate limiting | Fixed-window per IP: login/register 5/min, refresh 20/min, parse-voice 10/min, feedback 3/min |
 | Health check | `GET /health` (liveness, used by Render) |
 | CORS | `AllowedOrigins` config (comma-separated), overridable via env var |
 | API docs | Swagger UI at `/swagger` — **Development only** (not exposed in production) |
@@ -232,7 +264,7 @@
 
 **All roadmap specs shipped** (see `docs/specs/README.md`).
 
-**Shipped (were specced):** SPEC-01 AI Advisor ✅, SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅
+**Shipped (were specced):** SPEC-01 AI Advisor ✅, SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅
 
 **Unspecced ideas:**
 

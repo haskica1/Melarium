@@ -7,6 +7,7 @@ import { TreatmentStatus } from '../../core/models'
 import type { Treatment } from '../../core/models'
 import { VitalCard, VitalsSkeleton, ConfirmDialog, EmptyState, ErrorState } from '../../shared/components'
 import { usePermissions } from '../../core/hooks/usePermissions'
+import { useHelpTrigger } from '../../core/help/HelpContext'
 import { useToast } from '../../core/context/ToastContext'
 import { useAuth } from '../../core/context/AuthContext'
 import { downloadTreatmentRegisterPdf } from '../../shared/utils/treatmentPdf'
@@ -23,6 +24,7 @@ const STATUS_STYLE: Record<TreatmentStatus, string> = {
 export default function TreatmentsPage() {
   const navigate = useNavigate()
   const { canEditDelete } = usePermissions()
+  const { openHelp } = useHelpTrigger()
   const { toast } = useToast()
   const { user } = useAuth()
 
@@ -140,6 +142,7 @@ export default function TreatmentsPage() {
               <Plus className="w-4 h-4" /> Dodaj tretman
             </button>
           ) : undefined}
+          onHelp={openHelp}
         />
       )}
 
