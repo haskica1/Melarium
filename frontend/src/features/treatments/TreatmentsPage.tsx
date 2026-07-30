@@ -11,6 +11,7 @@ import { useHelpTrigger } from '../../core/help/HelpContext'
 import { useToast } from '../../core/context/ToastContext'
 import { useAuth } from '../../core/context/AuthContext'
 import { downloadTreatmentRegisterPdf } from '../../shared/utils/treatmentPdf'
+import { hivesLabel } from '../../shared/utils/plural'
 
 const CURRENT_YEAR = new Date().getFullYear()
 const YEARS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2, CURRENT_YEAR - 3, CURRENT_YEAR - 4]
@@ -157,15 +158,18 @@ export default function TreatmentsPage() {
 
           {grouped.map(([apiaryName, items]) => (
             <div key={apiaryName} className="space-y-3">
-              <div className="flex items-center justify-between px-1">
-                <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100">{apiaryName}</h2>
+              <div className="flex items-center justify-between gap-2 px-1">
+                <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 min-w-0 truncate">{apiaryName}</h2>
                 <button
                   onClick={() => handleDownloadPdf(apiaryName, items)}
                   disabled={pdfBusy === apiaryName}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-honey-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-60"
+                  className="flex items-center gap-1.5 shrink-0 px-2.5 sm:px-3 py-1.5 rounded-xl border border-honey-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-700 transition-colors disabled:opacity-60"
+                  aria-label={`Preuzmi evidenciju tretmana za ${apiaryName} u PDF-u`}
                 >
                   {pdfBusy === apiaryName ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-                  Preuzmi evidenciju (PDF)
+                  {/* Full label needs ~180 px — more than the apiary name can spare on a phone. */}
+                  <span className="hidden sm:inline">Preuzmi evidenciju (PDF)</span>
+                  <span className="sm:hidden">PDF</span>
                 </button>
               </div>
               <div className="space-y-3">
@@ -216,26 +220,29 @@ function TreatmentCard({ treatment: t, canEdit, isDeleting, onEdit, onDelete }: 
     : t.statusName
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none px-5 py-4 flex items-center gap-4 hover:border-honey-200 dark:hover:border-slate-700 transition-colors">
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-honey-50 text-honey-600 dark:bg-honey-500/15 dark:text-honey-300">
-        <Pill className="w-5 h-5" />
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none px-4 py-3.5 sm:px-5 sm:py-4 flex items-start gap-3 sm:gap-4 hover:border-honey-200 dark:hover:border-slate-700 transition-colors">
+      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 bg-honey-50 text-honey-600 dark:bg-honey-500/15 dark:text-honey-300">
+        <Pill className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
+      {/* Six fields is a lot for a ~160 px content column, so they're split across three wrapping
+          rows by importance — product, then status, then the legal detail — instead of two rows
+          that squeezed everything together on a phone. */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-gray-900 dark:text-slate-100">{t.productName}</span>
-          <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-800 rounded-full px-2 py-0.5">{t.purposeName}</span>
-          <span className={`text-xs rounded-full px-2 py-0.5 ${STATUS_STYLE[t.status]}`}>{karencaText}</span>
+        <p className="font-semibold text-gray-900 dark:text-slate-100 leading-snug break-words">{t.productName}</p>
+
+        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+          <span className={`text-xs rounded-full px-2 py-0.5 whitespace-nowrap ${STATUS_STYLE[t.status]}`}>{karencaText}</span>
+          <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-800 rounded-full px-2 py-0.5 whitespace-nowrap">{t.purposeName}</span>
         </div>
-        <div className="flex items-center gap-3 mt-0.5 text-sm text-gray-500 dark:text-slate-400">
-          <span>{format(new Date(t.startDate), 'dd.MM.yyyy')}</span>
-          <span>·</span>
-          <span>{t.activeSubstanceName}</span>
-          <span>·</span>
-          <span>{t.hiveCount} {t.hiveCount === 1 ? 'košnica' : 'košnica'}</span>
+
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] sm:text-sm text-gray-500 dark:text-slate-400">
+          <span className="whitespace-nowrap">{format(new Date(t.startDate), 'dd.MM.yyyy')}</span>
+          <span className="whitespace-nowrap">{hivesLabel(t.hiveCount)}</span>
+          <span className="break-words">{t.activeSubstanceName}</span>
         </div>
       </div>
       {canEdit && (
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 -mr-1.5 -mt-1 sm:mr-0 sm:mt-0">
           <button onClick={onEdit} className="p-2 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors" aria-label="Uredi tretman">
             <PencilLine className="w-4 h-4" />
           </button>

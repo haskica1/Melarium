@@ -32,7 +32,7 @@ export function PageSkeleton({ rows = 4 }: { rows?: number }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[88px] rounded-2xl" />)}
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {Array.from({ length: rows }).map((_, i) => <Skeleton key={i} className="h-28" />)}
       </div>
     </div>

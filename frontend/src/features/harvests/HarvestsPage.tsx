@@ -7,6 +7,7 @@ import { HoneyTypeLabels } from '../../core/models'
 import type { Harvest } from '../../core/models'
 import { VitalCard, VitalsSkeleton, ConfirmDialog, EmptyState, ErrorState } from '../../shared/components'
 import { usePermissions } from '../../core/hooks/usePermissions'
+import { hivesLabel } from '../../shared/utils/plural'
 import { useHelpTrigger } from '../../core/help/HelpContext'
 import { useToast } from '../../core/context/ToastContext'
 
@@ -151,9 +152,9 @@ export default function HarvestsPage() {
             const groupKg = items.reduce((s, h) => s + h.totalKg, 0)
             return (
               <div key={apiaryName} className="space-y-3">
-                <div className="flex items-center justify-between px-1">
-                  <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100">{apiaryName}</h2>
-                  <span className="text-sm font-medium text-honey-700 dark:text-honey-300">{fmtKg(groupKg)}</span>
+                <div className="flex items-center justify-between gap-2 px-1">
+                  <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 min-w-0 truncate">{apiaryName}</h2>
+                  <span className="text-sm font-medium text-honey-700 dark:text-honey-300 shrink-0">{fmtKg(groupKg)}</span>
                 </div>
                 <div className="space-y-3">
                   {items.map(h => (
@@ -199,9 +200,9 @@ interface HarvestCardProps {
 
 function HarvestCard({ harvest, canEdit, isDeleting, onEdit, onDelete }: HarvestCardProps) {
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none px-5 py-4 flex items-center gap-4 hover:border-honey-200 dark:hover:border-slate-700 transition-colors">
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-honey-50 text-honey-600 dark:bg-honey-500/15 dark:text-honey-300">
-        <Droplets className="w-5 h-5" />
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none px-4 py-3.5 sm:px-5 sm:py-4 flex items-start gap-3 sm:gap-4 hover:border-honey-200 dark:hover:border-slate-700 transition-colors">
+      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 bg-honey-50 text-honey-600 dark:bg-honey-500/15 dark:text-honey-300">
+        <Droplets className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
 
       <div className="flex-1 min-w-0">
@@ -211,21 +212,20 @@ function HarvestCard({ harvest, canEdit, isDeleting, onEdit, onDelete }: Harvest
             {harvest.honeyTypeName}
           </span>
         </div>
-        <div className="flex items-center gap-3 mt-0.5 text-sm text-gray-500 dark:text-slate-400">
-          <span>{format(new Date(harvest.date), 'dd.MM.yyyy')}</span>
-          <span>·</span>
-          <span>{harvest.entryCount} {harvest.entryCount === 1 ? 'košnica' : 'košnica'}</span>
+        {/* Wrapping, and no "·" separators: on a phone the content column is ~160 px, so a single
+            non-wrapping row squeezed date/hives/revenue into each other ("podaci su zbijeni"), and
+            middots left dangling at a line end once it did wrap. */}
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] sm:text-sm text-gray-500 dark:text-slate-400">
+          <span className="whitespace-nowrap">{format(new Date(harvest.date), 'dd.MM.yyyy')}</span>
+          <span className="whitespace-nowrap">{hivesLabel(harvest.entryCount)}</span>
           {harvest.estimatedRevenue != null && harvest.estimatedRevenue > 0 && (
-            <>
-              <span>·</span>
-              <span>≈ {harvest.estimatedRevenue.toFixed(0)} KM</span>
-            </>
+            <span className="whitespace-nowrap">≈ {harvest.estimatedRevenue.toFixed(0)} KM</span>
           )}
         </div>
       </div>
 
       {canEdit && (
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 -mr-1.5 -mt-1 sm:mr-0 sm:mt-0">
           <button
             onClick={onEdit}
             className="p-2 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"

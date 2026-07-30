@@ -54,11 +54,40 @@
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
-    height: 2.625rem;
-    line-height: 1.25rem;
     overflow: hidden;
     -webkit-appearance: none;
     appearance: none;
+    /* The explicit height must equal a plain text `.form-input` exactly, or the date field sits
+       shorter than the select/text field next to it in the same row. That means it is tied to the
+       font size: line-height + py-2.5 (2 × 0.625rem) + 2 × 1px border.
+       Phone — text-base: 1.5rem + 1.25rem + 2px = 2.875rem. */
+    height: 2.875rem;
+    line-height: 1.5rem;
+  }
+
+  /* From `sm` up the inputs drop back to text-sm: 1.25rem + 1.25rem + 2px = 2.625rem. */
+  @media (min-width: 640px) {
+    input[type='date'],
+    input[type='time'],
+    input[type='datetime-local'],
+    input[type='month'] {
+      height: 2.625rem;
+      line-height: 1.25rem;
+    }
+  }
+
+  /* A flex/grid item's automatic minimum size is its content's min-content width, so `min-width: 0`
+     on the input above is not enough on its own — the *wrapper* also has to be allowed to shrink,
+     or it holds the track open at the control's intrinsic width and the field sticks out of the
+     card. Doing it here rather than adding `min-w-0` to every date field's wrapper by hand keeps
+     new forms correct by default. Harmless on block wrappers, which ignore it. */
+  :where(div, label, fieldset):has(
+    > input[type='date'],
+    > input[type='time'],
+    > input[type='datetime-local'],
+    > input[type='month']
+  ) {
+    min-width: 0;
   }
 }
 
@@ -95,9 +124,15 @@
            dark:focus:ring-offset-slate-950;
   }
 
-  /* Form input */
+  /* Form input.
+     `text-base sm:text-sm`: iOS Safari zooms the entire page in when a focused control's font-size
+     is under 16px, and it does not zoom back out. The layout viewport then no longer matches the
+     visual one, so every card looks like it runs off the right edge of the screen and the page
+     pans horizontally — on a phone that reads as broken layout, not as a zoom. 16px on phones is
+     the documented way to opt out; `text-sm` still applies from `sm` up, where there is no such
+     behaviour. (`maximum-scale=1` would also stop it, at the cost of blocking pinch-zoom.) */
   .form-input {
-    @apply w-full min-w-0 px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-sm
+    @apply w-full min-w-0 px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl text-base sm:text-sm
            placeholder:text-gray-400 focus:outline-none focus:ring-2
            focus:ring-honey-400 focus:border-honey-400 transition
            dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100

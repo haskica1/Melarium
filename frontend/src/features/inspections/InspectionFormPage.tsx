@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { Camera, CheckCircle2, Circle, ImagePlus, Loader2, Mic, Square, X } from 'lucide-react'
+import { AlertCircle, Camera, CheckCircle2, Circle, ImagePlus, Loader2, Mic, Square, X } from 'lucide-react'
 import {
   useCreateInspection,
   useInspectionPhotos,
@@ -36,6 +36,35 @@ import { isNetworkError } from '../../core/offline/syncOutbox'
 const voiceChipCls =
   'text-xs font-medium px-2.5 py-1 rounded-full bg-honey-100 text-honey-700 dark:bg-honey-500/15 dark:text-honey-300'
 
+function formatElapsed(ms: number): string {
+  const total = Math.floor(ms / 1000)
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+}
+
+/**
+ * Input-level bars. The point is a signal that survives where `SpeechRecognition` doesn't (iOS
+ * Safari, and any flaky connection — Chrome streams audio to a server to transcribe live): the
+ * beekeeper can see the phone is picking up their voice without waiting for text.
+ */
+function MicLevelMeter({ level }: { level: number }) {
+  const BARS = 12
+  const lit = Math.round(level * BARS)
+  return (
+    <div className="flex items-end gap-1 h-6" aria-hidden="true">
+      {Array.from({ length: BARS }, (_, i) => (
+        <span
+          key={i}
+          className={`w-1.5 rounded-full transition-all duration-100 ${
+            i < lit ? 'bg-red-500' : 'bg-red-200 dark:bg-red-500/25'
+          }`}
+          // Taller towards the middle so it reads as a level meter rather than a loading bar.
+          style={{ height: `${30 + Math.sin((i / (BARS - 1)) * Math.PI) * 70}%` }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function InspectionFormPage() {
   const { id } = useParams<{ id?: string }>()
   const [searchParams] = useSearchParams()
@@ -52,12 +81,19 @@ export default function InspectionFormPage() {
   const outboxItemRef = useRef<OutboxItem | null>(null)
 
   // ── Voice state ──────────────────────────────────────────────────────────
+  // Three visible steps only: record → obrada → pregled. The old flow had a fourth ("snimak je
+  // spreman", with an empty "Prepoznati tekst" box and a separate "Obradi snimak" button), which
+  // read as a failure on phones — live transcription doesn't work there, so the box was always
+  // blank. Stopping the recording now starts the transcription itself.
   const [voiceOpen, setVoiceOpen]     = useState(false)
-  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
   const [isParsing, setIsParsing]     = useState(false)
   const [parseError, setParseError]   = useState<string | null>(null)
   const [parsedResult, setParsedResult] = useState<ParseVoiceResult | null>(null)  // review shown after processing
-  const blobRef = useRef<Blob | null>(null)   // stable ref alongside state
+  // Bumped whenever the user walks away from a transcription; a late reply for an older id is
+  // dropped instead of re-opening the review over whatever they're doing now. Transcription can
+  // take a while on a weak signal, and the request has a 30 s timeout — long enough that a spinner
+  // with no way back is its own trap.
+  const parseRunIdRef = useRef(0)
 
   // ── Photo attachments (SPEC-05) ──────────────────────────────────────────
   // Files picked before saving; uploaded sequentially AFTER the inspection is saved.
@@ -76,7 +112,6 @@ export default function InspectionFormPage() {
 
   const voice = useVoiceInput()
   const isRecording = voice.state === 'recording'
-  const isDone      = voice.state === 'done'
 
   // ── Query for edit mode ──────────────────────────────────────────────────
   const { data: inspection, isLoading } = useQuery({
@@ -139,62 +174,56 @@ export default function InspectionFormPage() {
 
   const handleOpenVoice = () => {
     voice.reset()
-    setRecordedBlob(null)
-    blobRef.current = null
     setParseError(null)
     setParsedResult(null)
     setVoiceOpen(true)
   }
 
   const handleCloseVoice = () => {
+    parseRunIdRef.current++
     voice.reset()
-    setRecordedBlob(null)
-    blobRef.current = null
+    setIsParsing(false)
     setParseError(null)
     setParsedResult(null)
     setVoiceOpen(false)
   }
 
   const handleStartRecording = async () => {
+    parseRunIdRef.current++
+    setIsParsing(false)
     setParseError(null)
+    setParsedResult(null)
     await voice.startRecording()
   }
 
-  const handleStopRecording = async () => {
+  /** "Završi": stop the recorder and transcribe in one step — no intermediate confirmation. */
+  const handleFinishRecording = async () => {
     const blob = await voice.stopRecording()
-    blobRef.current = blob
-    setRecordedBlob(blob)
-  }
+    voice.reset()
 
-  const handleResetTranscript = () => {
-    voice.resetTranscript()
-    setRecordedBlob(null)
-    blobRef.current = null
-    setParseError(null)
-  }
+    // An empty or near-empty blob means the mic never delivered audio (permission revoked
+    // mid-recording, or a mis-tap). Say so here instead of spending a paid API call to be told.
+    if (blob.size < 2000) {
+      setParseError('Snimak je prazan ili prekratak. Provjerite dozvolu za mikrofon i snimite ponovo.')
+      return
+    }
 
-  const handleProcess = async () => {
-    const blob = blobRef.current
-    if (!blob) return
-
+    const runId = ++parseRunIdRef.current
     setIsParsing(true)
     setParseError(null)
     try {
       const result = await inspectionService.parseVoice(blob)
-      if (result.date)               setValue('date', result.date)
+      if (runId !== parseRunIdRef.current) return
+      if (result.date)                setValue('date', result.date)
       if (result.honeyLevel  != null) setValue('honeyLevel', result.honeyLevel)
-      if (result.broodStatus)        setValue('broodStatus', result.broodStatus)
-      if (result.notes)              setValue('notes', result.notes)
-      // Show a review of what the server recognized (the live transcript isn't available on
-      // most mobile browsers) before returning to the form.
-      voice.reset()
-      setRecordedBlob(null)
-      blobRef.current = null
+      if (result.broodStatus)         setValue('broodStatus', result.broodStatus)
+      if (result.notes)               setValue('notes', result.notes)
       setParsedResult(result)
     } catch {
+      if (runId !== parseRunIdRef.current) return
       setParseError('Greška pri obradi snimka. Pokušajte ponovo ili unesite podatke ručno.')
     } finally {
-      setIsParsing(false)
+      if (runId === parseRunIdRef.current) setIsParsing(false)
     }
   }
 
@@ -357,16 +386,31 @@ export default function InspectionFormPage() {
                 <p className="text-xs text-gray-400 dark:text-slate-500">
                   Transkribovanje i ekstrakcija podataka
                 </p>
+                {/* Always a way back: on a weak signal this can sit here for up to 30 s. */}
+                <button type="button" onClick={handleCloseVoice} className="btn-secondary mt-2 text-sm">
+                  Otkaži i unesi ručno
+                </button>
               </div>
             ) : parsedResult ? (
               /* ── Review of what the server recognized (works on mobile too) ── */
               <div className="space-y-4">
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="w-5 h-5 shrink-0" />
-                  <span className="text-sm font-semibold">Snimak obrađen — podaci su uneseni u formu.</span>
-                </div>
+                {parsedResult.transcript?.trim() ? (
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="w-5 h-5 shrink-0" />
+                    <span className="text-sm font-semibold">Snimak obrađen — podaci su uneseni u formu.</span>
+                  </div>
+                ) : (
+                  /* Transcription succeeded but heard nothing — claiming "podaci su uneseni" over an
+                     empty transcript is what made this screen look broken. */
+                  <div className="flex items-start gap-2 text-amber-700 dark:text-amber-300">
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                    <span className="text-sm font-semibold">
+                      Iz snimka nije prepoznat nikakav govor. Snimite ponovo bliže mikrofonu ili unesite podatke ručno.
+                    </span>
+                  </div>
+                )}
 
-                {parsedResult.transcript && (
+                {parsedResult.transcript?.trim() && (
                   <div>
                     <label className="form-label">Prepoznati tekst</label>
                     <div className="w-full rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 px-4 py-3 text-sm leading-relaxed text-gray-700 dark:text-slate-200 max-h-40 overflow-y-auto whitespace-pre-line">
@@ -382,147 +426,103 @@ export default function InspectionFormPage() {
                   {parsedResult.notes && <span className={voiceChipCls}>Napomena dodana</span>}
                 </div>
 
-                <button type="button" onClick={handleCloseVoice} className="btn-primary w-full">
-                  Uredu — pregledaj formu
-                </button>
+                <div className="flex gap-3">
+                  <button type="button" onClick={handleStartRecording} className="btn-secondary flex-1">
+                    Snimi ponovo
+                  </button>
+                  <button type="button" onClick={handleCloseVoice} className="btn-primary flex-1">
+                    Uredu — pregledaj formu
+                  </button>
+                </div>
               </div>
-            ) : (
-              <>
-                {/* Live transcript display */}
-                <div>
-                  <label className="form-label">
-                    {isRecording ? (
-                      <span className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block" />
-                        Snimanje u toku — govorite bosanskim jezikom
-                      </span>
-                    ) : isDone ? (
-                      'Prepoznati tekst'
-                    ) : (
-                      'Vaš govor će se prikazati ovdje'
-                    )}
-                  </label>
-                  {voice.hasSpeechSupport ? (
-                    <>
-                      <textarea
-                        readOnly
-                        rows={6}
-                        value={voice.liveTranscript}
-                        placeholder={
-                          isRecording
-                            ? 'Slušam…'
-                            : 'Kliknite "Počni snimanje" i govorite na bosanskom jeziku.\n\nPrimjer: "Pregledao sam košnicu danas, leglo je zdravo, matica se vidi, med je na visokom nivou, dodao sam supericu."'
-                        }
-                        className={`w-full rounded-xl border px-4 py-3 text-sm leading-relaxed resize-none
-                          bg-gray-50 dark:bg-slate-800/60 text-gray-800 dark:text-slate-200
-                          placeholder:text-gray-400 dark:placeholder:text-slate-500
-                          transition-colors
-                          ${isRecording
-                            ? 'border-red-300 dark:border-red-500/40 ring-2 ring-red-100 dark:ring-red-500/10'
-                            : 'border-gray-200 dark:border-slate-700'
-                          }`}
-                      />
-                      {voice.liveTranscript.trim() === '' && isDone && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5">
-                          Tekst nije prepoznat. Provjerite dozvole mikrofona ili snimite ponovo.
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <div className={`w-full rounded-xl border px-4 py-5 text-sm
-                      bg-gray-50 dark:bg-slate-800/60
-                      ${isRecording
-                        ? 'border-red-300 dark:border-red-500/40 ring-2 ring-red-100 dark:ring-red-500/10'
-                        : 'border-gray-200 dark:border-slate-700'
-                      }`}
-                    >
-                      {isRecording ? (
-                        <p className="text-gray-500 dark:text-slate-400 text-center">
-                          Snimanje u toku — govorite normalno.
-                          <br />
-                          <span className="text-xs mt-1 block text-gray-400 dark:text-slate-500">
-                            Pregled teksta nije podržan u ovom pretraživaču. Snimak će biti obrađen na serveru.
-                          </span>
-                        </p>
-                      ) : isDone ? (
-                        <p className="text-gray-500 dark:text-slate-400 text-center">
-                          Snimak je spreman za obradu.
-                        </p>
-                      ) : (
-                        <p className="text-gray-400 dark:text-slate-500">
-                          Kliknite "Počni snimanje" i govorite na bosanskom jeziku.{'\n\n'}Primjer: "Pregledao sam košnicu danas, leglo je zdravo, matica se vidi, med je na visokom nivou, dodao sam supericu."
-                          <br /><br />
-                          <span className="text-xs text-gray-400 dark:text-slate-500">
-                            Pregled teksta nije podržan u ovom pretraživaču — snimak će biti automatski transkribovan na serveru.
-                          </span>
-                        </p>
-                      )}
-                    </div>
+            ) : isRecording ? (
+              /* ── Recording ─────────────────────────────────────────────── */
+              <div className="space-y-5">
+                <div className="rounded-xl border border-red-300 dark:border-red-500/40 bg-red-50/60 dark:bg-red-500/10 px-4 py-6">
+                  <div className="flex flex-col items-center gap-3">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-red-600 dark:text-red-300">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse inline-block" />
+                      Snimam…
+                    </span>
+                    <span className="font-mono text-3xl font-semibold tabular-nums text-gray-800 dark:text-slate-100">
+                      {formatElapsed(voice.elapsedMs)}
+                    </span>
+                    <MicLevelMeter level={voice.level} />
+                    <p className="text-xs text-gray-500 dark:text-slate-400 text-center">
+                      Govorite normalno, na bosanskom. Kad završite pritisnite <strong>Završi</strong> —
+                      snimak se odmah obrađuje.
+                    </p>
+                  </div>
+
+                  {/* Live text only when the browser is actually producing it — most phones don't,
+                      and an always-visible empty box read as "it isn't hearing me". */}
+                  {voice.liveTranscript.trim() !== '' && (
+                    <p className="mt-4 pt-4 border-t border-red-200 dark:border-red-500/20 text-sm leading-relaxed text-gray-700 dark:text-slate-200 max-h-32 overflow-y-auto">
+                      {voice.liveTranscript}
+                    </p>
                   )}
                 </div>
 
-                {/* Error */}
-                {(parseError || voice.errorMessage) && (
+                {voice.errorMessage && (
+                  <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/10 rounded-lg px-4 py-3">
+                    {voice.errorMessage}
+                  </p>
+                )}
+
+                <div className="flex gap-3">
+                  {/* Enabled during recording now — previously the only way out of this screen was
+                      to finish a recording you no longer wanted. */}
+                  <button type="button" onClick={handleCloseVoice} className="btn-secondary flex-1">
+                    Zatvori
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFinishRecording}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
+                      bg-red-500 hover:bg-red-600 text-white font-medium text-sm transition-colors"
+                  >
+                    <Square className="w-4 h-4 fill-current" />
+                    Završi
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ── Idle: instructions + start ────────────────────────────── */
+              <div className="space-y-5">
+                <div className="rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60 px-4 py-5">
+                  <p className="text-sm text-gray-700 dark:text-slate-200">
+                    Pritisnite <strong>Počni snimanje</strong> i ispričajte pregled svojim riječima.
+                  </p>
+                  <p className="mt-2.5 text-sm italic text-gray-500 dark:text-slate-400">
+                    „Pregledao sam košnicu danas, leglo je zdravo, matica se vidi, med je na visokom
+                    nivou, dodao sam supericu.”
+                  </p>
+                  <p className="mt-3 text-xs text-gray-400 dark:text-slate-500">
+                    Datum, nivo meda, status legla i napomena se popunjavaju automatski — sve možete
+                    ispraviti prije čuvanja.
+                  </p>
+                </div>
+
+                {(parseError ?? voice.errorMessage) && (
                   <p className="text-sm text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-500/10 rounded-lg px-4 py-3">
                     {parseError ?? voice.errorMessage}
                   </p>
                 )}
 
-                {/* Action buttons */}
-                {!isDone ? (
-                  /* Not recording / actively recording */
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={handleCloseVoice}
-                      className="btn-secondary flex-1"
-                      disabled={isRecording}
-                    >
-                      Zatvori
-                    </button>
-
-                    {isRecording ? (
-                      <button
-                        type="button"
-                        onClick={handleStopRecording}
-                        className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-2.5
-                          bg-red-500 hover:bg-red-600 text-white font-medium text-sm transition-colors"
-                      >
-                        <Square className="w-4 h-4 fill-current" />
-                        Završi snimanje
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleStartRecording}
-                        className="flex-1 flex items-center justify-center gap-2 btn-primary"
-                      >
-                        <Circle className="w-3.5 h-3.5 fill-current" />
-                        Počni
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  /* Done — waiting for action */
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={handleResetTranscript}
-                      className="btn-secondary flex-1"
-                    >
-                      Poništi unos
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleProcess}
-                      disabled={!recordedBlob}
-                      className="btn-primary flex-1"
-                    >
-                      Obradi snimak
-                    </button>
-                  </div>
-                )}
-              </>
+                <div className="flex gap-3">
+                  <button type="button" onClick={handleCloseVoice} className="btn-secondary flex-1">
+                    Zatvori
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStartRecording}
+                    className="flex-1 flex items-center justify-center gap-2 btn-primary"
+                  >
+                    <Circle className="w-3.5 h-3.5 fill-current" />
+                    {parseError ? 'Snimi ponovo' : 'Počni snimanje'}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         ) : (

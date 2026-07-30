@@ -204,8 +204,9 @@ export default function TreatmentFormPage() {
     )
   }
 
+  // text-base below `sm` so iOS doesn't zoom the page on focus — see the .form-input note in index.css.
   const inputClass =
-    'w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-2 focus:ring-honey-100 transition-all'
+    'w-full min-w-0 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-base sm:text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-2 focus:ring-honey-100 transition-all'
   const labelClass = 'block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5'
 
   return (

@@ -184,7 +184,7 @@ export default function PasturesPage() {
           <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 px-1 mb-3">
             Trenutne lokacije pčelinjaka
           </h2>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {locatedApiaries.map(a => (
               <Link
                 key={a.id}
@@ -209,7 +209,7 @@ export default function PasturesPage() {
 
       {/* Registry */}
       {!isLoading && pastures.length > 0 && (
-        <div className="grid sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {pastures.map(p => (
             <div key={p.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none px-5 py-4">
               <div className="flex items-start gap-3">

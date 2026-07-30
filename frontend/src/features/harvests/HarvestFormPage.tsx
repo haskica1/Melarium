@@ -135,8 +135,9 @@ export default function HarvestFormPage() {
     )
   }
 
+  // text-base below `sm` so iOS doesn't zoom the page on focus — see the .form-input note in index.css.
   const inputClass =
-    'w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-2 focus:ring-honey-100 transition-all'
+    'w-full min-w-0 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-base sm:text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-2 focus:ring-honey-100 transition-all'
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -236,27 +237,52 @@ export default function HarvestFormPage() {
               <p className="text-sm text-gray-400 dark:text-slate-500 py-4">Ovaj pčelinjak nema košnica.</p>
             ) : (
               <>
-                <div className="grid grid-cols-[2fr_1fr_1fr] gap-2 px-1 mb-1">
-                  {['Košnica', 'kg', 'Okviri'].map(h => (
-                    <span key={h} className="text-xs font-medium text-gray-400 dark:text-slate-500">{h}</span>
-                  ))}
+                {/* Three equal-ish columns fit a tablet but not a phone: the two number fields ended
+                    up ~55 px of usable width each, too narrow to read "12.5" back. Below `sm` each
+                    hive becomes its own bordered block — name on top, the two fields side by side
+                    under it, each with its unit shown inside — so the header row is `sm`-only.
+                    Header and rows share one flex structure (half / half-split-in-two) so the
+                    columns line up by construction rather than by matching fr values twice. */}
+                <div className="hidden sm:flex gap-2 px-1 mb-1">
+                  <span className="w-1/2 text-xs font-medium text-gray-400 dark:text-slate-500">Košnica</span>
+                  <div className="w-1/2 grid grid-cols-2 gap-2">
+                    {['kg', 'Okviri'].map(h => (
+                      <span key={h} className="text-xs font-medium text-gray-400 dark:text-slate-500">{h}</span>
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2.5 sm:space-y-2">
                   {hives.map(hive => (
-                    <div key={hive.id} className="grid grid-cols-[2fr_1fr_1fr] gap-2 items-center">
-                      <span className="text-sm text-gray-700 dark:text-slate-200 truncate">{hive.name}</span>
-                      <input
-                        type="number" step="0.01" min="0" placeholder="—"
-                        value={qty[hive.id] ?? ''}
-                        onChange={e => setQty(prev => ({ ...prev, [hive.id]: e.target.value }))}
-                        className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-1 focus:ring-honey-100 transition-all"
-                      />
-                      <input
-                        type="number" step="1" min="0" placeholder="—"
-                        value={frames[hive.id] ?? ''}
-                        onChange={e => setFrames(prev => ({ ...prev, [hive.id]: e.target.value }))}
-                        className="px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-1 focus:ring-honey-100 transition-all"
-                      />
+                    <div
+                      key={hive.id}
+                      className="rounded-xl border border-gray-100 dark:border-slate-800 p-2.5
+                                 sm:border-0 sm:p-0 sm:flex sm:gap-2 sm:items-center"
+                    >
+                      <span className="block sm:w-1/2 text-sm font-medium sm:font-normal text-gray-700 dark:text-slate-200 truncate mb-1.5 sm:mb-0">
+                        {hive.name}
+                      </span>
+                      <div className="grid grid-cols-2 gap-2 sm:w-1/2">
+                        <label className="relative block">
+                          <input
+                            type="number" step="0.01" min="0" inputMode="decimal" placeholder="—"
+                            aria-label={`Prinos u kilogramima — ${hive.name}`}
+                            value={qty[hive.id] ?? ''}
+                            onChange={e => setQty(prev => ({ ...prev, [hive.id]: e.target.value }))}
+                            className="w-full min-w-0 pl-3 pr-9 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-base sm:text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-1 focus:ring-honey-100 transition-all"
+                          />
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-slate-500 pointer-events-none">kg</span>
+                        </label>
+                        <label className="relative block">
+                          <input
+                            type="number" step="1" min="0" inputMode="numeric" placeholder="—"
+                            aria-label={`Broj izvrcanih okvira — ${hive.name}`}
+                            value={frames[hive.id] ?? ''}
+                            onChange={e => setFrames(prev => ({ ...prev, [hive.id]: e.target.value }))}
+                            className="w-full min-w-0 pl-3 pr-9 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-base sm:text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-1 focus:ring-honey-100 transition-all"
+                          />
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 dark:text-slate-500 pointer-events-none">kom</span>
+                        </label>
+                      </div>
                     </div>
                   ))}
                 </div>

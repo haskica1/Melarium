@@ -182,7 +182,7 @@ export default function StatsPage() {
       </Section>
 
       {/* ── Two-column row: beehive type + material ───────────────────────────── */}
-      <div className="grid sm:grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
         <div className="card">
           <div className="flex items-center gap-2 mb-5">
             <span className="text-xl">🏠</span>
@@ -328,7 +328,7 @@ export default function StatsPage() {
             )}
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             {/* Kg by honey type */}
             <div>
               <p className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3">Med po vrsti (kg)</p>
@@ -403,7 +403,7 @@ export default function StatsPage() {
 
       {/* ── Diet section ─────────────────────────────────────────────────────── */}
       {hasDietData && (
-        <div className="grid sm:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
           <div className="card">
             <div className="flex items-center gap-2 mb-5">
               <span className="text-xl">🌿</span>

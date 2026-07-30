@@ -95,7 +95,7 @@ export default function LearningPage() {
           <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 px-1">
             Aktuelno u {MONTH_LOCATIVE[currentMonth - 1]}
           </h2>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {aktuelno.map(t => <TopicCard key={t.id} topic={t} highlight />)}
           </div>
         </section>
@@ -106,7 +106,7 @@ export default function LearningPage() {
           <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 px-1">
             {LearningCategoryLabels[cat]}
           </h2>
-          <div className="grid sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {items.map(t => <TopicCard key={t.id} topic={t} />)}
           </div>
         </section>
@@ -130,34 +130,47 @@ function FilterChip({ label, active, onClick }: { label: string; active: boolean
   )
 }
 
+/**
+ * "jan, feb, mar…" gets long enough to dominate a phone-width card — and all twelve months means
+ * "any time of year" anyway, which is worth saying in two words instead of twelve abbreviations.
+ */
+function monthsLabel(months: number[]): string {
+  if (months.length >= 12) return 'cijela godina'
+  const names = months.map(m => MonthLabels[m - 1].slice(0, 3).toLowerCase())
+  return names.length > 4 ? `${names.slice(0, 4).join(', ')}…` : names.join(', ')
+}
+
 function TopicCard({ topic, highlight = false }: { topic: LearningTopicSummary; highlight?: boolean }) {
   return (
     <Link
       to={`/learning/${topic.id}`}
-      className={`block bg-white dark:bg-slate-900 rounded-2xl border px-5 py-4 shadow-sm dark:shadow-none transition-colors ${
+      className={`block bg-white dark:bg-slate-900 rounded-2xl border px-4 py-3.5 sm:px-5 sm:py-4 shadow-sm dark:shadow-none transition-colors ${
         highlight
           ? 'border-honey-300 dark:border-honey-500/40 hover:border-honey-400'
           : 'border-honey-100 dark:border-slate-800 hover:border-honey-200 dark:hover:border-slate-700'
       }`}
     >
       <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-honey-50 text-honey-600 dark:bg-honey-500/15 dark:text-honey-300">
-          <GraduationCap className="w-5 h-5" />
+        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 bg-honey-50 text-honey-600 dark:bg-honey-500/15 dark:text-honey-300">
+          <GraduationCap className="w-4 h-4 sm:w-5 sm:h-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-gray-900 dark:text-slate-100 truncate">{topic.title}</h3>
-            {topic.isRead && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" aria-label="Pročitano" />}
+          {/* items-start (not center) so the badge sits on the title's first line once it wraps. */}
+          <div className="flex items-start gap-1.5">
+            {/* Bosnian topic titles are long; `truncate` cut them mid-word on a phone and its
+                white-space: nowrap was also what stretched the card past the viewport. */}
+            <h3 className="font-semibold text-gray-900 dark:text-slate-100 leading-snug line-clamp-2 break-words min-w-0">
+              {topic.title}
+            </h3>
+            {topic.isRead && <CheckCircle2 className="w-4 h-4 mt-0.5 text-emerald-500 shrink-0" aria-label="Pročitano" />}
           </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-slate-400 line-clamp-2">{topic.summary}</p>
-          <div className="mt-2 flex items-center gap-2 flex-wrap">
+          <p className="mt-1 text-sm text-gray-500 dark:text-slate-400 line-clamp-2 break-words">{topic.summary}</p>
+          <div className="mt-2 flex items-center gap-x-2 gap-y-1 flex-wrap">
             <span className="text-xs text-honey-700 dark:text-honey-300 bg-honey-100 dark:bg-honey-500/15 rounded-full px-2 py-0.5">
               {topic.categoryName}
             </span>
             {topic.months && topic.months.length > 0 && (
-              <span className="text-xs text-gray-400 dark:text-slate-500">
-                {topic.months.map(m => MonthLabels[m - 1].slice(0, 3).toLowerCase()).join(', ')}
-              </span>
+              <span className="text-xs text-gray-400 dark:text-slate-500">{monthsLabel(topic.months)}</span>
             )}
             {topic.videoUrl && <Video className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" aria-label="Sadrži video" />}
             {topic.fileUrl && <Paperclip className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" aria-label="Sadrži prilog" />}
