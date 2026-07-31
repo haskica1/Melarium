@@ -295,7 +295,7 @@ export default function Layout() {
 
           {/* Mobile panel */}
           {mobileOpen && (
-            <div className="sm:hidden border-t border-honey-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 space-y-1 animate-fade-in">
+            <div className="mobile-menu-panel sm:hidden border-t border-honey-100 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 space-y-1 animate-fade-in">
               {/* Nav items — shared list with the desktop Sidebar */}
               {getNavItems(navFlags).map(item => (
                 <MobileNavItem
@@ -354,6 +354,13 @@ export default function Layout() {
                     {isDark ? 'Svjetla tema' : 'Tamna tema'}
                   </button>
                   <button
+                    onClick={() => { setMobileOpen(false); navigate('/plans') }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <CreditCard className="w-4 h-4 text-honey-600 dark:text-honey-400" />
+                    Paket i pretplata
+                  </button>
+                  <button
                     onClick={() => { setMobileOpen(false); setFeedbackOpen(true) }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
                   >
@@ -407,13 +414,19 @@ export default function Layout() {
       </div>
 
       {/* ── Mobile FAB (scan) ─────────────────────────────────────────────────── */}
-      <button
-        onClick={() => setScannerOpen(true)}
-        className="sm:hidden fixed bottom-6 right-6 z-40 flex items-center justify-center w-14 h-14 rounded-full bg-honey-500 hover:bg-honey-600 active:bg-honey-700 text-white shadow-honey shadow-lg transition-colors"
-        aria-label="Skeniraj QR kod košnice"
-      >
-        <QrCode className="w-6 h-6" />
-      </button>
+      {/* Hidden while the hamburger panel is open: the panel now ends exactly at the bottom of the
+          viewport, and this button (z-40, above the z-30 header) sits over the right-hand end of
+          its last row — a tap there opened the scanner instead of signing out. The panel has its
+          own "Skeniraj" entry, so nothing is lost by hiding it. */}
+      {!mobileOpen && (
+        <button
+          onClick={() => setScannerOpen(true)}
+          className="sm:hidden fixed bottom-6 right-6 z-40 flex items-center justify-center w-14 h-14 rounded-full bg-honey-500 hover:bg-honey-600 active:bg-honey-700 text-white shadow-honey shadow-lg transition-colors"
+          aria-label="Skeniraj QR kod košnice"
+        >
+          <QrCode className="w-6 h-6" />
+        </button>
+      )}
 
       {/* ── QR Scanner Modal ──────────────────────────────────────────────────── */}
       {scannerOpen && <QrScannerModal onClose={() => setScannerOpen(false)} />}

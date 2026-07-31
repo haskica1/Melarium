@@ -33,6 +33,7 @@
 | 13 | [User Feedback](SPEC-13-user-feedback.md) | Prijava problema i povratne informacije (bug/žalba/pohvala/prijedlog/pitanje) → in-app notifikacija SystemAdminima + jedan email na konfigurisanu adresu + admin dashboard za trijažu | M | — (reuse ADR-021 queue, ADR-027 storage) | ✅ Implemented (2026-07-30) |
 | 14 | [In-App Help](SPEC-14-in-app-help.md) | Kontekstualna pomoć po stranici (info ikona + panel), uvodni flow za nove korisnike i izvedena "Prvi koraci" lista | M | — (soft-link 06) | ✅ Implemented (2026-07-30) |
 | 15 | [Invite a Friend](SPEC-15-invite-friend.md) | "Pozovi prijatelja": referral link + email pozivnica na platformu (nagrada u danima Pro paketa), plus pozivnica u vlastitu organizaciju koja **zamjenjuje** ručno dodavanje člana s lozinkom | L | — (reuse ADR-021 queue, ADR-029 token model) | 📋 Planned — odluke donesene, spremno za Fazu A |
+| 16 | [Org Activity & Status](SPEC-16-org-activity-retention.md) | Da li se organizacija *koristi*: heartbeat aktivnosti + izračunat status (Aktivna / Uspavana / Za brisanje) i radne liste za naplatu u admin tabeli, ručni prekidač "Neaktivna" koji blokira prijavu, i popravljeno ručno brisanje organizacije. **Ništa se ne briše automatski** | M | — (extends 09, reuse ADR-021/027) | 📋 Planned — odluke donesene, spremno za Fazu A |
 
 **Recommended order = index order.** Rationale:
 
@@ -62,6 +63,14 @@
   answered on 2026-07-30 (§13), so it is ready to start. Two of those answers make it **not** a
   slot-it-anywhere spec: it **removes** `POST /api/org/members`, so its Phases C and D must deploy
   together or OrgAdmins temporarily cannot add members at all.
+- **SPEC-16** was added 2026-07-31. Its defining decision is what it **does not** do: the system measures
+  usage and *labels* an organization, but **never deletes anything on its own** (§0 D2) — every deletion is
+  a SystemAdmin clicking through a confirm-by-name modal. Read that constraint before implementing, because
+  the obvious "helpful" additions (a countdown, a warning e-mail, a nightly cleanup job) were considered and
+  rejected, not overlooked. Two parts of it change behaviour rather than adding to it, and both are
+  deliberate: a deactivated organization's users **cannot sign in** (Phase B), and `DeleteOrganizationAsync`
+  stops refusing organizations that have users (Phase C). Phase C also fixes a **pre-existing bug it did not
+  introduce** — `DeleteUserAsync` throws on an FK when the user has an assigned todo.
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD

@@ -153,6 +153,25 @@
   .badge {
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
+
+  /* Mobile hamburger panel.
+     The panel lives inside the `sticky top-0` header and had no height limit, so with ~11 nav
+     items plus the user block it grew to 851px — taller than an iPhone SE viewport (667px),
+     leaving theme, plan, feedback and *sign out* below the fold. Those were still technically
+     reachable (a sticky header sits in normal flow, so it adds its own height to the document's
+     scroll range), but only by scrolling the whole page with nothing on screen suggesting there
+     was more menu down there — and the content behind the menu scrolled along with it.
+     Capping the panel at the viewport minus the 3.5rem header bar gives it its own scrollbar
+     instead. `dvh` first: on iOS Safari `100vh` is the *large* viewport (URL bar hidden), which
+     would still hide the last row behind the browser chrome; the `vh` line above it is the
+     fallback for engines that don't know `dvh` (< iOS 15.4). `overscroll-contain` stops the
+     scroll chaining to the page once the menu hits its end. */
+  .mobile-menu-panel {
+    max-height: calc(100vh - 3.5rem);
+    max-height: calc(100dvh - 3.5rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }
 
 /* Honeycomb decorative pattern — seamless interlocking hexagon outlines (matches the login art) */
