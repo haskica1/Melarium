@@ -1,6 +1,7 @@
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
+using Melarium.Application.Common.Validation;
 using Melarium.Application.Features.Notifications;
 using Melarium.Application.Features.Profile.DTOs;
 using Melarium.Domain.Entities;
@@ -35,7 +36,7 @@ public class ProfileService : IProfileService
         var user = await _uow.Users.GetByIdAsync(userId)
             ?? throw new NotFoundException(nameof(User), userId);
 
-        return new ProfileResponseDto(user.FirstName, user.LastName, user.Email, user.EmailVerifiedAt);
+        return new ProfileResponseDto(user.FirstName, user.LastName, user.Email, user.Phone, user.EmailVerifiedAt);
     }
 
     public async Task<ProfileResponseDto> UpdateProfileAsync(UpdateProfileDto dto)
@@ -54,6 +55,14 @@ public class ProfileService : IProfileService
             if (conflict != null)
                 throw new BusinessRuleException($"Email '{dto.Email}' is already in use.");
         }
+
+        // Phone uniqueness — blank means "leave the stored number alone", never "clear it", so a
+        // client that doesn't send the field can't strip a login identifier off the account.
+        // Excluding the caller's own id lets them re-save the profile with their number untouched.
+        var newPhone = PhoneRules.Normalize(dto.Phone);
+        var phoneChanged = newPhone is not null && newPhone != user.Phone;
+        if (phoneChanged && await _uow.Users.IsPhoneTakenAsync(newPhone!, user.Id))
+            throw new BusinessRuleException(PhoneRules.DuplicateMessage);
 
         // Password change (optional)
         var passwordChanged = !string.IsNullOrWhiteSpace(dto.NewPassword);
@@ -82,6 +91,8 @@ public class ProfileService : IProfileService
         user.FirstName = dto.FirstName.Trim();
         user.LastName = dto.LastName.Trim();
         user.Email = newEmail;
+        if (phoneChanged)
+            user.Phone = newPhone;
 
         await _uow.Users.UpdateAsync(user);
         await _uow.SaveChangesAsync();
@@ -94,6 +105,6 @@ public class ProfileService : IProfileService
                 + "Ako to niste bili vi, odmah zatražite promjenu lozinke putem 'Zaboravili ste lozinku?'.",
                 NotificationType.PasswordChanged);
 
-        return new ProfileResponseDto(user.FirstName, user.LastName, user.Email, user.EmailVerifiedAt);
+        return new ProfileResponseDto(user.FirstName, user.LastName, user.Email, user.Phone, user.EmailVerifiedAt);
     }
 }

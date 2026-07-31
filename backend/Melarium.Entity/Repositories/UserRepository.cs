@@ -15,6 +15,16 @@ public class UserRepository : Repository<User>, IUserRepository
             .Include(u => u.Apiary)
             .FirstOrDefaultAsync(u => u.Email == email.ToLower());
 
+    public async Task<User?> GetByPhoneAsync(string phone) =>
+        await _context.Users
+            .Include(u => u.Organization)
+            .Include(u => u.Apiary)
+            .FirstOrDefaultAsync(u => u.Phone == phone);
+
+    public async Task<bool> IsPhoneTakenAsync(string phone, int? excludeUserId = null) =>
+        await _context.Users
+            .AnyAsync(u => u.Phone == phone && (excludeUserId == null || u.Id != excludeUserId));
+
     public async Task<IEnumerable<User>> GetAllWithOrganizationAsync() =>
         await _context.Users
             .AsNoTracking()

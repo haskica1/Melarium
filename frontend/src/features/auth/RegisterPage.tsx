@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import axios from 'axios'
-import { ArrowRight, Building2, Eye, EyeOff, Loader2, Lock, Mail, Moon, Sun, User as UserIcon } from 'lucide-react'
+import { ArrowRight, Building2, Eye, EyeOff, Loader2, Lock, Mail, Moon, Phone, Sun, User as UserIcon } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../../core/context/AuthContext'
 import { useTheme } from '../../core/hooks/useTheme'
@@ -12,6 +12,7 @@ interface RegisterForm {
   firstName: string
   lastName: string
   email: string
+  phone: string
   password: string
   confirmPassword: string
   organizationName: string
@@ -59,6 +60,7 @@ export default function RegisterPage() {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
+        phone: data.phone,
         password: data.password,
         organizationName: data.organizationName,
         organizationDescription: data.organizationDescription?.trim() || undefined,
@@ -66,9 +68,11 @@ export default function RegisterPage() {
       // Fresh registrants are always Organization Admins → apiary workspace.
       navigate('/apiaries', { replace: true })
     } catch (err) {
-      // The only 422 the register endpoint returns is a duplicate email — map it to the field.
+      // The only 422s the register endpoint returns are the two duplicate-identifier conflicts,
+      // both worded by the backend. Attach it to whichever field it names.
       if (axios.isAxiosError(err) && err.response?.status === 422) {
-        setError('email', { message: 'Korisnik s ovom e-poštom već postoji.' })
+        const message = getServerError(err, 'Korisnik s ovim podacima već postoji.')
+        setError(message.toLowerCase().includes('telefon') ? 'phone' : 'email', { message })
         return
       }
       setServerError(getServerError(err, 'Registracija neuspješna. Pokušajte ponovo.'))
@@ -214,6 +218,33 @@ export default function RegisterPage() {
                   />
                 </div>
                 {errors.email && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.email.message}</p>}
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
+                  Broj telefona
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500 pointer-events-none" />
+                  <input
+                    id="phone"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="061 123 456"
+                    className={clsx('pl-11 pr-4', fieldClass(!!errors.phone))}
+                    {...register('phone', {
+                      required: 'Broj telefona je obavezan',
+                      // Loose on purpose — the server owns the real rule. This only catches
+                      // an obviously incomplete number before the round trip.
+                      validate: v => v.replace(/\D/g, '').length >= 8 || 'Unesite ispravan broj telefona',
+                    })}
+                  />
+                </div>
+                {errors.phone
+                  ? <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.phone.message}</p>
+                  : <p className="mt-1.5 text-xs text-gray-500 dark:text-slate-400">Njime se možete prijaviti umjesto e-poštom.</p>}
               </div>
 
               {/* Password */}

@@ -1,6 +1,7 @@
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
+using Melarium.Application.Common.Validation;
 using Melarium.Application.Features.Admin.DTOs;
 using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Entities;
@@ -139,6 +140,11 @@ public class AdminService : IAdminService
         if (existing != null)
             throw new BusinessRuleException($"A user with email '{dto.Email}' already exists.");
 
+        // The validator has already rejected an unparseable number, so this cannot be null here.
+        var phone = PhoneRules.Normalize(dto.Phone)!;
+        if (await _uow.Users.IsPhoneTakenAsync(phone))
+            throw new BusinessRuleException(PhoneRules.DuplicateMessage);
+
         if (!Enum.TryParse<UserRole>(dto.Role, out var role))
             throw new BusinessRuleException($"Invalid role '{dto.Role}'.");
 
@@ -166,6 +172,7 @@ public class AdminService : IAdminService
             FirstName = dto.FirstName.Trim(),
             LastName = dto.LastName.Trim(),
             Email = dto.Email.Trim().ToLower(),
+            Phone = phone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Role = role,
             OrganizationId = dto.OrganizationId,
@@ -269,6 +276,17 @@ public class AdminService : IAdminService
             var conflict = await _uow.Users.GetByEmailAsync(newEmail);
             if (conflict != null)
                 throw new BusinessRuleException($"A user with email '{dto.Email}' already exists.");
+        }
+
+        // Blank means "leave the stored number alone", never "clear it" — an older client that
+        // doesn't send the field must not silently strip a login identifier off the account.
+        var newPhone = PhoneRules.Normalize(dto.Phone);
+        if (newPhone is not null && newPhone != user.Phone)
+        {
+            if (await _uow.Users.IsPhoneTakenAsync(newPhone, user.Id))
+                throw new BusinessRuleException(PhoneRules.DuplicateMessage);
+
+            user.Phone = newPhone;
         }
 
         // Capture old state for change detection
@@ -472,6 +490,7 @@ public class AdminService : IAdminService
         FirstName = u.FirstName,
         LastName = u.LastName,
         Email = u.Email,
+        Phone = u.Phone,
         Role = u.Role.ToString(),
         OrganizationId = u.OrganizationId,
         OrganizationName = u.Organization?.Name,

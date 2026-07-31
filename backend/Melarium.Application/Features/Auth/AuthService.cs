@@ -6,6 +6,7 @@ using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Models;
 using Melarium.Application.Common.Security;
+using Melarium.Application.Common.Validation;
 using Melarium.Application.Features.Auth.DTOs;
 using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Entities;
@@ -46,25 +47,50 @@ public class AuthService : IAuthService
 
     public async Task<LoginResponseDto> LoginAsync(LoginDto dto)
     {
-        var user = await _uow.Users.GetByEmailAsync(dto.Email.Trim().ToLower());
+        var user = await FindByIdentifierAsync(dto.LoginName);
 
-        // Always run a verify — skipping it for unknown emails makes "no such user" measurably
+        // Always run a verify — skipping it for unknown accounts makes "no such user" measurably
         // faster than "wrong password", which is enough to enumerate accounts.
         var passwordMatches = BCrypt.Net.BCrypt.Verify(dto.Password, user?.PasswordHash ?? DummyPasswordHash);
 
         if (user is null || !passwordMatches)
-            throw new UnauthorizedException("Pogrešna e-pošta ili lozinka.");
+            throw new UnauthorizedException("Pogrešna e-pošta, broj telefona ili lozinka.");
 
         return await IssueTokensAsync(user);
+    }
+
+    /// <summary>
+    /// Resolves whatever the user typed into an account. An '@' is what separates the two forms —
+    /// no email lacks one and no phone number contains one. Both branches run a single lookup and
+    /// return null for "not found", so <see cref="LoginAsync"/>'s constant-time guarantee holds:
+    /// the one shortcut below fires on malformed input, which reveals nothing about who has an account.
+    /// </summary>
+    private async Task<User?> FindByIdentifierAsync(string identifier)
+    {
+        var trimmed = identifier.Trim();
+        if (trimmed.Length == 0) return null;
+
+        if (trimmed.Contains('@'))
+            return await _uow.Users.GetByEmailAsync(trimmed.ToLower());
+
+        // An unparseable number can't match anything — stored numbers are always canonical.
+        return PhoneRules.Normalize(trimmed) is { } phone
+            ? await _uow.Users.GetByPhoneAsync(phone)
+            : null;
     }
 
     public async Task<LoginResponseDto> RegisterAsync(RegisterDto dto)
     {
         var email = dto.Email.Trim().ToLower();
 
-        var existing = await _uow.Users.GetByEmailAsync(email);
-        if (existing != null)
-            throw new BusinessRuleException($"A user with email '{dto.Email}' already exists.");
+        // The validator has already rejected an unparseable number, so this cannot be null here.
+        var phone = PhoneRules.Normalize(dto.Phone)!;
+
+        if (await _uow.Users.GetByEmailAsync(email) != null)
+            throw new BusinessRuleException("Korisnik s ovom e-poštom već postoji.");
+
+        if (await _uow.Users.IsPhoneTakenAsync(phone))
+            throw new BusinessRuleException(PhoneRules.DuplicateMessage);
 
         var now = DateTime.UtcNow;
 
@@ -91,6 +117,7 @@ public class AuthService : IAuthService
             FirstName = dto.FirstName.Trim(),
             LastName = dto.LastName.Trim(),
             Email = email,
+            Phone = phone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Role = UserRole.OrganizationAdmin,
             Organization = organization,

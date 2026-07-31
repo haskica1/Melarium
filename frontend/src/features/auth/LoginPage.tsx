@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail, Moon, Sun } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Moon, Sun, User as UserIcon } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../../core/context/AuthContext'
 import { useTheme } from '../../core/hooks/useTheme'
@@ -9,7 +9,8 @@ import type { LoginResponse } from '../../core/services/authService'
 import { getServerError } from './authErrors'
 
 interface LoginForm {
-  email: string
+  /** Email address or phone number — the backend decides which by looking for an '@'. */
+  identifier: string
   password: string
 }
 
@@ -43,7 +44,7 @@ export default function LoginPage() {
   async function onSubmit(data: LoginForm) {
     setServerError(null)
     try {
-      const response = await login(data.email, data.password) as LoginResponse
+      const response = await login(data.identifier, data.password) as LoginResponse
       const destination = returnUrl ?? (response.role === 'SystemAdmin' ? '/admin' : '/apiaries')
       navigate(destination, { replace: true })
     } catch (err) {
@@ -144,32 +145,33 @@ export default function LoginPage() {
             )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-              {/* Email */}
+              {/* Email or phone */}
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
-                  E-pošta
+                <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
+                  E-pošta ili broj telefona
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500 pointer-events-none" />
+                  <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500 pointer-events-none" />
                   <input
-                    id="email"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
+                    id="identifier"
+                    // Deliberately `text`, not `email` — `email` makes the browser reject a phone
+                    // number before the form ever submits.
+                    type="text"
+                    autoComplete="username"
+                    placeholder="you@example.com ili 061 123 456"
                     className={clsx(
                       'w-full pl-11 pr-4 py-3 rounded-xl border text-sm transition-all duration-200 outline-none',
                       'bg-gray-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 dark:text-slate-100',
-                      errors.email
+                      errors.identifier
                         ? 'border-red-400 focus:ring-2 focus:ring-red-200 dark:focus:ring-red-500/30'
                         : 'border-gray-200 dark:border-slate-700 focus:border-honey-400 focus:ring-2 focus:ring-honey-100 dark:focus:ring-honey-500/20',
                     )}
-                    {...register('email', {
-                      required: 'E-pošta je obavezna',
-                      pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Unesite valjanu e-poštu' },
-                    })}
+                    // No format check here: which of the two it is, and whether it is well-formed,
+                    // is the server's call — guessing client-side would only lock people out.
+                    {...register('identifier', { required: 'Unesite e-poštu ili broj telefona' })}
                   />
                 </div>
-                {errors.email && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.email.message}</p>}
+                {errors.identifier && <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{errors.identifier.message}</p>}
               </div>
 
               {/* Password */}

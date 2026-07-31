@@ -9,7 +9,7 @@
 ## Implemented Features
 
 ### Authentication & Accounts
-- `POST /api/auth/login` — email + password, returns access token (**30 min**) + rotating refresh token (**14 days**)
+- `POST /api/auth/login` — **email _or_ phone** + password, returns access token (**30 min**) + rotating refresh token (**14 days**)
 - `POST /api/auth/register` — **self-service sign-up**: creates a new Organization and its OrganizationAdmin, auto-login
 - `POST /api/auth/refresh` — rotates the refresh token; **reuse of a rotated token revokes the user's whole active set**
 - `POST /api/auth/logout` — revokes the presented refresh token (idempotent)
@@ -21,8 +21,22 @@
 - `POST /api/auth/resend-verification` — authenticated; re-sends the link to the signed-in user
 - Rate limiting per client IP: login 5/min, register 5/min, refresh 20/min, **auth-email 3/min**
   (forgot-password, resend-verification), **auth-token 10/min** (reset, verify) → `429`
+- **Phone is a second login identifier**: `User.Phone`, unique (partial index, NULL allowed),
+  stored canonical E.164 via `Common/Validation/PhoneRules` — "061 123 456", "+387 61 123 456" and
+  "0038761123456" all resolve to one account. `LoginDto.Identifier` routes on '@'; the legacy
+  `email` field still binds (cached PWA clients)
+- **Required wherever an account is created** — self-registration, `/api/admin/users`,
+  org member creation. Still **nullable**, because accounts predating the field have none and keep
+  signing in by email
+- **Editable** in the profile and in admin user edit. A blank field means *leave the stored number
+  unchanged*, never "clear it" — an older client that omits the field must not silently strip a
+  login identifier. Uniqueness on change is `IUserRepository.IsPhoneTakenAsync(phone, excludeUserId)`;
+  excluding your own id is what lets you re-save your profile, and normalising before comparing is
+  what stops a differently-written form of your own number reading as a change
+- Phone is **not verified** (no SMS): it can sign you in, but it must not become a recovery
+  channel — password reset stays email-only
 - Bad credentials return **401** (not 422), with an identical message and cost for
-  "unknown email" and "wrong password" (dummy BCrypt verify equalises timing)
+  "unknown account" and "wrong password" (dummy BCrypt verify equalises timing)
 - Passwords hashed with BCrypt; refresh + emailed tokens stored **hashed** (SHA-256).
   One password policy for every entry point (`Common/Validation/PasswordRules`, min 8)
 - **Email verification is soft**: recorded on `User.EmailVerifiedAt`, surfaced as a profile banner,

@@ -8,6 +8,16 @@ public class User : BaseEntity
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Canonical E.164 phone number (e.g. <c>+38761123456</c>) — a second login identifier
+    /// alongside <see cref="Email"/>. Always written through
+    /// <c>PhoneRules.Normalize</c>, never with whatever the user typed.
+    /// Nullable: required at self-registration, but accounts created before this field existed
+    /// (and those created by an admin) have none and keep signing in by email.
+    /// </summary>
+    public string? Phone { get; set; }
+
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; } = UserRole.ApiaryAdmin;
 

@@ -21,6 +21,8 @@ public class CreateOrgMemberValidator : AbstractValidator<CreateOrgMemberDto>
             .EmailAddress().WithMessage("Enter a valid email address.")
             .MaximumLength(256).WithMessage("Email must not exceed 256 characters.");
 
+        RuleFor(x => x.Phone).Phone();
+
         RuleFor(x => x.Password).Password();
 
         // Role/apiary/beehive consistency stays in OrgManagementService — it needs the

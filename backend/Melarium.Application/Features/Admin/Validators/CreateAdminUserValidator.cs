@@ -21,6 +21,8 @@ public class CreateAdminUserValidator : AbstractValidator<CreateAdminUserDto>
             .EmailAddress().WithMessage("Enter a valid email address.")
             .MaximumLength(256).WithMessage("Email must not exceed 256 characters.");
 
+        RuleFor(x => x.Phone).Phone();
+
         RuleFor(x => x.Password).Password();
 
         // Role/organisation/apiary consistency stays in AdminService (ValidateRoleOrgApiaryConsistency)

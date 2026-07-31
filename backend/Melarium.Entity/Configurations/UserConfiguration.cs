@@ -1,3 +1,4 @@
+using Melarium.Application.Common.Validation;
 using Melarium.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -24,6 +25,15 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(u => u.Email)
             .IsUnique();
+
+        builder.Property(u => u.Phone)
+            .HasMaxLength(PhoneRules.MaxLength);
+
+        // Filtered so the many pre-existing accounts without a number don't collide on NULL —
+        // same shape as Beehive.UniqueId.
+        builder.HasIndex(u => u.Phone)
+            .IsUnique()
+            .HasFilter("\"Phone\" IS NOT NULL");
 
         builder.Property(u => u.PasswordHash)
             .IsRequired();

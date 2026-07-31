@@ -32,6 +32,7 @@
 | 12 | [Apiary Feeding](SPEC-12-apiary-feeding.md) | Prehrana na nivou pčelinjaka: jedan program → odabir košnica (kao tretmani), oznaka "aktivna prehrana" na košnici, ukida kopiranje | M/L | — (mijenja 01/04/11) | 📋 Planned |
 | 13 | [User Feedback](SPEC-13-user-feedback.md) | Prijava problema i povratne informacije (bug/žalba/pohvala/prijedlog/pitanje) → in-app notifikacija SystemAdminima + jedan email na konfigurisanu adresu + admin dashboard za trijažu | M | — (reuse ADR-021 queue, ADR-027 storage) | ✅ Implemented (2026-07-30) |
 | 14 | [In-App Help](SPEC-14-in-app-help.md) | Kontekstualna pomoć po stranici (info ikona + panel), uvodni flow za nove korisnike i izvedena "Prvi koraci" lista | M | — (soft-link 06) | ✅ Implemented (2026-07-30) |
+| 15 | [Invite a Friend](SPEC-15-invite-friend.md) | "Pozovi prijatelja": referral link + email pozivnica na platformu (nagrada u danima Pro paketa), plus pozivnica u vlastitu organizaciju koja **zamjenjuje** ručno dodavanje člana s lozinkom | L | — (reuse ADR-021 queue, ADR-029 token model) | 📋 Planned — odluke donesene, spremno za Fazu A |
 
 **Recommended order = index order.** Rationale:
 
@@ -54,6 +55,13 @@
   to new users. Both are additive and low-risk (13 = one new table, no existing consumer touched; 14 =
   frontend-only, no schema at all), so unlike SPEC-12 they can ship independently and in either order.
   14's bulk cost is **writing Bosnian help copy**, not code.
+- **SPEC-15** was added 2026-07-30. It is the first spec that **grants plan value automatically**
+  (referral reward days written to `Organization.PlanValidUntil`) and the first that lets a user make
+  the app send mail to an address they type — so its reward-grant invariants and its anti-abuse section
+  are the parts to implement literally, not approximately. All six of its policy questions were
+  answered on 2026-07-30 (§13), so it is ready to start. Two of those answers make it **not** a
+  slot-it-anywhere spec: it **removes** `POST /api/org/members`, so its Phases C and D must deploy
+  together or OrgAdmins temporarily cannot add members at all.
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD

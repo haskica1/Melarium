@@ -42,6 +42,7 @@ public class AuthServiceTests
         FirstName      = "Asim",
         LastName       = "Tester",
         Email          = "asim@test.ba",
+        Phone          = "+38761123456",
         PasswordHash   = BCrypt.Net.BCrypt.HashPassword("Correct123!"),
         Role           = UserRole.OrganizationAdmin,
         OrganizationId = 5,
@@ -99,6 +100,61 @@ public class AuthServiceTests
         Assert.NotNull(persisted);
         Assert.NotEqual(result.RefreshToken, persisted!.TokenHash);    // only the hash is stored
         Assert.Equal("TestOrg", result.OrganizationName);
+    }
+
+    // ── Login by phone ─────────────────────────────────────────────────────────
+
+    // The whole point of accepting a phone number: however the owner writes it down, it has to
+    // reach the one canonical value stored on the account.
+    [Theory]
+    [InlineData("061123456")]
+    [InlineData("061 123 456")]
+    [InlineData("061-123-456")]
+    [InlineData("+38761123456")]
+    [InlineData("+387 61 123 456")]
+    [InlineData("0038761123456")]
+    [InlineData("38761123456")]
+    [InlineData("  061 123 456  ")]
+    public async Task Login_ByPhone_AcceptsEveryWrittenFormOfTheSameNumber(string typed)
+    {
+        _uow.Users.GetByPhoneAsync("+38761123456").Returns(OrgAdmin());
+        _uow.RefreshTokens.AddAsync(Arg.Any<RefreshToken>()).Returns(ci => ci.Arg<RefreshToken>());
+
+        var result = await _service.LoginAsync(new LoginDto(typed, "Correct123!"));
+
+        Assert.Equal(3, result.Token.Split('.').Length);
+        Assert.Equal("TestOrg", result.OrganizationName);
+    }
+
+    // A phone that belongs to nobody, and a number too malformed to even look up, must fail
+    // exactly like a wrong password — otherwise the endpoint tells you which numbers are registered.
+    [Theory]
+    [InlineData("062999888")]
+    [InlineData("nonsense")]
+    public async Task Login_UnknownOrMalformedPhone_IsIndistinguishableFromWrongPassword(string typed)
+    {
+        _uow.Users.GetByPhoneAsync(Arg.Any<string>()).Returns((User?)null);
+        _uow.Users.GetByEmailAsync("asim@test.ba").Returns(OrgAdmin());
+
+        var noAccount = await Assert.ThrowsAsync<UnauthorizedException>(() =>
+            _service.LoginAsync(new LoginDto(typed, "Whatever1!")));
+        var wrongPassword = await Assert.ThrowsAsync<UnauthorizedException>(() =>
+            _service.LoginAsync(new LoginDto("asim@test.ba", "Whatever1!")));
+
+        Assert.Equal(noAccount.Message, wrongPassword.Message);
+    }
+
+    // A frontend cached before the identifier rename still posts `email`. Dropping that field
+    // would sign those users out until their service worker updated.
+    [Fact]
+    public async Task Login_LegacyEmailField_StillAuthenticates()
+    {
+        _uow.Users.GetByEmailAsync("asim@test.ba").Returns(OrgAdmin());
+        _uow.RefreshTokens.AddAsync(Arg.Any<RefreshToken>()).Returns(ci => ci.Arg<RefreshToken>());
+
+        var result = await _service.LoginAsync(new LoginDto(null, "Correct123!", Email: "asim@test.ba"));
+
+        Assert.Equal(3, result.Token.Split('.').Length);
     }
 
     // ── Refresh rotation ───────────────────────────────────────────────────────

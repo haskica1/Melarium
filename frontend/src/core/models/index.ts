@@ -585,6 +585,8 @@ export interface AdminUser {
   firstName: string
   lastName: string
   email: string
+  /** Canonical E.164. Null on accounts created before phone numbers existed. */
+  phone: string | null
   role: string
   organizationId?: number
   organizationName?: string
@@ -609,6 +611,7 @@ export interface CreateAdminUserPayload {
   firstName: string
   lastName: string
   email: string
+  phone: string
   password: string
   role: string
   organizationId?: number | null
@@ -620,6 +623,8 @@ export interface UpdateAdminUserPayload {
   firstName: string
   lastName: string
   email: string
+  /** Blank leaves the stored number unchanged — it never clears it. */
+  phone?: string
   role: string
   organizationId?: number | null
   apiaryId?: number | null
@@ -633,6 +638,8 @@ export interface OrgMember {
   firstName: string
   lastName: string
   email: string
+  /** Canonical E.164. Null on accounts created before phone numbers existed. */
+  phone: string | null
   role: string
   apiaryId?: number
   apiaryName?: string
@@ -663,6 +670,7 @@ export interface CreateOrgMemberPayload {
   firstName: string
   lastName: string
   email: string
+  phone: string
   password: string
   role: string
   apiaryId?: number | null

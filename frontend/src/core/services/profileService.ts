@@ -4,6 +4,8 @@ export interface ProfileResponse {
   firstName: string
   lastName: string
   email: string
+  /** Canonical E.164. Null on accounts created before phone numbers existed. */
+  phone: string | null
   /** Null while the address is unconfirmed. */
   emailVerifiedAt: string | null
 }
@@ -12,6 +14,8 @@ export interface UpdateProfilePayload {
   firstName: string
   lastName: string
   email: string
+  /** Omitted or blank leaves the stored number unchanged — it never clears it. */
+  phone?: string
   currentPassword?: string
   newPassword?: string
 }

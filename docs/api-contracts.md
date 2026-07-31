@@ -19,6 +19,16 @@ All endpoints require `Authorization: Bearer <jwt>` except
 | POST | `/auth/refresh` | 20/min per IP; rotates the refresh token (reuse revokes the whole set) |
 | POST | `/auth/logout` | revokes the presented refresh token (idempotent) |
 
+**Login request:** `{ identifier, password }` — `identifier` is an **email address or a phone
+number**; the server picks the lookup by whether it contains an `@`. Phone numbers are matched
+after normalisation to E.164, so any way of writing the same number works. `{ email, password }`
+is still accepted as a legacy alias for `identifier` (clients cached before the rename).
+
+**Register request:** `{ firstName, lastName, email, phone, password, organizationName,
+organizationDescription? }` — `phone` is **required** and must be a parseable number
+(bare numbers are assumed BiH, `+387`). Both a duplicate email and a duplicate phone return
+`422` with a Bosnian message naming the field that clashed.
+
 **JWT Claims:**
 
 | Claim | Key | Description |
@@ -67,7 +77,7 @@ HTTP `200 OK`, `201 Created`, `204 No Content` — response body is the DTO dire
 |---|---|---|---|
 | POST | `/auth/login` | Public | Returns token + user |
 
-**Login request:** `{ email, password }`
+**Login request:** `{ identifier, password }` — see the Authentication section above.
 **Login response:** `{ token, userId, email, role, organizationId }`
 
 ---
@@ -291,9 +301,17 @@ pasture or a foreign-org pasture → `400`; `movedAt` max +1 day. `GET /api/stat
 | PUT | `/admin/organizations/{id}` | Update org |
 | DELETE | `/admin/organizations/{id}` | Delete org |
 | GET | `/admin/users` | List all users with org |
-| POST | `/admin/users` | Create user |
-| PUT | `/admin/users/{id}` | Update user |
+| POST | `/admin/users` | Create user — `phone` **required** |
+| PUT | `/admin/users/{id}` | Update user — `phone` optional; blank leaves it unchanged |
 | DELETE | `/admin/users/{id}` | Delete user |
+
+**Phone on user payloads.** Every endpoint that creates an account (`/auth/register`,
+`/admin/users`, org member creation) requires a `phone`; every endpoint that updates one
+(`/admin/users/{id}`, `/profile`) takes it optionally, where **blank means "leave the stored number
+unchanged"** — it never clears it. A number held by another account returns `422` with
+`"Korisnik s ovim brojem telefona već postoji."`; re-submitting your own (in any notation) is not a
+conflict. `AdminUserDto`, `OrgMemberDto` and the profile response all return `phone` (null for
+accounts created before the field existed).
 
 ---
 

@@ -30,7 +30,7 @@ public class PasswordPolicyTests
     public void Register_rejects_passwords_below_the_minimum(string password)
     {
         var result = new RegisterValidator().Validate(new RegisterDto(
-            "Ime", "Prezime", "user@example.com", password, "Organizacija", null));
+            "Ime", "Prezime", "user@example.com", "061 123 456", password, "Organizacija", null));
 
         Assert.False(result.IsValid);
     }
@@ -48,7 +48,8 @@ public class PasswordPolicyTests
             FirstName = "Ime",
             LastName  = "Prezime",
             Email     = "user@example.com",
-            Password  = password,
+            Phone     = "061 123 456",
+            Password  =password,
             Role      = "Beekeeper",
         });
 
@@ -63,7 +64,8 @@ public class PasswordPolicyTests
             FirstName = "Ime",
             LastName  = "Prezime",
             Email     = "user@example.com",
-            Password  = Valid,
+            Phone     = "061 123 456",
+            Password  =Valid,
             Role      = "Beekeeper",
         });
 
@@ -83,7 +85,8 @@ public class PasswordPolicyTests
             FirstName = "Ime",
             LastName  = "Prezime",
             Email     = "member@example.com",
-            Password  = password,
+            Phone     = "061 123 456",
+            Password  =password,
             Role      = "Beekeeper",
         });
 
@@ -98,7 +101,7 @@ public class PasswordPolicyTests
     public void UpdateProfile_rejects_a_new_password_below_the_minimum(string newPassword)
     {
         var result = new UpdateProfileValidator().Validate(
-            new UpdateProfileDto("Ime", "Prezime", "user@example.com", "CurrentPass1", newPassword));
+            new UpdateProfileDto("Ime", "Prezime", "user@example.com", null, "CurrentPass1", newPassword));
 
         Assert.False(result.IsValid);
     }
@@ -107,7 +110,7 @@ public class PasswordPolicyTests
     public void UpdateProfile_requires_the_current_password_when_setting_a_new_one()
     {
         var result = new UpdateProfileValidator().Validate(
-            new UpdateProfileDto("Ime", "Prezime", "user@example.com", null, Valid));
+            new UpdateProfileDto("Ime", "Prezime", "user@example.com", null, null, Valid));
 
         Assert.False(result.IsValid);
     }
@@ -116,7 +119,7 @@ public class PasswordPolicyTests
     public void UpdateProfile_allows_editing_the_name_without_touching_the_password()
     {
         var result = new UpdateProfileValidator().Validate(
-            new UpdateProfileDto("Ime", "Prezime", "user@example.com", null, null));
+            new UpdateProfileDto("Ime", "Prezime", "user@example.com", null, null, null));
 
         Assert.True(result.IsValid);
     }
@@ -125,7 +128,7 @@ public class PasswordPolicyTests
     public void UpdateProfile_accepts_a_conforming_password_change()
     {
         var result = new UpdateProfileValidator().Validate(
-            new UpdateProfileDto("Ime", "Prezime", "user@example.com", "CurrentPass1", Valid));
+            new UpdateProfileDto("Ime", "Prezime", "user@example.com", null, "CurrentPass1", Valid));
 
         Assert.True(result.IsValid);
     }
@@ -136,7 +139,7 @@ public class PasswordPolicyTests
     public void UpdateProfile_rejects_a_malformed_email()
     {
         var result = new UpdateProfileValidator().Validate(
-            new UpdateProfileDto("Ime", "Prezime", "not-an-email", null, null));
+            new UpdateProfileDto("Ime", "Prezime", "not-an-email", null, null, null));
 
         Assert.False(result.IsValid);
     }

@@ -41,11 +41,12 @@ public class RegistrationTrialTests
     {
         User? captured = null;
         _uow.Users.GetByEmailAsync(Arg.Any<string>()).Returns((User?)null);
+        _uow.Users.GetByPhoneAsync(Arg.Any<string>()).Returns((User?)null);
         _uow.Users.AddAsync(Arg.Do<User>(u => captured = u)).Returns(ci => ci.Arg<User>());
 
         var before = DateTime.UtcNow.Date;
         await _service.RegisterAsync(new RegisterDto(
-            "Asim", "Tester", "new@org.ba", "Correct123!", "Nova Organizacija", null));
+            "Asim", "Tester", "new@org.ba", "061 123 456", "Correct123!", "Nova Organizacija", null));
 
         var org = captured!.Organization!;
         Assert.Equal(PlanType.Pro, org.Plan);

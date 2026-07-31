@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Check, Eye, EyeOff, KeyRound, Mail, MailWarning, User } from 'lucide-react'
+import { Check, Eye, EyeOff, KeyRound, Mail, MailWarning, Phone, User } from 'lucide-react'
 import { useAuth } from '../../core/context/AuthContext'
 import { profileService } from '../../core/services/profileService'
 import type { UpdateProfilePayload } from '../../core/services/profileService'
@@ -15,6 +15,7 @@ interface ProfileForm {
   firstName: string
   lastName: string
   email: string
+  phone: string
   currentPassword: string
   newPassword: string
   confirmPassword: string
@@ -46,6 +47,7 @@ export default function ProfilePage() {
     handleSubmit,
     watch,
     setError,
+    getValues,
     reset,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<ProfileForm>({
@@ -53,11 +55,21 @@ export default function ProfilePage() {
       firstName: user?.firstName ?? '',
       lastName: user?.lastName ?? '',
       email: user?.email ?? '',
+      phone: '',
       currentPassword: '',
       newPassword: '',
       confirmPassword: '',
     },
   })
+
+  // The cached auth session carries no phone number, so unlike the other fields this one can only
+  // be seeded once the profile query lands. It goes through `reset` rather than `setValue` so it
+  // becomes the field's *default*: with setValue the seeded number counts as an edit, and the page
+  // loads with "Spremi promjene" already enabled and nothing actually changed.
+  const storedPhone = profile?.phone
+  useEffect(() => {
+    if (storedPhone !== undefined) reset({ ...getValues(), phone: storedPhone ?? '' })
+  }, [storedPhone, reset, getValues])
 
   const newPassword = watch('newPassword')
 
@@ -80,6 +92,7 @@ export default function ProfilePage() {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
+        phone: data.phone ?? '',
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
@@ -96,6 +109,8 @@ export default function ProfilePage() {
         setError('currentPassword', { message: msg })
       } else if (lower.includes('password')) {
         setError('newPassword', { message: msg })
+      } else if (lower.includes('telefon')) {
+        setError('phone', { message: msg })
       } else if (lower.includes('email')) {
         setError('email', { message: msg })
       } else {
@@ -114,6 +129,7 @@ export default function ProfilePage() {
       firstName: data.firstName,
       lastName: data.lastName,
       email: data.email,
+      phone: data.phone.trim(),
     }
 
     if (data.newPassword) {
@@ -228,6 +244,29 @@ export default function ProfilePage() {
               />
             </div>
             {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Broj telefona</label>
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500" />
+              <input
+                {...register('phone', {
+                  // Optional here: leaving it empty keeps whatever is stored, and accounts made
+                  // before phone numbers existed have none to begin with.
+                  validate: v =>
+                    v.trim() === '' || v.replace(/\D/g, '').length >= 8 || 'Unesite ispravan broj telefona',
+                })}
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                className={clsx('form-input pl-9', errors.phone && 'border-red-400 focus:ring-red-300')}
+                placeholder="061 123 456"
+              />
+            </div>
+            {errors.phone
+              ? <p className="text-xs text-red-500 mt-1">{errors.phone.message}</p>
+              : <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Njime se možete prijaviti umjesto e-poštom.</p>}
           </div>
         </div>
 

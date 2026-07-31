@@ -1,3 +1,4 @@
+using Melarium.Application.Common.Validation;
 using Melarium.Application.Features.Admin.DTOs;
 using FluentValidation;
 
@@ -23,6 +24,8 @@ public class UpdateAdminUserValidator : AbstractValidator<UpdateAdminUserDto>
             .NotEmpty().WithMessage("Email is required.")
             .EmailAddress().WithMessage("Enter a valid email address.")
             .MaximumLength(256).WithMessage("Email must not exceed 256 characters.");
+
+        RuleFor(x => x.Phone).OptionalPhone();
 
         RuleFor(x => x.Role)
             .NotEmpty().WithMessage("Role is required.");

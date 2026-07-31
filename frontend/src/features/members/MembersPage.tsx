@@ -9,6 +9,7 @@ interface AddMemberForm {
   firstName: string
   lastName: string
   email: string
+  phone: string
   password: string
   role: 'ApiaryAdmin' | 'Beekeeper'
   apiaryId: string
@@ -18,6 +19,7 @@ const EMPTY_FORM: AddMemberForm = {
   firstName: '',
   lastName: '',
   email: '',
+  phone: '',
   password: '',
   role: 'Beekeeper',
   apiaryId: '',
@@ -79,6 +81,10 @@ export default function MembersPage() {
       setFormError('Unesite valjanu e-poštu.')
       return
     }
+    if (form.phone.replace(/\D/g, '').length < 8) {
+      setFormError('Unesite ispravan broj telefona.')
+      return
+    }
     if (form.password.length < 8) {
       setFormError('Lozinka mora imati najmanje 8 znakova.')
       return
@@ -93,6 +99,7 @@ export default function MembersPage() {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         email: form.email.trim(),
+        phone: form.phone.trim(),
         password: form.password,
         role: form.role,
         apiaryId: form.role === 'ApiaryAdmin' && form.apiaryId ? parseInt(form.apiaryId) : null,
@@ -340,6 +347,25 @@ export default function MembersPage() {
                   className="form-input w-full"
                   required
                 />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                  Broj telefona <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="061 123 456"
+                  value={form.phone}
+                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                  className="form-input w-full"
+                  required
+                />
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Član se njime može prijaviti umjesto e-poštom.
+                </p>
               </div>
 
               {/* Password */}

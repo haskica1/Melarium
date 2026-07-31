@@ -7,6 +7,19 @@ namespace Melarium.Application.Common.Interfaces;
 public interface IUserRepository : IRepository<User>
 {
     Task<User?> GetByEmailAsync(string email);
+
+    /// <summary>
+    /// Looks a user up by phone number. The argument must already be canonical E.164
+    /// (<c>PhoneRules.Normalize</c>) — stored numbers are canonical, so a raw string never matches.
+    /// </summary>
+    Task<User?> GetByPhoneAsync(string phone);
+
+    /// <summary>
+    /// True when the (already canonical) number belongs to some account other than
+    /// <paramref name="excludeUserId"/>. The exclusion is what lets a user re-save their own
+    /// profile without colliding with themselves.
+    /// </summary>
+    Task<bool> IsPhoneTakenAsync(string phone, int? excludeUserId = null);
     /// <summary>Every user on the platform. SystemAdmin screens only — see the org-scoped overload below.</summary>
     Task<IEnumerable<User>> GetAllWithOrganizationAsync();
 

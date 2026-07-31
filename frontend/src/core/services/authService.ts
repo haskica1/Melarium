@@ -30,6 +30,7 @@ export interface RegisterPayload {
   firstName: string
   lastName: string
   email: string
+  phone: string
   password: string
   organizationName: string
   organizationDescription?: string
@@ -54,8 +55,9 @@ function persistSession(data: LoginResponse): void {
 }
 
 export const authService = {
-  async login(email: string, password: string): Promise<LoginResponse> {
-    const { data } = await authApi.post<LoginResponse>('/auth/login', { email, password })
+  /** `identifier` is whatever the user typed — an email address or a phone number. */
+  async login(identifier: string, password: string): Promise<LoginResponse> {
+    const { data } = await authApi.post<LoginResponse>('/auth/login', { identifier, password })
     persistSession(data)
     return data
   },

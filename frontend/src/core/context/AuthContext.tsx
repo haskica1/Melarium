@@ -5,7 +5,8 @@ import { authService, type AuthUser, type LoginResponse, type RegisterPayload } 
 interface AuthContextValue {
   user: AuthUser | null
   isAuthenticated: boolean
-  login: (email: string, password: string) => Promise<LoginResponse>
+  /** `identifier` is an email address or a phone number — either signs the user in. */
+  login: (identifier: string, password: string) => Promise<LoginResponse>
   register: (payload: RegisterPayload) => Promise<LoginResponse>
   logout: () => void
   updateUser: (partial: Pick<AuthUser, 'firstName' | 'lastName' | 'email'>) => void
@@ -17,8 +18,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient()
   const [user, setUser] = useState<AuthUser | null>(() => authService.getUser())
 
-  const login = useCallback(async (email: string, password: string): Promise<LoginResponse> => {
-    const response = await authService.login(email, password)
+  const login = useCallback(async (identifier: string, password: string): Promise<LoginResponse> => {
+    const response = await authService.login(identifier, password)
     // Drop any cached data from a previous session so the new user never sees stale data.
     queryClient.clear()
     setUser({

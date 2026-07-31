@@ -21,6 +21,8 @@ public class UpdateProfileValidator : AbstractValidator<UpdateProfileDto>
             .EmailAddress().WithMessage("Enter a valid email address.")
             .MaximumLength(256).WithMessage("Email must not exceed 256 characters.");
 
+        RuleFor(x => x.Phone).OptionalPhone();
+
         // Password change is optional — the policy applies only when a new one is supplied.
         // ProfileService still verifies CurrentPassword before applying it.
         RuleFor(x => x.NewPassword!)

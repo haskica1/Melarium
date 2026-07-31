@@ -17,6 +17,7 @@ interface UserForm {
   firstName: string
   lastName: string
   email: string
+  phone: string
   password: string
   role: string
   organizationId: string
@@ -63,6 +64,7 @@ export default function UserFormPage() {
         firstName: existing.firstName,
         lastName: existing.lastName,
         email: existing.email,
+        phone: existing.phone ?? '',
         password: '',
         role: existing.role,
         organizationId: existing.organizationId?.toString() ?? '',
@@ -90,6 +92,7 @@ export default function UserFormPage() {
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
+          phone: data.phone.trim(),
           role: data.role,
           organizationId: orgId,
           apiaryId: needsApiary ? apiaryId : null,
@@ -100,6 +103,7 @@ export default function UserFormPage() {
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
+          phone: data.phone.trim(),
           password: data.password,
           role: data.role,
           organizationId: orgId,
@@ -199,6 +203,32 @@ export default function UserFormPage() {
               })}
             />
             {errors.email && <p className="mt-1.5 text-xs text-red-600">{errors.email.message}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
+              Broj telefona {!isEdit && <span className="text-red-500">*</span>}
+            </label>
+            <input
+              type="tel"
+              inputMode="tel"
+              placeholder="061 123 456"
+              className={inputCls(!!errors.phone)}
+              {...register('phone', {
+                // Only required when creating: accounts made before phone numbers existed have
+                // none, and blanking the field on edit means "leave it as it is", not "clear it".
+                required: isEdit ? false : 'Broj telefona je obavezan',
+                validate: v =>
+                  v.trim() === '' || v.replace(/\D/g, '').length >= 8 || 'Unesite ispravan broj telefona',
+              })}
+            />
+            {errors.phone
+              ? <p className="mt-1.5 text-xs text-red-600">{errors.phone.message}</p>
+              : <p className="mt-1.5 text-xs text-gray-500 dark:text-slate-400">
+                  {isEdit
+                    ? 'Ostavite prazno da ostane nepromijenjen. Korisnik se njime može prijaviti.'
+                    : 'Korisnik se njime može prijaviti umjesto e-poštom.'}
+                </p>}
           </div>
 
           {!isEdit && (

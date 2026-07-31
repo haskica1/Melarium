@@ -8,6 +8,7 @@ public record RegisterDto(
     string FirstName,
     string LastName,
     string Email,
+    string Phone,
     string Password,
     string OrganizationName,
     string? OrganizationDescription

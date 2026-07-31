@@ -1,6 +1,7 @@
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
+using Melarium.Application.Common.Validation;
 using Melarium.Application.Features.Notifications;
 using Melarium.Application.Features.OrgManagement.DTOs;
 using Melarium.Domain.Entities;
@@ -228,6 +229,12 @@ public class OrgManagementService : IOrgManagementService
         if (existing != null)
             throw new BusinessRuleException($"A user with email '{dto.Email}' already exists.");
 
+        // The validator has already rejected an unparseable number, so this cannot be null here.
+        // The check is platform-wide, not org-scoped: the number is a global login identifier.
+        var phone = PhoneRules.Normalize(dto.Phone)!;
+        if (await _uow.Users.IsPhoneTakenAsync(phone))
+            throw new BusinessRuleException(PhoneRules.DuplicateMessage);
+
         Apiary? apiary = null;
         if (role == UserRole.ApiaryAdmin)
         {
@@ -261,6 +268,7 @@ public class OrgManagementService : IOrgManagementService
             FirstName = dto.FirstName.Trim(),
             LastName = dto.LastName.Trim(),
             Email = dto.Email.Trim().ToLower(),
+            Phone = phone,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Role = role,
             OrganizationId = orgId,
@@ -324,6 +332,7 @@ public class OrgManagementService : IOrgManagementService
         FirstName = u.FirstName,
         LastName = u.LastName,
         Email = u.Email,
+        Phone = u.Phone,
         Role = u.Role.ToString(),
         ApiaryId = u.ApiaryId,
         ApiaryName = u.Apiary?.Name,
