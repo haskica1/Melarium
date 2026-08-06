@@ -4,10 +4,12 @@ using Melarium.Application.Common.Models;
 using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Auth.DTOs;
+using Melarium.Application.Features.Invitations;
 using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
 
@@ -32,7 +34,8 @@ public class PasswordResetTests
         config["FrontendUrl"].Returns("https://melarium.app");
 
         _service = new AuthService(
-            _uow, config, Substitute.For<INotificationService>(), _emailQueue, new SessionRevoker(_uow));
+            _uow, config, Substitute.For<INotificationService>(), _emailQueue, new SessionRevoker(_uow),
+            Substitute.For<IInvitationService>(), Substitute.For<ILogger<AuthService>>());
     }
 
     private static User Existing(int id = 1) => new()

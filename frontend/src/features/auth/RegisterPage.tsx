@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import axios from 'axios'
-import { ArrowRight, Building2, Eye, EyeOff, Loader2, Lock, Mail, Moon, Phone, Sun, User as UserIcon } from 'lucide-react'
+import { ArrowRight, Building2, Eye, EyeOff, Gift, Loader2, Lock, Mail, Moon, Phone, Sun, User as UserIcon } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../../core/context/AuthContext'
 import { useTheme } from '../../core/hooks/useTheme'
+import { useReferralInviter } from '../../core/services/inviteQueries'
 import { getServerError } from './authErrors'
 
 interface RegisterForm {
@@ -45,6 +46,12 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
 
+  // "Pozovi prijatelja" (SPEC-15). The banner is not decoration: a query parameter nobody can see
+  // is one nobody notices has stopped working, so this is also the manual test for attribution.
+  const [searchParams] = useSearchParams()
+  const referralCode = searchParams.get('ref')
+  const { data: inviter } = useReferralInviter(referralCode)
+
   const {
     register,
     handleSubmit,
@@ -64,6 +71,9 @@ export default function RegisterPage() {
         password: data.password,
         organizationName: data.organizationName,
         organizationDescription: data.organizationDescription?.trim() || undefined,
+        // Passed through untouched. The backend ignores an unknown or malformed code rather than
+        // rejecting the sign-up, so a stale link in a group chat still creates the account.
+        referralCode: referralCode ?? undefined,
       })
       // Fresh registrants are always Organization Admins → apiary workspace.
       navigate('/apiaries', { replace: true })
@@ -152,6 +162,19 @@ export default function RegisterPage() {
               <h2 className="font-display text-2xl font-bold text-gray-900 dark:text-slate-100">Napravite račun</h2>
               <p className="text-gray-500 dark:text-slate-400 mt-1 text-sm">Registrujte se i postanite administrator vaše organizacije</p>
             </div>
+
+            {/* Invitation banner (SPEC-15). Renders only once the code resolves to a real inviter,
+                so an unknown ?ref= simply shows the ordinary sign-up form. First name only —
+                never a surname and never an address. */}
+            {inviter && (
+              <div className="mb-6 flex items-start gap-3 bg-honey-50 dark:bg-honey-500/10 border border-honey-200 dark:border-honey-500/30 text-honey-800 dark:text-honey-200 rounded-xl px-4 py-3 text-sm animate-slide-up">
+                <Gift className="w-5 h-5 mt-0.5 shrink-0 text-honey-600 dark:text-honey-400" />
+                <span>
+                  <strong>{inviter.inviterFirstName}</strong> vas poziva u Melarium — dobijate{' '}
+                  <strong>{inviter.trialDays} dana</strong> Pro paketa umjesto uobičajenih 30.
+                </span>
+              </div>
+            )}
 
             {/* Server error */}
             {serverError && (

@@ -47,6 +47,7 @@ import StatsPage from './features/stats/StatsPage'
 import CalendarPage from './features/calendar/CalendarPage'
 import CalendarSettingsPage from './features/calendar/CalendarSettingsPage'
 import PlansPage from './features/plans/PlansPage'
+import InvitePage from './features/invites/InvitePage'
 import UpsellModal from './shared/components/UpsellModal'
 import HistoryTracker from './shared/components/HistoryTracker'
 
@@ -117,6 +118,10 @@ export default function App() {
 
               {/* Plans & billing (paketi) — all authenticated users */}
               <Route path="plans" element={<PlansPage />} />
+
+              {/* Invite a friend (SPEC-15) — all authenticated users, including members of
+                  someone else's organization: the invitee always gets their own organization. */}
+              <Route path="invite" element={<InvitePage />} />
 
               {/* Stats — all authenticated users */}
               <Route path="stats" element={<StatsPage />} />

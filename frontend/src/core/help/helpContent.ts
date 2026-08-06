@@ -518,6 +518,17 @@ export const HELP_CONTENT: Record<HelpKey, HelpEntry> = {
     ],
   },
 
+  '/invite': {
+    title: 'Pozovi prijatelja',
+    summary: 'Vaš lični link za pozivanje prijatelja u Melarium — i dani koje time zarađujete.',
+    tips: [
+      'Pošaljite link kroz Viber ili WhatsApp. Osoba koja se registruje preko njega dobija 60 dana Pro paketa umjesto uobičajenih 30.',
+      'Vaših 30 dana stiže tek kad pozvana osoba potvrdi svoju e-poštu — dok to ne uradi, u listi piše "čeka potvrdu".',
+      'Pozvana osoba dobija svoju vlastitu organizaciju. Ovo nije način da nekog dodate kao člana u vašu.',
+      'Ako vaš paket nema datum isteka, nagradni dani se ne dodaju — nema se šta produžiti.',
+    ],
+  },
+
   '/profile': {
     title: 'Moj profil',
     summary: 'Vaše ime, e-pošta, lozinka i pregled poslanih povratnih informacija.',

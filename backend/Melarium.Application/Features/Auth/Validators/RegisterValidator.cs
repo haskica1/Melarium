@@ -35,5 +35,11 @@ public class RegisterValidator : AbstractValidator<RegisterDto>
         RuleFor(x => x.OrganizationDescription)
             .MaximumLength(1000).WithMessage("Description must not exceed 1000 characters.")
             .When(x => x.OrganizationDescription is not null);
+
+        // Length only. An unknown or malformed referral code is ignored later, never rejected here —
+        // a bad ?ref= in a shared link must not stop someone from signing up (SPEC-15).
+        RuleFor(x => x.ReferralCode)
+            .MaximumLength(64).WithMessage("Referral code must not exceed 64 characters.")
+            .When(x => x.ReferralCode is not null);
     }
 }

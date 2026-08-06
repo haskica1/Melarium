@@ -1393,3 +1393,54 @@ export interface UpdateFeedbackStatusPayload {
 export interface FeedbackSummary {
   newCount: number
 }
+
+// ── Invite a friend (SPEC-15) ───────────────────────────────────────────────────
+
+export enum InvitationSource {
+  EmailInvite = 1,
+  ShareLink   = 2,
+}
+
+export const InvitationSourceLabels: Record<InvitationSource, string> = {
+  [InvitationSource.EmailInvite]: 'E-pošta',
+  [InvitationSource.ShareLink]:   'Link',
+}
+
+export enum InvitationStatus {
+  Sent     = 1,
+  Accepted = 2,
+}
+
+export interface Invitation {
+  id: number
+  source: InvitationSource
+  sourceName: string
+  email: string
+  status: InvitationStatus
+  /**
+   * Bosnian label from the backend. Three states out of two stored values: an invitee who
+   * registered but has not confirmed their address yet reads "Registrovao se — čeka potvrdu",
+   * because that is exactly what the inviter's reward is waiting on. Render it as-is.
+   */
+  statusName: string
+  rewardDays?: number | null
+  acceptedAt?: string | null
+  createdAt: string
+}
+
+export interface InvitationSummary {
+  sentCount: number
+  acceptedCount: number
+  rewardDaysEarned: number
+  rewardDaysRemaining: number
+  /** Built server-side — the client cannot know FrontendUrl, which differs from the browser origin. */
+  shareUrl: string
+  inviteeTrialDays: number
+  rewardDaysPerInvite: number
+}
+
+/** First name only — the /register banner never shows a surname or an address. */
+export interface ReferralInviter {
+  inviterFirstName: string
+  trialDays: number
+}

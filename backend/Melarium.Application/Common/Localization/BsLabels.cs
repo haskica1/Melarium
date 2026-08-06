@@ -227,6 +227,18 @@ public static class BsLabels
         _                        => s.ToString(),
     };
 
+    /// <summary>
+    /// How the invitation reached the person. <c>InvitationStatus</c> has no label map here on
+    /// purpose: the invitation list needs three labels from its two values (see
+    /// <c>InvitationService.StatusLabel</c>), so the wording depends on the reward state too.
+    /// </summary>
+    public static string Label(InvitationSource s) => s switch
+    {
+        InvitationSource.EmailInvite => "E-pošta",
+        InvitationSource.ShareLink   => "Link",
+        _                            => s.ToString(),
+    };
+
     private static readonly string[] MonthsShort =
         { "jan", "feb", "mar", "apr", "maj", "jun", "jul", "avg", "sep", "okt", "nov", "dec" };
 

@@ -28,6 +28,15 @@ public class User : BaseEntity
     /// </summary>
     public DateTime? EmailVerifiedAt { get; set; }
 
+    /// <summary>
+    /// Personal referral code for the "pozovi prijatelja" share link (SPEC-15), minted lazily the
+    /// first time the user opens /invite. Null until then.
+    /// Stored as-is (not hashed) so the URL can be shown to the user again — the same "secret
+    /// address" model as <c>CalendarSettings.FeedToken</c>. It is not a capability: whoever holds it
+    /// can only credit the owner with their own sign-up, which is bounded by the reward cap.
+    /// </summary>
+    public string? ReferralCode { get; set; }
+
     public int? OrganizationId { get; set; }
     public Organization? Organization { get; set; }
 

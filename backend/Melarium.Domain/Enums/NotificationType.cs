@@ -43,4 +43,9 @@ public enum NotificationType
 
     // ── Apiary feeding (SPEC-12 Phase D) ──
     FeedingOverdue         = 23,
+
+    // ── Invite a friend (SPEC-15) ──
+    // Two moments share one type: the invitee registering, and the reward landing once they
+    // verify their e-mail. Both are about the same invitation, so they are one kind of news.
+    InvitationAccepted     = 24,
 }

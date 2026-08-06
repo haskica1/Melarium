@@ -20,6 +20,13 @@ public interface IUserRepository : IRepository<User>
     /// profile without colliding with themselves.
     /// </summary>
     Task<bool> IsPhoneTakenAsync(string phone, int? excludeUserId = null);
+
+    /// <summary>
+    /// Resolves a "pozovi prijatelja" share link back to its owner (SPEC-15). Read-only lookup —
+    /// tracked navigation properties are not needed and the caller must not mutate the result.
+    /// </summary>
+    Task<User?> GetByReferralCodeAsync(string referralCode);
+
     /// <summary>Every user on the platform. SystemAdmin screens only — see the org-scoped overload below.</summary>
     Task<IEnumerable<User>> GetAllWithOrganizationAsync();
 

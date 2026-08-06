@@ -518,3 +518,64 @@ existing data**, never stored.
 **Known limit (Phase C):** the "seen"/"don't auto-open" flags live in `localStorage` keyed by e-mail, so
 they are per browser — the same user gets the first-run experience again on their phone. Moving them to
 the account is one small table and one endpoint, deliberately deferred until it proves to matter.
+
+---
+
+## ADR-032: Referral Rewards Go Through One Guarded Credit Path and Never Touch `PlanNotes` (SPEC-15)
+
+**Status:** Accepted (2026-08-06) — Phase 1 implemented
+
+**Context:** "Pozovi prijatelja" pays an existing customer in plan days when someone they invited joins
+and verifies their e-mail. Before this, `Organization.PlanValidUntil` had exactly two writers and both
+assigned an **absolute** value chosen by a human: `AdminService` (SystemAdmin activating a plan) and
+`AuthService` (the registration trial). The reward is the first writer that does **arithmetic on an
+existing value**, and the first plan change no person approves.
+
+**Decision:**
+
+1. All granting goes through `IPlanCredit.GrantDaysAsync`, which lives beside `PlanGuard` rather than in
+   the invitation feature. `PlanGuard` refuses actions and depends on who is asking; `PlanCredit` gives
+   and must behave identically no matter what triggered it. The algorithm is a **pure static method** so
+   its invariants are unit-testable without a database (`InvitationRewardTests`).
+2. The reward **never writes to `PlanNotes`**. The itemised record lives on the `Invitation` rows.
+3. Attribution and reward run **after** the caller's own work is committed — attribution after
+   `IssueTokensAsync`, the reward after the verification `SaveChangesAsync`.
+4. An unknown, expired or malformed referral code **never fails a registration**.
+
+**Why:**
+
+- **The plan is only ever raised, never lowered.** The upgrade test is `effective == Free`, not an ordinal
+  comparison, because `PlanType` runs Free=1 … Partner=5 — so `Plan = Pro` on a Partner organization would
+  be a downgrade from 5 to 3. A `Plan < Pro` test would have shipped that bug looking correct.
+- **A lifetime plan is never given an expiry date.** `PlanValidUntil == null` means "bez isteka" for
+  Partner and early-adopter organizations; writing `today + 30` there converts an unlimited plan into one
+  that expires in a month. It is the single most destructive thing this feature could do, so the null
+  check comes first and grants nothing.
+- **`PlanNotes` is load-bearing UI, not a comment field.** `PlansPage` detects the registration trial with
+  `planNotes === 'Probni period'` — an exact string match. A tidy audit line appended there would silently
+  remove the trial notice from the plans page for exactly the users most likely to be inviting people.
+  This was found by reading the frontend, not by a failing test, which is why the prohibition is an ADR
+  and a test rather than a comment.
+- **`try/catch` does not isolate an EF failure.** The invitation code shares the request's `IUnitOfWork`.
+  If its `SaveChangesAsync` throws, the entities it touched stay tracked and `Modified`; the next
+  `SaveChangesAsync` in the same method re-attempts them and throws again *outside* the `try`. Running the
+  grant before the verification commit would therefore have left the user unverified **and unable to fix
+  it by retrying**, because the grant would fail identically every time. Ordering is the mechanism;
+  the `try/catch` is only the second line of defence.
+- **Losing attribution is cheaper than losing a sign-up.** A referral code arrives from a link pasted into
+  a group chat months ago. Rejecting a registration because of it would trade a customer for a statistic.
+
+**Alternatives considered:**
+- Granting inside `InvitationService` — rejected: plan semantics would then live in two places, and the
+  next feature that grants days would copy the arithmetic rather than the invariants.
+- Writing the running total into `PlanNotes` for at-a-glance admin visibility — rejected above. If that
+  number is wanted, it is a computed column over the invitation rows.
+- Rewarding at registration instead of verification — rejected: it makes fake accounts free to farm. At
+  verification, a farmer needs a real, receiving mailbox per fake organization.
+- Scaling the reward or the caps by plan — rejected: it couples growth to billing and punishes exactly the
+  behaviour being paid for.
+
+**Bounded by configuration, not by code:** `Invitations:Reward:*` — 30 days per accepted invitation, **180
+lifetime per organization**, at most 5 per rolling 30 days, and one reward per invited organization ever.
+The lifetime cap is the only thing bounding what the feature can cost against fraud; the length of the
+referral code is not a control and must never be treated as one.

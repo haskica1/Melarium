@@ -35,6 +35,15 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsUnique()
             .HasFilter("\"Phone\" IS NOT NULL");
 
+        builder.Property(u => u.ReferralCode)
+            .HasMaxLength(64);
+
+        // Filtered for the same reason as Phone: only users who have opened /invite have one,
+        // and NULLs must not collide.
+        builder.HasIndex(u => u.ReferralCode)
+            .IsUnique()
+            .HasFilter("\"ReferralCode\" IS NOT NULL");
+
         builder.Property(u => u.PasswordHash)
             .IsRequired();
 

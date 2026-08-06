@@ -332,6 +332,31 @@ Bosnian message and **nothing persisted**. Reuses `Groq:ApiKey`.
 
 ---
 
+### Invitations — "Pozovi prijatelja" (SPEC-15, Phase 1)
+
+Any authenticated role, including a member of someone else's organization — the invitee always gets
+their **own** organization, so this touches neither the inviter's data nor their seats:
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/invites/summary` | `InvitationSummaryDto` — `{ sentCount, acceptedCount, rewardDaysEarned, rewardDaysRemaining, shareUrl, inviteeTrialDays, rewardDaysPerInvite }`. **Mints the caller's referral code on first call**, so it is a GET with a side effect on first use only (same lazy model as the calendar feed token) |
+| GET | `/invites/mine` | `InvitationDto[]` — own rows, newest first. `statusName` carries **three** labels from two stored states; "Registrovao se — čeka potvrdu" is a registered invitee who has not verified yet |
+
+Anonymous — the visitor has no account yet:
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/invites/ref/{code}` | `{ inviterFirstName, trialDays }` or **404**. `auth-token` policy 10/min. **First name only** — never a surname, never an address. Not an enumeration risk: a referral code identifies an invitation, not an account |
+
+`POST /auth/register` gains an optional trailing **`referralCode`**. An unknown, expired or malformed
+value is **ignored, never rejected** — registration always succeeds and falls back to the standard
+30-day trial. A recognised one (by code, or by an address we had already invited) yields the longer
+`Invitations:InviteeTrialDays` trial instead.
+
+Sending invitations by e-mail (`POST /invites`) is **Phase 2** and does not exist yet.
+
+---
+
 ### Feedback (SPEC-13)
 
 Any authenticated role — `/api/feedback`:

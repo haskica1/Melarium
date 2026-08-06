@@ -3,10 +3,12 @@ using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Auth.DTOs;
+using Melarium.Application.Features.Invitations;
 using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Xunit;
 
@@ -33,7 +35,9 @@ public class AuthServiceTests
             config,
             Substitute.For<INotificationService>(),
             Substitute.For<IEmailQueue>(),
-            new SessionRevoker(_uow));
+            new SessionRevoker(_uow),
+            Substitute.For<IInvitationService>(),
+            Substitute.For<ILogger<AuthService>>());
     }
 
     private static User OrgAdmin(int id = 1) => new()

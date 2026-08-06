@@ -42,6 +42,12 @@ services:
       # Where new-feedback mail goes (SPEC-13). Empty = feedback still saves and SystemAdmins still
       # get the in-app notification, only the e-mail is skipped.
       Feedback__NotifyEmail: ${FEEDBACK_NOTIFY_EMAIL:-}
+      # Referral offer and its ceilings (SPEC-15). Defaults live in appsettings.json; these let the
+      # offer be tuned from .env without a redeploy.
+      Invitations__InviteeTrialDays: ${INVITE_INVITEE_TRIAL_DAYS:-60}
+      Invitations__Reward__DaysPerAccepted: ${INVITE_REWARD_DAYS:-30}
+      Invitations__Reward__MaxDaysPerOrganization: ${INVITE_REWARD_MAX_DAYS_PER_ORG:-180}
+      Invitations__Reward__MaxPerRolling30Days: ${INVITE_REWARD_MAX_PER_30_DAYS:-5}
       AllowedOrigins: "https://${DOMAIN}"
       FrontendUrl: "https://${DOMAIN}"
       App__PublicBaseUrl: "https://${DOMAIN}"

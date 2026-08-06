@@ -11,5 +11,12 @@ public record RegisterDto(
     string Phone,
     string Password,
     string OrganizationName,
-    string? OrganizationDescription
+    string? OrganizationDescription,
+
+    /// <summary>
+    /// Optional "pozovi prijatelja" code from <c>?ref=</c> (SPEC-15). A defaulted trailing parameter
+    /// so every existing call site keeps compiling. An unknown, expired or malformed value is
+    /// ignored — it must never fail a registration.
+    /// </summary>
+    string? ReferralCode = null
 );

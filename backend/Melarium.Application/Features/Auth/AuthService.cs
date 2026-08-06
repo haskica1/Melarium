@@ -2,16 +2,19 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Melarium.Application.Common;
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Models;
 using Melarium.Application.Common.Security;
 using Melarium.Application.Common.Validation;
 using Melarium.Application.Features.Auth.DTOs;
+using Melarium.Application.Features.Invitations;
 using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Melarium.Application.Features.Auth;
@@ -30,19 +33,25 @@ public class AuthService : IAuthService
     private readonly INotificationService _notifications;
     private readonly IEmailQueue _emailQueue;
     private readonly ISessionRevoker _sessions;
+    private readonly IInvitationService _invitations;
+    private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         IUnitOfWork uow,
         IConfiguration config,
         INotificationService notifications,
         IEmailQueue emailQueue,
-        ISessionRevoker sessions)
+        ISessionRevoker sessions,
+        IInvitationService invitations,
+        ILogger<AuthService> logger)
     {
         _uow = uow;
         _config = config;
         _notifications = notifications;
         _emailQueue = emailQueue;
         _sessions = sessions;
+        _invitations = invitations;
+        _logger = logger;
     }
 
     public async Task<LoginResponseDto> LoginAsync(LoginDto dto)
@@ -99,7 +108,9 @@ public class AuthService : IAuthService
         // (mirrors AdminService's role/org/apiary consistency rules).
         // New organisations start on a Pro trial (SPEC-09) — just a pre-set expiring Pro:
         // the computed effective plan falls back to Free after PlanValidUntil, no extra machinery.
-        var trialDays = int.TryParse(_config["Plans:Trial:Days"], out var d) ? d : 30;
+        // Someone who arrived through an invitation gets the longer one (SPEC-15). This never throws
+        // and falls back to the standard trial, so a broken referral cannot cost us the sign-up.
+        var trialDays = await _invitations.ResolveTrialDaysAsync(dto.ReferralCode, email);
         var organization = new Organization
         {
             Name = dto.OrganizationName.Trim(),
@@ -148,7 +159,21 @@ public class AuthService : IAuthService
         // a failed email must never leave someone unable to use the account they just created.
         await SendVerificationEmailAsync(user);
 
-        return await IssueTokensAsync(user);
+        var response = await IssueTokensAsync(user);
+
+        // Deliberately the very last thing in the method. It shares this request's DbContext, so
+        // running it earlier would let a failed attribution leave dirty entities behind and take
+        // down token issuance with them — registering someone and then not signing them in.
+        try
+        {
+            await _invitations.TryAttributeRegistrationAsync(user.Id, organization.Id, email, dto.ReferralCode);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Referral attribution failed for new user {UserId}", user.Id);
+        }
+
+        return response;
     }
 
     public async Task<LoginResponseDto> RefreshAsync(string refreshToken)
@@ -270,6 +295,18 @@ public class AuthService : IAuthService
         stored.UsedAt = now;
 
         await _uow.SaveChangesAsync();
+
+        // Only after the verification is durable. The reward shares this DbContext, so calling it
+        // before the save would let a failed grant re-throw on the line above — leaving the user
+        // unverified and unable to fix it by retrying, since the grant would fail identically.
+        try
+        {
+            await _invitations.TryGrantRewardForVerifiedUserAsync(user.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Referral reward failed for verified user {UserId}", user.Id);
+        }
     }
 
     public async Task ResendVerificationEmailAsync(int userId)
@@ -328,11 +365,8 @@ public class AuthService : IAuthService
         return raw;
     }
 
-    private string BuildFrontendUrl(string pathAndQuery)
-    {
-        var baseUrl = _config["FrontendUrl"] ?? _config["App:PublicBaseUrl"] ?? "http://localhost:5173";
-        return $"{baseUrl.TrimEnd('/')}{pathAndQuery}";
-    }
+    private string BuildFrontendUrl(string pathAndQuery) =>
+        FrontendUrl.Build(_config, pathAndQuery);
 
     private int GetHours(string key, int fallback) =>
         int.TryParse(_config[key], out var value) && value > 0 ? value : fallback;

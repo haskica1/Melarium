@@ -5,6 +5,7 @@ using Melarium.Application.Features.Admin;
 using Melarium.Application.Features.Advisor;
 using Melarium.Application.Features.Alerts;
 using Melarium.Application.Features.Apiaries;
+using Melarium.Application.Features.Invitations;
 using Melarium.Application.Features.OrgManagement;
 using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Calendar;
@@ -48,6 +49,9 @@ public static class DependencyInjection
         // Subscription-plan enforcement (SPEC-09) — single source of truth for plan gates
         services.AddScoped<IPlanGuard, PlanGuard>();
 
+        // Granting plan time (SPEC-15) — the only place allowed to do arithmetic on PlanValidUntil
+        services.AddScoped<IPlanCredit, PlanCredit>();
+
         // Session termination — used wherever a credential or a JWT-carried privilege changes
         services.AddScoped<ISessionRevoker, SessionRevoker>();
 
@@ -81,6 +85,7 @@ public static class DependencyInjection
         services.AddScoped<IAdvisorService, AdvisorService>();
         services.AddScoped<IAlertRuleService, AlertRuleService>();
         services.AddScoped<IFeedbackService, FeedbackService>();
+        services.AddScoped<IInvitationService, InvitationService>();
         services.AddSingleton<IQrCodeService, QrCodeService>();
 
         return services;

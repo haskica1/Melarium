@@ -21,6 +21,11 @@ public class UserRepository : Repository<User>, IUserRepository
             .Include(u => u.Apiary)
             .FirstOrDefaultAsync(u => u.Phone == phone);
 
+    public async Task<User?> GetByReferralCodeAsync(string referralCode) =>
+        await _context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.ReferralCode == referralCode);
+
     public async Task<bool> IsPhoneTakenAsync(string phone, int? excludeUserId = null) =>
         await _context.Users
             .AnyAsync(u => u.Phone == phone && (excludeUserId == null || u.Id != excludeUserId));

@@ -242,6 +242,19 @@
 - `?` opens help (ignored while typing). Preference toggle on `ProfilePage`. Flags in `localStorage`
   keyed by e-mail. See `features/help-onboarding.md`
 
+### Invitations — "Pozovi prijatelja" (SPEC-15, **Faza 1**)
+- A personal share link (`User.ReferralCode`, unhashed like `CalendarSettings.FeedToken`) invites people
+  **to the platform** — the invitee gets their **own** organization. Not a way to add a member to yours
+- Invitee gets **60** trial days instead of 30, at registration. Inviter's organization gets **+30** days
+  when the invitee **verifies their e-mail** — capped at 180 lifetime / 5 per 30 days / one per invited org
+- `IPlanCredit.GrantDaysAsync` (beside `PlanGuard`) is the **only** code that does arithmetic on
+  `PlanValidUntil`. A lifetime plan is never given an expiry, `Plan` is only ever raised (and only from an
+  effective Free), and **`PlanNotes` is never written** — `PlansPage` detects the trial by exact string
+- Attribution: `?ref=` first, then a match on an address we had already invited. **An unknown or malformed
+  code never fails a registration.** Attribution and reward run *after* the caller's own save commits —
+  a shared `DbContext` means `try/catch` alone would not protect them. ADR-032
+- **Phase 2 (sending invitations by e-mail) is not built.** See `features/invitations.md`
+
 ### Profile
 - `GET/PUT /api/profile` — name/email + password change
 - "Moje povratne informacije" (SPEC-13) + help preference toggle (SPEC-14) sections
@@ -278,7 +291,7 @@
 
 **All roadmap specs shipped** (see `docs/specs/README.md`).
 
-**Shipped (were specced):** SPEC-01 AI Advisor ✅, SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅
+**Shipped (were specced):** SPEC-01 AI Advisor ✅, SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
 
 **Unspecced ideas:**
 

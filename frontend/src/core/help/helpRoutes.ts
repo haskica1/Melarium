@@ -44,6 +44,7 @@ export const HELP_ROUTES = [
   '/stats',
   '/outbox',
   '/plans',
+  '/invite',
   '/profile',
   '/admin/feedback',
   '/admin/learning-topics',

@@ -34,6 +34,8 @@ export interface RegisterPayload {
   password: string
   organizationName: string
   organizationDescription?: string
+  /** From ?ref= on /register (SPEC-15). An unknown value is ignored server-side, never rejected. */
+  referralCode?: string
 }
 
 const TOKEN_KEY = 'beehive_token'

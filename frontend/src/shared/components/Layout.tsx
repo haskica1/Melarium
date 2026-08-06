@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, CloudOff, CreditCard, LogOut, Menu, MessageSquarePlus, Moon, QrCode, Search, Settings, Sun, X } from 'lucide-react'
+import { ArrowLeft, CloudOff, CreditCard, LogOut, Menu, MessageSquarePlus, Moon, QrCode, Search, Settings, Sun, UserPlus, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../../core/context/AuthContext'
 import { usePermissions } from '../../core/hooks/usePermissions'
@@ -245,6 +245,15 @@ export default function Layout() {
                       <CreditCard className="w-4 h-4" />
                       Paket i pretplata
                     </button>
+                    {/* Invite a friend (SPEC-15). Here rather than in the sidebar: the sidebar is
+                        the daily working set, and a referral link is not a daily tool. */}
+                    <button
+                      onClick={() => { setProfileOpen(false); navigate('/invite') }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Pozovi prijatelja
+                    </button>
                     {/* Feedback (SPEC-13) — reachable from every page, whatever the user is doing */}
                     <button
                       onClick={() => { setProfileOpen(false); setFeedbackOpen(true) }}
@@ -359,6 +368,15 @@ export default function Layout() {
                   >
                     <CreditCard className="w-4 h-4 text-honey-600 dark:text-honey-400" />
                     Paket i pretplata
+                  </button>
+                  {/* The second copy of the profile menu — the desktop dropdown above is the first.
+                      Both must carry every entry; missing this one is the classic bug here. */}
+                  <button
+                    onClick={() => { setMobileOpen(false); navigate('/invite') }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <UserPlus className="w-4 h-4 text-honey-600 dark:text-honey-400" />
+                    Pozovi prijatelja
                   </button>
                   <button
                     onClick={() => { setMobileOpen(false); setFeedbackOpen(true) }}
