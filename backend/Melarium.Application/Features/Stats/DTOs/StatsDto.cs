@@ -35,4 +35,11 @@ public record StatsDto
     /// <summary>Current-year kg attributed to the pasture the apiary was on at harvest date
     /// ("Matična lokacija" bucket for pre-first-move harvests). Empty when no moves exist.</summary>
     public IReadOnlyList<NameDecimalDto> KgByPasture { get; init; } = [];
+
+    // ── Apiary feeding (SPEC-12 Phase E) ───────────────────────────────────────
+    /// <summary>
+    /// Money attributed to feeding programmes starting in the current year, BAM only — summing
+    /// currencies would be a silent lie, and in practice everything is BAM.
+    /// </summary>
+    public decimal FeedingCost { get; init; }
 }

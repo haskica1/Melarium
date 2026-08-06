@@ -42,29 +42,43 @@ public class CalendarObligationService : ICalendarObligationService
 
         bool InRange(DateOnly d) => d >= from && d <= to;
 
-        // ── Feedings (pending entries of non-stopped diets) ──────────────────────
-        if (categories.Feedings && scope.BeehiveIds.Count > 0)
+        // ── Feedings (pending rounds of non-stopped diets) ───────────────────────
+        // A round is one visit covering every hive on the programme, so it produces ONE obligation
+        // per date whatever the hive count — that de-duplication is the point of SPEC-12.
+        if (categories.Feedings && scope.ApiaryIds.Count > 0 && scope.BeehiveIds.Count > 0)
         {
-            var diets = (await _uow.Diets.GetByBeehiveIdsAsync(scope.BeehiveIds)).ToList();
-            foreach (var d in diets.Where(d => d.Status != DietStatus.StoppedEarly))
+            var diets = (await _uow.Diets.GetByApiaryIdsAsync(scope.ApiaryIds))
+                .Where(d => d.Status != DietStatus.StoppedEarly)
+                // Narrow to programmes covering a hive the caller actually has. A Beekeeper's
+                // ApiaryIds are the apiaries *containing* their hives, so without this a colleague's
+                // programme would be pushed into their personal calendar. A programme with zero
+                // active hives drops out here too — there is nothing to do in the field.
+                .Where(d => d.Beehives.Any(db => db.RemovedOn == null && scope.BeehiveIds.Contains(db.BeehiveId)))
+                .ToList();
+
+            foreach (var d in diets)
             {
-                var foodName = d.FoodType == FoodType.Custom
+                var foodName   = d.FoodType == FoodType.Custom
                     ? (d.CustomFoodType ?? "Vlastito")
                     : BsLabels.Label(d.FoodType);
-                var hiveName = scope.BeehiveNames.TryGetValue(d.BeehiveId, out var hn) ? hn : $"Košnica {d.BeehiveId}";
+                var apiaryName = scope.ApiaryNames.TryGetValue(d.ApiaryId, out var an) ? an : $"Pčelinjak {d.ApiaryId}";
+                var hiveCount  = d.Beehives.Count(db => db.RemovedOn == null);
 
                 foreach (var e in d.FeedingEntries.Where(e => e.Status == FeedingEntryStatus.Pending))
                 {
                     var date = DateOnly.FromDateTime(e.ScheduledDate);
                     if (!InRange(date)) continue;
 
-                    var desc = $"Program: {d.Name}\nHrana: {foodName}";
-                    var link = Link(d.BeehiveId, null);
-                    if (link != null) desc += $"\nOtvori: {link}";
+                    var desc = $"Program: {d.Name}\nHrana: {foodName}\nKošnice: {hiveCount}";
+                    // The programme page, not the apiary: it is the checklist the user needs to tick.
+                    if (baseUrl.Length > 0) desc += $"\nOtvori: {baseUrl}/feedings/{d.Id}";
 
+                    // StableKey stays "feeding-{entryId}": the ICS UID is derived from it, so events
+                    // already synced to a real calendar update in place instead of duplicating.
                     result.Add(new CalendarObligation(
                         ObligationKind.Feeding, $"feeding-{e.Id}", date,
-                        $"🍯 Prihrana — {hiveName}", desc, hiveName, d.BeehiveId, null, false));
+                        $"🍯 Prehrana — {apiaryName} ({hiveCount} {HiveWord(hiveCount)})",
+                        desc, apiaryName, null, d.ApiaryId, false));
                 }
             }
         }
@@ -175,6 +189,16 @@ public class CalendarObligationService : ICalendarObligationService
             .OrderBy(o => o.Date)
             .ThenBy(o => o.Kind)
             .ToList();
+    }
+
+    /// <summary>Bosnian plural of "košnica": 1 → košnica, 2–4 → košnice, else košnica (with 11–14 exception).</summary>
+    private static string HiveWord(int n)
+    {
+        var mod100 = n % 100;
+        var mod10  = n % 10;
+        if (mod10 == 1 && mod100 != 11) return "košnica";
+        if (mod10 is >= 2 and <= 4 && mod100 is < 12 or > 14) return "košnice";
+        return "košnica";
     }
 
     private int GetInt(string key, int fallback) => int.TryParse(_config[key], out var v) ? v : fallback;

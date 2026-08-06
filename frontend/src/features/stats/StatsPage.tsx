@@ -403,12 +403,21 @@ export default function StatsPage() {
 
       {/* ── Diet section ─────────────────────────────────────────────────────── */}
       {hasDietData && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-          <div className="card">
-            <div className="flex items-center gap-2 mb-5">
-              <span className="text-xl">🌿</span>
-              <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100">Status prehrane</h2>
+        <div className="mb-6">
+          {/* Feeding cost (SPEC-12 Phase E) — symmetric with the harvest revenue chip above:
+              a current-year, BAM-only aggregate, shown whenever anything has been attributed. */}
+          {stats.feedingCost > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium mb-4
+                            bg-honey-100 text-honey-800 dark:bg-honey-500/15 dark:text-honey-300 w-fit">
+              💰 Trošak prehrane: {stats.feedingCost.toFixed(2)} BAM
             </div>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="card">
+              <div className="flex items-center gap-2 mb-5">
+                <span className="text-xl">🌿</span>
+                <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100">Status prehrane</h2>
+              </div>
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
@@ -459,6 +468,7 @@ export default function StatsPage() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </div>
         </div>
       )}
 

@@ -148,11 +148,12 @@ public class WeeklySummaryService : IWeeklySummaryService
             })
             .ToList();
 
-        var feedingsDone = hiveIds.Count > 0
+        // Counts feeding *rounds*, not hive-rounds: one round covers every hive on the programme.
+        var feedingsDone = apiaryIds.Count > 0
             ? (await _uow.FeedingEntries.FindAsync(fe =>
                 fe.Status == FeedingEntryStatus.Completed &&
                 fe.CompletionDate >= weekAgo &&
-                hiveIds.Contains(fe.Diet.BeehiveId))).Count()
+                apiaryIds.Contains(fe.Diet.ApiaryId))).Count()
             : 0;
 
         var todos = (apiaryIds.Count > 0 || hiveIds.Count > 0)

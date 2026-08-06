@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   BarChart2, Bot, CalendarDays, ChevronsLeft, ChevronsRight, Droplets, GraduationCap, Home,
-  LayoutDashboard, MessageSquareHeart, Pill, ReceiptText, Tent, Users,
+  LayoutDashboard, Leaf, MessageSquareHeart, Pill, ReceiptText, Tent, Users,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -34,6 +34,7 @@ export function getNavItems(flags: NavRoleFlags): NavItemDef[] {
     { to: '/pastures', icon: <Tent className="w-4 h-4" />, label: 'Pašnjaci', visible: flags.canSeePastures },
     { to: '/expenses', icon: <ReceiptText className="w-4 h-4" />, label: 'Troškovi', visible: flags.canSeeExpenses },
     { to: '/harvests', icon: <Droplets className="w-4 h-4" />, label: 'Vrcanja', visible: true },
+    { to: '/feedings', icon: <Leaf className="w-4 h-4" />, label: 'Prehrana', visible: true },
     { to: '/treatments', icon: <Pill className="w-4 h-4" />, label: 'Tretmani', visible: true },
     { to: '/advisor', icon: <Bot className="w-4 h-4" />, label: 'AI Savjetnik', visible: true },
     { to: '/learning', icon: <GraduationCap className="w-4 h-4" />, label: 'Edukacija', visible: true },

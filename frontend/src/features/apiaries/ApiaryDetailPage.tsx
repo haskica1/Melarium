@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Download, Pencil, Plus, Trash2, MapPin, Wind, Droplets, Thermometer, Search } from 'lucide-react'
 import { format, parseISO, isPast, isToday } from 'date-fns'
@@ -22,6 +22,9 @@ import { TodoSection } from '../../shared/components/TodoSection'
 import { CollapsibleSection } from '../../shared/components/CollapsibleSection'
 import { ApiaryHarvestsSection } from '../harvests/ApiaryHarvestsSection'
 import { ApiaryTreatmentsSection } from '../treatments/ApiaryTreatmentsSection'
+import { ApiaryFeedingsSection } from '../diets/ApiaryFeedingsSection'
+import { ActiveFeedingChip, groupActiveByHive } from '../diets/ActiveFeedingBadge'
+import { useActiveDiets } from '../../core/services/dietQueries'
 import { ApiaryMovesSection } from '../pastures/ApiaryMovesSection'
 import { useApiaryMoves } from '../../core/services/pastureQueries'
 import type { Beehive, DailyWeather } from '../../core/models'
@@ -122,6 +125,10 @@ export default function ApiaryDetailPage() {
   // Current pasture chip (SPEC-10) — same query the "Selidbe" section uses (deduped by key).
   const { data: apiaryMoves = [] } = useApiaryMoves(apiaryId)
   const currentPastureMove = apiaryMoves[0]
+
+  // Feeding chips (SPEC-12): ONE request for the whole apiary, grouped once — never one per hive row.
+  const { data: activeFeedings = [] } = useActiveDiets(apiaryId)
+  const activeByHive = useMemo(() => groupActiveByHive(activeFeedings), [activeFeedings])
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null)
   const [hiveQuery, setHiveQuery] = useState('')
@@ -353,8 +360,9 @@ export default function ApiaryDetailPage() {
                       <span className="text-2xl shrink-0 mt-0.5">🏠</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-semibold text-gray-800 dark:text-slate-100 truncate group-hover:text-honey-700 dark:group-hover:text-honey-400 transition-colors">
-                            {beehive.name}
+                          <h3 className="font-semibold text-gray-800 dark:text-slate-100 truncate group-hover:text-honey-700 dark:group-hover:text-honey-400 transition-colors flex items-center gap-1.5 min-w-0">
+                            <span className="truncate">{beehive.name}</span>
+                            <ActiveFeedingChip infos={activeByHive.get(beehive.id) ?? []} />
                           </h3>
                           {canEditDelete && (
                             <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
@@ -502,6 +510,9 @@ export default function ApiaryDetailPage() {
 
           {/* Harvests (vrcanja) */}
           <ApiaryHarvestsSection apiaryId={apiaryId} />
+
+          {/* Feeding programmes (prehrana) */}
+          <ApiaryFeedingsSection apiaryId={apiaryId} />
 
           {/* Treatments (tretmani) */}
           <ApiaryTreatmentsSection apiaryId={apiaryId} />

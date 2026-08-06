@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace Melarium.API.Controllers;
 
 /// <summary>
-/// Manages feeding programmes (diets) for beehives. Access to a beehive's diets is enforced in
-/// the service layer (managers within scope, or a Beekeeper assigned to the hive).
+/// Manages feeding programmes (diets). A programme belongs to an apiary and covers a chosen set of
+/// its hives. Access is enforced in the service layer: managers write within scope, a Beekeeper reads
+/// programmes containing one of their assigned hives and may tick a feeding round, but not create,
+/// edit, delete or stop one.
 /// </summary>
 [ApiController]
 [Route("api/feedings")]
@@ -17,37 +19,52 @@ namespace Melarium.API.Controllers;
 public class DietsController : ControllerBase
 {
     private readonly IDietService _service;
-    private readonly IValidator<CreateDietDto>    _createValidator;
-    private readonly IValidator<CopyDietDto>      _copyValidator;
-    private readonly IValidator<UpdateDietDto>    _updateValidator;
-    private readonly IValidator<CompleteEarlyDto> _completeEarlyValidator;
+    private readonly IValidator<CreateDietDto>           _createValidator;
+    private readonly IValidator<UpdateDietDto>           _updateValidator;
+    private readonly IValidator<AddDietBeehivesDto>      _addBeehivesValidator;
+    private readonly IValidator<CompleteEarlyDto>        _completeEarlyValidator;
+    private readonly IValidator<CompleteFeedingEntryDto> _completeEntryValidator;
 
     public DietsController(
         IDietService service,
         IValidator<CreateDietDto> createValidator,
-        IValidator<CopyDietDto> copyValidator,
         IValidator<UpdateDietDto> updateValidator,
-        IValidator<CompleteEarlyDto> completeEarlyValidator)
+        IValidator<AddDietBeehivesDto> addBeehivesValidator,
+        IValidator<CompleteEarlyDto> completeEarlyValidator,
+        IValidator<CompleteFeedingEntryDto> completeEntryValidator)
     {
         _service                = service;
         _createValidator        = createValidator;
-        _copyValidator          = copyValidator;
         _updateValidator        = updateValidator;
+        _addBeehivesValidator   = addBeehivesValidator;
         _completeEarlyValidator = completeEarlyValidator;
+        _completeEntryValidator = completeEntryValidator;
     }
 
-    /// <summary>Returns all diets for a given beehive, newest first.</summary>
-    [HttpGet("by-beehive/{beehiveId:int}")]
+    /// <summary>Lists feeding programmes the caller may see, optionally filtered by apiary, hive or year.</summary>
+    [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<DietDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetByBeehive(int beehiveId)
+    public async Task<IActionResult> GetAll([FromQuery] int? apiaryId, [FromQuery] int? beehiveId, [FromQuery] int? year)
     {
-        var diets = await _service.GetByBeehiveIdAsync(beehiveId);
+        var diets = await _service.GetAllAsync(apiaryId, beehiveId, year);
         return Ok(diets);
     }
 
-    /// <summary>Returns a single diet with its feeding entries.</summary>
+    /// <summary>
+    /// Active programmes for a whole apiary — one flat row per (hive × programme), so the hive badges
+    /// on a list cost a single request. Declared before "{id:int}" so the literal route always wins.
+    /// </summary>
+    [HttpGet("active")]
+    [ProducesResponseType(typeof(IEnumerable<DietActiveInfoDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetActive([FromQuery] int apiaryId)
+    {
+        var active = await _service.GetActiveAsync(apiaryId);
+        return Ok(active);
+    }
+
+    /// <summary>Returns a single programme with its rounds and its hives (including removed ones).</summary>
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(DietDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -58,7 +75,7 @@ public class DietsController : ControllerBase
         return Ok(diet);
     }
 
-    /// <summary>Creates a new diet and auto-generates feeding entries.</summary>
+    /// <summary>Creates a programme for an apiary and auto-generates its feeding rounds.</summary>
     [HttpPost]
     [ProducesResponseType(typeof(DietDetailDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -74,24 +91,7 @@ public class DietsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
 
-    /// <summary>Copies this diet's programme onto one or more other beehives the caller can access.</summary>
-    [HttpPost("{id:int}/copy")]
-    [ProducesResponseType(typeof(IEnumerable<DietDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
-    public async Task<IActionResult> Copy(int id, [FromBody] CopyDietDto dto)
-    {
-        var validation = await _copyValidator.ValidateAsync(dto);
-        if (!validation.IsValid)
-            return BadRequest(validation.ToDictionary());
-
-        var created = await _service.CopyToBeehivesAsync(id, dto);
-        return Ok(created);
-    }
-
-    /// <summary>Updates a diet (only allowed when not completed/stopped).</summary>
+    /// <summary>Updates a programme (only allowed when not completed/stopped). Never changes its hives.</summary>
     [HttpPut("{id:int}")]
     [ProducesResponseType(typeof(DietDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -108,7 +108,7 @@ public class DietsController : ControllerBase
         return Ok(updated);
     }
 
-    /// <summary>Deletes a diet (only allowed before it has started).</summary>
+    /// <summary>Deletes a programme (only allowed before it has started).</summary>
     [HttpDelete("{id:int}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -120,7 +120,35 @@ public class DietsController : ControllerBase
         return NoContent();
     }
 
-    /// <summary>Stops a diet early.</summary>
+    /// <summary>Adds hives to a running programme. They join the schedule from now on.</summary>
+    [HttpPost("{id:int}/beehives")]
+    [ProducesResponseType(typeof(DietDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> AddBeehives(int id, [FromBody] AddDietBeehivesDto dto)
+    {
+        var validation = await _addBeehivesValidator.ValidateAsync(dto);
+        if (!validation.IsValid)
+            return BadRequest(validation.ToDictionary());
+
+        var updated = await _service.AddBeehivesAsync(id, dto);
+        return Ok(updated);
+    }
+
+    /// <summary>Removes a hive from a programme. Soft — the link stays as history with its removal date.</summary>
+    [HttpDelete("{id:int}/beehives/{beehiveId:int}")]
+    [ProducesResponseType(typeof(DietDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RemoveBeehive(int id, int beehiveId)
+    {
+        var updated = await _service.RemoveBeehiveAsync(id, beehiveId);
+        return Ok(updated);
+    }
+
+    /// <summary>Stops a programme early.</summary>
     [HttpPost("{id:int}/complete-early")]
     [ProducesResponseType(typeof(DietDetailDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -137,15 +165,27 @@ public class DietsController : ControllerBase
         return Ok(updated);
     }
 
-    /// <summary>Marks a specific feeding entry as completed.</summary>
+    /// <summary>
+    /// Marks one feeding round as done for the whole group, with an optional note. Returns the full
+    /// detail because the tick also moves the programme's status and progress.
+    /// The body is optional: ticking without a note is the normal case, and a client that predates
+    /// the note field must keep working.
+    /// </summary>
     [HttpPost("{dietId:int}/feeding-entries/{entryId:int}/complete")]
     [ProducesResponseType(typeof(DietDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
-    public async Task<IActionResult> CompleteFeedingEntry(int dietId, int entryId)
+    public async Task<IActionResult> CompleteFeedingEntry(int dietId, int entryId, [FromBody] CompleteFeedingEntryDto? dto = null)
     {
-        await _service.CompleteFeedingEntryAsync(dietId, entryId);
+        dto ??= new CompleteFeedingEntryDto();
+
+        var validation = await _completeEntryValidator.ValidateAsync(dto);
+        if (!validation.IsValid)
+            return BadRequest(validation.ToDictionary());
+
+        await _service.CompleteFeedingEntryAsync(dietId, entryId, dto);
         var updated = await _service.GetByIdAsync(dietId);
         return Ok(updated);
     }

@@ -9,4 +9,5 @@ public class ExpenseItemDto
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public int SortOrder { get; set; }
+    public int? DietId { get; set; }
 }

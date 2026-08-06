@@ -145,4 +145,94 @@ public class AlertRuleServiceTests
             NotificationType.FrostWarning, Arg.Any<int?>(), Arg.Any<string>());
         await _weather.DidNotReceive().GetForecastAsync(Arg.Any<double>(), Arg.Any<double>());
     }
+
+    // ── Rule 8: feeding overdue (SPEC-12 Phase D) ────────────────────────────────
+
+    private static Diet MakeDiet(int apiaryId, DietStatus status, params FeedingEntry[] entries)
+    {
+        var diet = new Diet { Id = 5, ApiaryId = apiaryId, Status = status, Name = "Zimska prehrana" };
+        diet.Beehives.Add(new DietBeehive { BeehiveId = 10, RemovedOn = null });
+        foreach (var e in entries) diet.FeedingEntries.Add(e);
+        return diet;
+    }
+
+    private static FeedingEntry PendingRound(int daysAgo) =>
+        new() { ScheduledDate = DateTime.UtcNow.AddDays(-daysAgo), Status = FeedingEntryStatus.Pending };
+
+    [Fact]
+    public async Task FeedingOverdue_Fires_WhenARoundIsPastTheThreshold()
+    {
+        var apiary = MakeApiary();
+        World(apiary, MakeHive(daysOld: 1), []);
+        var diet = MakeDiet(apiary.Id, DietStatus.InProgress, PendingRound(daysAgo: 3));
+        _uow.Diets.GetByApiaryAsync(apiary.Id).Returns(new[] { diet });
+
+        await _service.RunDailyScanAsync();
+
+        await _notifications.Received(1).NotifyAsync(1, Arg.Any<string>(), Arg.Any<string>(),
+            NotificationType.FeedingOverdue, 5, "Diet");
+    }
+
+    [Fact]
+    public async Task FeedingOverdue_FiresOncePerDiet_NotOncePerOverdueRound()
+    {
+        var apiary = MakeApiary();
+        World(apiary, MakeHive(daysOld: 1), []);
+        // Two rounds are overdue — a programme two weeks behind should still produce one nudge.
+        var diet = MakeDiet(apiary.Id, DietStatus.InProgress, PendingRound(daysAgo: 10), PendingRound(daysAgo: 6));
+        _uow.Diets.GetByApiaryAsync(apiary.Id).Returns(new[] { diet });
+
+        await _service.RunDailyScanAsync();
+
+        await _notifications.Received(1).NotifyAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(),
+            NotificationType.FeedingOverdue, 5, "Diet");
+    }
+
+    [Fact]
+    public async Task FeedingOverdue_DoesNotFire_WhenProgrammeHasNoActiveHives()
+    {
+        var apiary = MakeApiary();
+        World(apiary, MakeHive(daysOld: 1), []);
+        var diet = MakeDiet(apiary.Id, DietStatus.InProgress, PendingRound(daysAgo: 10));
+        diet.Beehives.Single().RemovedOn = DateTime.UtcNow.Date; // no hives left → nothing to do in the field
+        _uow.Diets.GetByApiaryAsync(apiary.Id).Returns(new[] { diet });
+
+        await _service.RunDailyScanAsync();
+
+        await _notifications.DidNotReceive().NotifyAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(),
+            NotificationType.FeedingOverdue, Arg.Any<int?>(), Arg.Any<string>());
+    }
+
+    [Theory]
+    [InlineData(DietStatus.NotStarted)]
+    [InlineData(DietStatus.Completed)]
+    [InlineData(DietStatus.StoppedEarly)]
+    public async Task FeedingOverdue_DoesNotFire_ForNonInProgressDiet(DietStatus status)
+    {
+        var apiary = MakeApiary();
+        World(apiary, MakeHive(daysOld: 1), []);
+        var diet = MakeDiet(apiary.Id, status, PendingRound(daysAgo: 10));
+        _uow.Diets.GetByApiaryAsync(apiary.Id).Returns(new[] { diet });
+
+        await _service.RunDailyScanAsync();
+
+        await _notifications.DidNotReceive().NotifyAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(),
+            NotificationType.FeedingOverdue, Arg.Any<int?>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task FeedingOverdue_Suppressed_WhenDisabledByConfig()
+    {
+        _config["Alerts:FeedingOverdue:Enabled"].Returns("false");
+        var apiary = MakeApiary();
+        World(apiary, MakeHive(daysOld: 1), []);
+        var diet = MakeDiet(apiary.Id, DietStatus.InProgress, PendingRound(daysAgo: 10));
+        _uow.Diets.GetByApiaryAsync(apiary.Id).Returns(new[] { diet });
+
+        await _service.RunDailyScanAsync();
+
+        await _notifications.DidNotReceive().NotifyAsync(Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(),
+            NotificationType.FeedingOverdue, Arg.Any<int?>(), Arg.Any<string>());
+        await _uow.Diets.DidNotReceive().GetByApiaryAsync(Arg.Any<int>());
+    }
 }

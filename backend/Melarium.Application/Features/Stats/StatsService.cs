@@ -45,8 +45,10 @@ public class StatsService : IStatsService
             ? (await _uow.Inspections.FindAsync(i => beehiveIds.Contains(i.BeehiveId))).ToList()
             : [];
 
-        var diets = beehiveIds.Count > 0
-            ? (await _uow.Diets.FindAsync(d => beehiveIds.Contains(d.BeehiveId))).ToList()
+        // By apiary, not by a join through the hive links: a programme whose hives were all removed
+        // is still a live programme and still listed on /feedings, so it must still be counted here.
+        var diets = apiaryIds.Count > 0
+            ? (await _uow.Diets.GetByApiaryIdsAsync(apiaryIds)).ToList()
             : [];
 
         var todos = beehiveIds.Count > 0 || apiaryIds.Count > 0
@@ -211,6 +213,18 @@ public class StatsService : IStatsService
                 harvests.Where(h => h.Date.Year == y).Sum(h => h.Entries.Sum(e => e.QuantityKg))))
             .ToList();
 
+        // ── Feeding cost (SPEC-12 Phase E) ─────────────────────────────────────
+        // Symmetric with SeasonTotalKg/EstimatedRevenue above: current year, one query.
+
+        var currentYearDietIds = diets.Where(d => d.StartDate.Year == currentYear).Select(d => d.Id).ToList();
+        var dietCostTotals = currentYearDietIds.Count > 0
+            ? await _uow.Expenses.GetTotalsByDietsAsync(currentYearDietIds)
+            : [];
+        var feedingCost = dietCostTotals.Values
+            .SelectMany(totals => totals)
+            .Where(t => t.Currency == "BAM")
+            .Sum(t => t.Total);
+
         // ── Yield per pasture (SPEC-10) ────────────────────────────────────────
 
         var moves = apiaryIds.Count > 0
@@ -266,6 +280,7 @@ public class StatsService : IStatsService
             TopHivesByYield          = topHivesByYield,
             YearlyYield              = yearlyYield,
             KgByPasture              = kgByPasture,
+            FeedingCost              = feedingCost,
         };
     }
 

@@ -31,9 +31,10 @@ the scan produces **no duplicates** (no new dedup table). Delivery reuses `INoti
 | 4 | `OldQueen` (13) | active queen in ≥ 3rd season; evaluated **only in the March scan month** | same as #1 | 300 days |
 | 5 | `StripsLeftIn` (15) | treatment with `Method = Trake` and no `endDate`, started ≥ `StripRemovalDays` (42) days ago (SPEC-08) | all users with access to the apiary | 7 days |
 | 6 | `KarencaEnded` (16) | treatment karenca (`karencaUntil`) expired within the last 3 days (SPEC-08) | same as #5 | 7 days |
+| 8 | `FeedingOverdue` (23) | apiary-scoped feeding programme, `InProgress`, with ≥ 1 active hive, whose earliest `Pending` round is ≥ `FeedingOverdueDays` (2) days late (SPEC-12 Phase D) — fires once per **programme**, not per round | same as #5 | 3 days |
 
-`relatedEntityId` = hive id (rules 1/2/4, type `Beehive`), apiary id (rule 3, type `Apiary`), or
-treatment id (rules 5/6, type `Treatment`).
+`relatedEntityId` = hive id (rules 1/2/4, type `Beehive`), apiary id (rule 3, type `Apiary`),
+treatment id (rules 5/6, type `Treatment`), or diet id (rule 8, type `Diet`).
 Apiary without coordinates → frost skipped silently. Weather API unreachable → frost skipped for that
 apiary, other rules unaffected.
 
@@ -58,11 +59,13 @@ On Mondays, for each organization with any activity in the last 7 days:
 "Alerts": {
   "ScanHourUtc": 5,
   "StaleInspectionDays": 21,
+  "FeedingOverdueDays": 2,
   "StaleInspection": { "Enabled": true },
   "HoneyLevelDrop":  { "Enabled": true },
   "FrostWarning":    { "Enabled": true },
   "OldQueen":        { "Enabled": true },
-  "WeeklySummary":   { "Enabled": true }
+  "WeeklySummary":   { "Enabled": true },
+  "FeedingOverdue":  { "Enabled": true }
 }
 ```
 
@@ -70,7 +73,7 @@ Read via the `IConfiguration` indexer + manual parse (no `Configuration.Binder` 
 
 ## Frontend
 
-No new pages. `NotificationBell` type→icon map extended with the five new types (⏰ 📉 ❄️ 👑 📰);
+No new pages. `NotificationBell` type→icon map extended with the six new types (⏰ 📉 ❄️ 👑 📰 🍯);
 `WeeklySummary` renders its multi-line bullet text with `whitespace-pre-line` instead of the
 two-line clamp.
 
@@ -78,5 +81,7 @@ two-line clamp.
 
 `AlertRuleServiceTests` — stale fires past threshold, dedup suppresses, fresh hive doesn't fire,
 honey-drop fires only when decreasing to Low, frost fires below 0 °C and is skipped without
-coordinates. `WeeklyDigestBuilderTests` — digest contains all counts/sections; `HasActivity`
+coordinates, feeding-overdue fires once per programme (not per round), is skipped when the
+programme has no active hives or is disabled by config, and never fires for a non-`InProgress`
+programme. `WeeklyDigestBuilderTests` — digest contains all counts/sections; `HasActivity`
 gating. (The worker itself is intentionally thin and untested.)

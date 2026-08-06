@@ -47,11 +47,8 @@ public class BeehiveConfiguration : IEntityTypeConfiguration<Beehive>
             .HasForeignKey(i => i.BeehiveId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // One beehive → many diets; cascade delete
-        builder.HasMany(b => b.Diets)
-            .WithOne(d => d.Beehive)
-            .HasForeignKey(d => d.BeehiveId)
-            .OnDelete(DeleteBehavior.Cascade);
+        // Diets are apiary-scoped (SPEC-12) — a hive reaches them through DietBeehive, configured
+        // there, so there is no direct Beehive → Diet relationship any more.
 
         builder.ToTable("Beehives");
     }

@@ -15,6 +15,15 @@ public class AdvisorContextBuilderTests
         Id = 1, Name = "Košnica 1", Type = BeehiveType.Langstroth, Material = BeehiveMaterial.Wood, ApiaryId = 3,
     };
 
+    private static DietActiveInfo ActiveDiet(
+        int dietId = 1, string name = "Zimsko hranjenje", FoodType food = FoodType.SugarSyrup,
+        decimal? amount = null, FeedingAmountUnit? unit = null, string? amountNote = null,
+        DateTime? next = null, int completed = 1, int total = 3) =>
+        new(BeehiveId: 1, DietId: dietId, DietName: name, FoodType: food, CustomFoodType: null,
+            AmountPerHive: amount, AmountUnit: unit, AmountNote: amountNote,
+            StartDate: new DateTime(2026, 6, 1), NextFeedingDate: next,
+            CompletedRounds: completed, TotalRounds: total);
+
     [Fact]
     public void Build_WithFullData_IncludesEverySection()
     {
@@ -22,7 +31,6 @@ public class AdvisorContextBuilderTests
         {
             new() { Date = new DateTime(2026, 7, 1), HoneyLevel = HoneyLevel.High, BroodStatus = "Matica uočena", Notes = "Mirno društvo" },
         };
-        var diet = new Diet { FoodType = FoodType.SugarSyrup, Status = DietStatus.InProgress };
         var todos = new List<Todo> { new() { Title = "Dodati nastavak", Priority = TodoPriority.High, DueDate = new DateTime(2026, 7, 10) } };
         var queen = new Queen { Year = 2024, Status = QueenStatus.Active, Origin = QueenOrigin.Purchased };
 
@@ -32,7 +40,7 @@ public class AdvisorContextBuilderTests
             StartDate: new DateTime(2026, 6, 1), EndDate: null, WithdrawalDays: 0);
 
         var text = AdvisorContextBuilder.Build(
-            Hive(), "Pčelinjak Sjever", inspections, diet, 1, 3, todos, queen, seasonYieldKg: 14.5m,
+            Hive(), "Pčelinjak Sjever", inspections, [ActiveDiet()], todos, queen, seasonYieldKg: 14.5m,
             latestTreatment: treatment, pastureLine: "Kadulja, od 01.06.2026", weatherLine: "12°C trenutno, danas 8–22°C");
 
         Assert.Contains("Košnica 1", text);
@@ -41,7 +49,7 @@ public class AdvisorContextBuilderTests
         Assert.Contains("Prinos meda ove sezone: 14.5 kg", text);
         Assert.Contains("med Visoko", text);                // inspection with Bosnian honey label
         Assert.Contains("Matica uočena", text);
-        Assert.Contains("Aktivna prihrana: Šećerni sirup (1/3 obroka)", text);
+        Assert.Contains("Aktivna prehrana: Šećerni sirup (1/3 rundi)", text);
         Assert.Contains("Dodati nastavak", text);
         Assert.Contains("Zadnji tretman: Apivar (Amitraz), 01.06.2026, status: U toku", text);
         Assert.Contains("Pašnjak: Kadulja, od 01.06.2026", text);
@@ -49,15 +57,41 @@ public class AdvisorContextBuilderTests
     }
 
     [Fact]
+    public void Build_DietWithAmountAndNote_RendersBoth()
+    {
+        // "1 L 1:1" and "1 L 2:1" are the same litre and a different intervention — the note has to
+        // reach the model, or the advice is grounded in half the fact.
+        var text = AdvisorContextBuilder.Build(
+            Hive(), "A", [], [ActiveDiet(amount: 1.5m, unit: FeedingAmountUnit.Litre, amountNote: "1:1",
+                                        next: new DateTime(2026, 7, 12))],
+            [], null, null, null, null, null);
+
+        Assert.Contains("Aktivna prehrana: Šećerni sirup, 1.5 L (1:1) (1/3 rundi, sljedeće 12.07.2026)", text);
+    }
+
+    [Fact]
+    public void Build_TwoOverlappingProgrammes_RendersOneLineEach()
+    {
+        var text = AdvisorContextBuilder.Build(
+            Hive(), "A",
+            [],
+            [ActiveDiet(dietId: 1, food: FoodType.SugarSyrup), ActiveDiet(dietId: 2, food: FoodType.ProteinPatties)],
+            [], null, null, null, null, null);
+
+        Assert.Contains("Aktivna prehrana: Šećerni sirup", text);
+        Assert.Contains("Aktivna prehrana: Proteinski kolači", text);
+    }
+
+    [Fact]
     public void Build_WithoutData_StatesNoInspectionsAndOmitsOptionalSections()
     {
         var text = AdvisorContextBuilder.Build(
-            Hive(), "Pčelinjak A", [], activeDiet: null, 0, 0, [], activeQueen: null,
+            Hive(), "Pčelinjak A", [], [], [], activeQueen: null,
             seasonYieldKg: null, latestTreatment: null, pastureLine: null, weatherLine: null);
 
         Assert.Contains("Pregledi: nema zabilježenih pregleda.", text);
         Assert.DoesNotContain("Matica:", text);
-        Assert.DoesNotContain("Aktivna prihrana", text);
+        Assert.DoesNotContain("Aktivna prehrana", text);
         Assert.DoesNotContain("Prinos meda", text);
         Assert.DoesNotContain("Zadnji tretman", text);
         Assert.DoesNotContain("Pašnjak:", text);
@@ -74,7 +108,7 @@ public class AdvisorContextBuilderTests
         };
 
         var text = AdvisorContextBuilder.Build(
-            Hive(), "A", inspections, null, 0, 0, [], null, null, null, null, null);
+            Hive(), "A", inspections, [], [], null, null, null, null, null);
 
         Assert.Contains("…", text);
         Assert.DoesNotContain(longNote, text); // full 300-char string must not appear verbatim
@@ -89,7 +123,7 @@ public class AdvisorContextBuilderTests
             StartDate: DateTime.UtcNow.AddDays(-10), EndDate: DateTime.UtcNow.AddDays(-2), WithdrawalDays: 30);
 
         var text = AdvisorContextBuilder.Build(
-            Hive(), "A", [], null, 0, 0, [], null, null, treatment, null, null);
+            Hive(), "A", [], [], [], null, null, treatment, null, null);
 
         var expectedUntil = treatment.EndDate!.Value.AddDays(30).ToString("dd.MM.yyyy");
         Assert.Contains($"Zadnji tretman: Oksalna kiselina (Oksalna kiselina)", text);

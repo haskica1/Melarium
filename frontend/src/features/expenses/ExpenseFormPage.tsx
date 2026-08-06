@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
-import { useParams, useLocation } from 'react-router-dom'
+import { useEffect, useMemo } from 'react'
+import { useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { AlertCircle, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useExpense, useCreateExpense, useUpdateExpense } from '../../core/services/expenseQueries'
+import { useDiets } from '../../core/services/dietQueries'
 import { ExpenseSource } from '../../core/models'
 import type { CreateExpenseItemPayload } from '../../core/models'
 import { FormHeader } from '../../shared/components'
@@ -20,7 +21,14 @@ interface FormValues {
     unit: string
     unitPrice: string
     totalPrice: string
+    /** '' means "not attributed". Native <select> values are strings, converted back on submit. */
+    dietId: string
   }>
+}
+
+interface DietOption {
+  id: number
+  label: string
 }
 
 const DEFAULT_CURRENCIES = ['BAM', 'EUR', 'USD', 'HRK']
@@ -39,9 +47,31 @@ export default function ExpenseFormPage() {
   const location = useLocation()
   const prefilled = location.state as { items?: CreateExpenseItemPayload[]; source?: ExpenseSource } | null
 
+  // "Poveži trošak" deep link from a diet's detail page (SPEC-12) — pre-attributes the first item.
+  const [searchParams] = useSearchParams()
+  const dietIdFromUrl = searchParams.get('dietId')
+
   const { data: existing, isLoading: loadingExisting } = useExpense(expenseId ?? 0)
   const createExpense = useCreateExpense()
   const updateExpense = useUpdateExpense(expenseId ?? 0)
+
+  // "Current and previous year" per SPEC-12 — two small requests rather than one unbounded one.
+  const currentYear = new Date().getFullYear()
+  const { data: dietsThisYear = [] } = useDiets({ year: currentYear })
+  const { data: dietsLastYear = [] } = useDiets({ year: currentYear - 1 })
+  const dietOptions = useMemo<DietOption[]>(
+    () => [...dietsThisYear, ...dietsLastYear]
+      .sort((a, b) => b.startDate.localeCompare(a.startDate))
+      .map(d => ({ id: d.id, label: `${d.name} — ${d.apiaryName ?? `Pčelinjak #${d.apiaryId}`}` })),
+    [dietsThisYear, dietsLastYear],
+  )
+  // A programme attributed before the current/previous-year window must still appear as selected —
+  // otherwise editing an old receipt would show it as unattributed and silently drop it on save.
+  const optionsForRow = (dietId: string): DietOption[] => {
+    const id = dietId ? Number(dietId) : null
+    if (id == null || dietOptions.some(o => o.id === id)) return dietOptions
+    return [...dietOptions, { id, label: `Program #${id} (stariji)` }]
+  }
 
   const {
     register,
@@ -63,7 +93,8 @@ export default function ExpenseFormPage() {
         unit: i.unit ?? '',
         unitPrice: String(i.unitPrice),
         totalPrice: String(i.totalPrice),
-      })) ?? [emptyItem()],
+        dietId: i.dietId != null ? String(i.dietId) : '',
+      })) ?? [dietIdFromUrl ? { ...emptyItem(), dietId: dietIdFromUrl } : emptyItem()],
     },
   })
 
@@ -83,6 +114,7 @@ export default function ExpenseFormPage() {
           unit: i.unit ?? '',
           unitPrice: String(i.unitPrice),
           totalPrice: String(i.totalPrice),
+          dietId: i.dietId != null ? String(i.dietId) : '',
         })),
       })
     }
@@ -115,6 +147,7 @@ export default function ExpenseFormPage() {
       unitPrice: parseDecimal(item.unitPrice) || 0,
       totalPrice: parseDecimal(item.totalPrice) || 0,
       sortOrder: i,
+      dietId: item.dietId ? Number(item.dietId) : null,
     }))
 
     // Total is always the sum of the line totals — never a stale form field.
@@ -293,6 +326,18 @@ export default function ExpenseFormPage() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
+                    {/* Attribution to a feeding programme (SPEC-12 Phase E) — optional, per item.
+                        A full-width row with no matching column header, so its label always shows —
+                        unlike the fields above it, which rely on the desktop header row instead. */}
+                    <div className="col-span-2 sm:col-span-6">
+                      <label className="block text-[11px] font-medium text-gray-400 dark:text-slate-500 mb-1">Program prehrane</label>
+                      <select {...register(`items.${index}.dietId`)} className={itemInputCls}>
+                        <option value="">— nije povezano —</option>
+                        {optionsForRow(field.dietId).map(o => (
+                          <option key={o.id} value={o.id}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )
               })}
@@ -333,5 +378,5 @@ export default function ExpenseFormPage() {
 }
 
 function emptyItem() {
-  return { name: '', quantity: '', unit: '', unitPrice: '', totalPrice: '' }
+  return { name: '', quantity: '', unit: '', unitPrice: '', totalPrice: '', dietId: '' }
 }

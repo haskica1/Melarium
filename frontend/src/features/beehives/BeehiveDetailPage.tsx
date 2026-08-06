@@ -6,9 +6,9 @@ import { downloadBeehiveQrPdf } from '../../shared/utils/qrPdf'
 import {
   useBeehive, useDeleteInspection,
   useTodosByBeehive, useCreateTodo, useUpdateTodo, useDeleteTodo,
-  useDietsByBeehive,
   queryKeys,
 } from '../../core/services/queries'
+import { useDiets } from '../../core/services/dietQueries'
 import {
   PageSkeleton,
   ErrorState,
@@ -19,7 +19,8 @@ import {
 } from '../../shared/components'
 import { TodoSection } from '../../shared/components/TodoSection'
 import { CollapsibleSection } from '../../shared/components/CollapsibleSection'
-import DietSection from '../diets/DietSection'
+import { HiveFeedingCard } from '../diets/HiveFeedingCard'
+import { ActiveFeedingBadge } from '../diets/ActiveFeedingBadge'
 import { InspectionPhotoStrip } from '../inspections/InspectionPhotos'
 import { QueenSection } from './QueenSection'
 import { HiveYieldCard } from './HiveYieldCard'
@@ -53,7 +54,7 @@ export default function BeehiveDetailPage() {
 
   const todoKey = queryKeys.todosByBeehive(beehiveId)
   const { data: todos = [], isLoading: todosLoading } = useTodosByBeehive(beehiveId)
-  const { data: diets = [] } = useDietsByBeehive(beehiveId)
+  const { data: diets = [] } = useDiets({ beehiveId })
   const createTodo = useCreateTodo(todoKey)
   const updateTodo = useUpdateTodo(todoKey)
   const deleteTodo = useDeleteTodo(todoKey)
@@ -134,6 +135,7 @@ export default function BeehiveDetailPage() {
                 <p className="mt-0.5 text-sm text-gray-600 dark:text-slate-400">
                   {beehive.typeName} · {beehive.materialName}
                 </p>
+                <ActiveFeedingBadge apiaryId={beehive.apiaryId} beehiveId={beehiveId} />
               </div>
             </div>
 
@@ -250,9 +252,6 @@ export default function BeehiveDetailPage() {
             onDelete={id => deleteTodo.mutateAsync(id)}
             isMutating={createTodo.isPending || updateTodo.isPending || deleteTodo.isPending}
           />
-
-          {/* Feeding programmes */}
-          <DietSection beehiveId={beehiveId} />
         </div>
 
         {/* Sidebar */}
@@ -298,6 +297,9 @@ export default function BeehiveDetailPage() {
 
           {/* Honey yield (prinos) */}
           <HiveYieldCard beehiveId={beehiveId} />
+
+          {/* Feeding (prehrana) — sits next to Tretmani so the two hive-level cards match */}
+          <HiveFeedingCard beehiveId={beehiveId} />
 
           {/* Treatments (tretmani) */}
           <HiveTreatmentCard beehiveId={beehiveId} />

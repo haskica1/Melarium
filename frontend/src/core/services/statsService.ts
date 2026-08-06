@@ -30,6 +30,8 @@ export interface StatsData {
   yearlyYield: NameValue[]
   // Pastures (SPEC-10) — empty when the organization has no moves
   kgByPasture: NameValue[]
+  // Apiary feeding (SPEC-12 Phase E) — BAM attributed to programmes starting this year
+  feedingCost: number
 }
 
 export const statsService = {

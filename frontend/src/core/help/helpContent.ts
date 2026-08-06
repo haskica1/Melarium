@@ -186,17 +186,39 @@ export const HELP_CONTENT: Record<HelpKey, HelpEntry> = {
   },
 
   // ── Feeding ─────────────────────────────────────────────────────────────────
+  '/feedings': {
+    title: 'Prehrana',
+    summary:
+      'Svi programi prehrane po pčelinjacima. Jedan program pokriva onoliko košnica koliko ste odabrali — ne pravi se posebno za svaku.',
+    steps: [
+      'Novi program dodajete dugmetom „Dodaj prehranu“.',
+      'Odaberite pčelinjak, pa čekirajte košnice na koje se program odnosi.',
+      'Otvorite program da označite obavljene runde ili promijenite spisak košnica.',
+    ],
+    tips: [
+      'Jedna runda = jedan odlazak na pčelinjak. Označava se jednom, ne po košnici.',
+      'Runde se prikazuju u kalendaru — jedna obaveza po datumu, bez obzira na broj košnica.',
+      'Košnicu možete izbaciti iz programa usred trajanja; ostaje zapisano da je do tada bila hranjena.',
+    ],
+    notesByRole: {
+      Beekeeper: 'Vi vidite programe koji obuhvataju vaše košnice i možete označiti obavljenu rundu, ali programe ne unosite ni mijenjate.',
+    },
+    learningCategory: LearningCategory.SezonskiRadovi,
+  },
+
   '/feedings/new': {
     title: 'Novi program prehrane',
     summary:
-      'Program prehrane je plan hranjenja: šta dajete, koliko često i koliko dugo. Termini se generišu sami.',
+      'Program prehrane je plan hranjenja za pčelinjak: šta dajete, koliko, koliko često i koliko dugo. Runde se generišu same.',
     steps: [
+      'Odaberite pčelinjak, pa čekirajte košnice — po pravilu su sve već označene.',
       'Odaberite vrstu hrane i razlog hranjenja.',
       'Unesite datum početka, trajanje i koliko dana je između hranjenja.',
-      'Sačuvajte — termini se izračunaju automatski.',
+      'Sačuvajte — runde se izračunaju automatski.',
     ],
     tips: [
-      'Termini se prikazuju u kalendaru, pa ne morate pamtiti kada je naredno hranjenje.',
+      'Količinu po košnici unesite s jedinicom; napomena („1:1“, „pola pogače“) nosi ono što broj ne može.',
+      'Runde se prikazuju u kalendaru, pa ne morate pamtiti kada je naredno hranjenje.',
       'Program možete prekinuti ranije — traži se komentar, da poslije znate zašto je prekinut.',
     ],
     learningCategory: LearningCategory.SezonskiRadovi,
@@ -205,17 +227,24 @@ export const HELP_CONTENT: Record<HelpKey, HelpEntry> = {
   '/feedings/:id/edit': {
     title: 'Uredi program prehrane',
     summary: 'Mijenjajte parametre programa prehrane.',
-    tips: ['Završen ili prekinut program se ne može mijenjati — to je namjerno, da historija ostane vjerodostojna.'],
+    tips: [
+      'Spisak košnica se ne mijenja ovdje nego na stranici programa — tamo ostaje zapisano kada je koja košnica dodana ili izbačena.',
+      'Završen ili prekinut program se ne može mijenjati — to je namjerno, da historija ostane vjerodostojna.',
+    ],
   },
 
   '/feedings/:id': {
     title: 'Program prehrane',
-    summary: 'Pojedinačni program: svi termini hranjenja i njihov status.',
+    summary: 'Pojedinačni program: košnice koje obuhvata i sve runde hranjenja s njihovim statusom.',
     steps: [
-      'Kad obavite hranjenje, označite taj termin kao obavljen.',
+      'Kad obavite hranjenje, označite tu rundu kao obavljenu — jednom za cijelu grupu.',
+      'Košnice dodajete ili izbacujete u sekciji „Košnice“.',
       'Ako prekidate program prije vremena, koristite „Zaustavi ranije“ i upišite razlog.',
     ],
-    tips: ['Označeni termini nestaju iz kalendara, pa vam kalendar ostaje čist i pokazuje samo ono što još treba.'],
+    tips: [
+      'Uz označenu rundu možete upisati napomenu — npr. da su dvije košnice preskočene.',
+      'Označene runde nestaju iz kalendara, pa vam kalendar ostaje čist i pokazuje samo ono što još treba.',
+    ],
   },
 
   // ── Harvests ────────────────────────────────────────────────────────────────

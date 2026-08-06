@@ -432,17 +432,49 @@ export const FoodTypeLabels: Record<FoodType, string> = {
   [FoodType.Custom]:         'Vlastito',
 }
 
+export enum FeedingAmountUnit {
+  Litre      = 1,
+  Millilitre = 2,
+  Kilogram   = 3,
+  Gram       = 4,
+}
+
+export const FeedingAmountUnitLabels: Record<FeedingAmountUnit, string> = {
+  [FeedingAmountUnit.Litre]:      'L',
+  [FeedingAmountUnit.Millilitre]: 'ml',
+  [FeedingAmountUnit.Kilogram]:   'kg',
+  [FeedingAmountUnit.Gram]:       'g',
+}
+
 export interface FeedingEntry {
   id: number
   scheduledDate: string
   status: FeedingEntryStatus
   statusName: string
   completionDate?: string
+  /** Optional note recorded when the round was ticked ("košnice 7 i 12 preskočene"). */
+  note?: string
   dietId: number
 }
 
+/** One hive's membership in a programme. Removed links stay for history. */
+export interface DietBeehive {
+  id: number
+  beehiveId: number
+  beehiveName: string
+  addedOn: string
+  /** Null while the hive is still on the programme. */
+  removedOn?: string
+}
+
+/**
+ * A feeding programme. Apiary-scoped since SPEC-12: it covers a set of the apiary's hives
+ * (`beehives` on the detail view) rather than belonging to one hive.
+ */
 export interface Diet {
   id: number
+  apiaryId: number
+  apiaryName?: string
   name: string
   startDate: string
   reason: DietReason
@@ -453,21 +485,67 @@ export interface Diet {
   foodType: FoodType
   foodTypeName: string
   customFoodType?: string
+  amountPerHive?: number
+  amountUnit?: FeedingAmountUnit
+  amountUnitName?: string
+  amountNote?: string
   status: DietStatus
   statusName: string
   earlyCompletionComment?: string
-  beehiveId: number
+  /** Hives currently on the programme — removed ones are never counted. */
+  hiveCount: number
   totalEntries: number
   completedEntries: number
+  /** Earliest pending round from today on; else the earliest overdue one. */
+  nextFeedingDate?: string
   createdByName?: string
   createdAt: string
+
+  // ── Feeding cost (SPEC-12 Phase E) ──────────────────────────────────────────
+  /** Exact planned consumption over ALL rounds; undefined when no amount was recorded. */
+  plannedAmount?: number
+  /** Same fold, but only over completed rounds — how much has actually been used so far. */
+  consumedAmount?: number
+  /**
+   * Attributed cost, grouped by currency. Undefined both when nothing has been attributed yet and
+   * when the caller is a Beekeeper — the server omits it, so there is nothing to distinguish here.
+   */
+  costTotals?: CostTotal[]
+  /** Total ÷ active hive count — only present when there is exactly one currency and hiveCount > 0. */
+  costPerHive?: number
+}
+
+export interface CostTotal {
+  currency: string
+  total: number
 }
 
 export interface DietDetail extends Diet {
   feedingEntries: FeedingEntry[]
+  /** Every link, active and removed. */
+  beehives: DietBeehive[]
+}
+
+/** One (hive × active programme) pair from GET /feedings/active. */
+export interface DietActiveInfo {
+  beehiveId: number
+  dietId: number
+  dietName: string
+  foodType: FoodType
+  foodTypeName: string
+  customFoodType?: string
+  amountPerHive?: number
+  amountUnit?: FeedingAmountUnit
+  amountUnitName?: string
+  amountNote?: string
+  startDate: string
+  nextFeedingDate?: string
+  completedRounds: number
+  totalRounds: number
 }
 
 export interface CreateDietPayload {
+  apiaryId: number
   name: string
   startDate: string
   reason: DietReason
@@ -476,9 +554,16 @@ export interface CreateDietPayload {
   frequencyDays: number
   foodType: FoodType
   customFoodType?: string
-  beehiveId: number
+  amountPerHive?: number | null
+  amountUnit?: FeedingAmountUnit | null
+  amountNote?: string | null
+  beehiveIds: number[]
 }
 
+/**
+ * Update deliberately carries no hive list: DietBeehive rows hold removal history, so replacing the
+ * set on every edit would destroy it. Hives are managed through their own endpoints.
+ */
 export interface UpdateDietPayload {
   name: string
   startDate: string
@@ -488,15 +573,21 @@ export interface UpdateDietPayload {
   frequencyDays: number
   foodType: FoodType
   customFoodType?: string
+  amountPerHive?: number | null
+  amountUnit?: FeedingAmountUnit | null
+  amountNote?: string | null
 }
 
 export interface CompleteEarlyPayload {
   comment: string
 }
 
-export interface CopyDietPayload {
-  /** Beehives that should receive a copy of the diet programme (source hive is ignored if present). */
-  targetBeehiveIds: number[]
+export interface AddDietBeehivesPayload {
+  beehiveIds: number[]
+}
+
+export interface CompleteFeedingEntryPayload {
+  note?: string | null
 }
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -515,6 +606,7 @@ export interface CalendarTodo {
   beehiveName?: string
 }
 
+/** A feeding round covers every hive on the programme, so it carries the apiary and a count. */
 export interface CalendarFeedingEntry {
   id: number
   scheduledDate: string
@@ -522,8 +614,9 @@ export interface CalendarFeedingEntry {
   statusName: string
   dietId: number
   dietName: string
-  beehiveId: number
-  beehiveName: string
+  apiaryId: number
+  apiaryName: string
+  hiveCount: number
   foodTypeName: string
 }
 
@@ -697,6 +790,8 @@ export interface ExpenseItem {
   unitPrice: number
   totalPrice: number
   sortOrder: number
+  /** Optional attribution to a feeding programme (SPEC-12 Phase E). */
+  dietId?: number
 }
 
 export interface Expense {
@@ -723,6 +818,12 @@ export interface CreateExpenseItemPayload {
   unitPrice: number
   totalPrice: number
   sortOrder: number
+  /**
+   * Optional attribution to a feeding programme (SPEC-12 Phase E). Must always be carried through
+   * on every edit — the backend replaces the whole item collection on update, so if this is dropped
+   * from even one PUT, every attribution on that receipt is silently wiped, no error.
+   */
+  dietId?: number | null
 }
 
 export interface CreateExpensePayload {

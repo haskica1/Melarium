@@ -1,41 +1,106 @@
-using AutoMapper;
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Localization;
 using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Diets.DTOs;
+using Melarium.Domain.Common;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
 
 namespace Melarium.Application.Features.Diets;
 
+/// <summary>
+/// Feeding programme (diet) CRUD with apiary-scoped authorization, mirroring treatments: managers
+/// write within scope; a Beekeeper reads programmes containing at least one of their assigned hives
+/// and may tick a feeding round, but no longer creates or edits programmes (SPEC-12) — under an
+/// apiary-scoped model that would mean choosing hives they cannot see.
+/// </summary>
 public class DietService : IDietService
 {
     private readonly IUnitOfWork _uow;
-    private readonly IMapper _mapper;
     private readonly ICurrentUser _currentUser;
     private readonly IAccessGuard _access;
 
-    public DietService(IUnitOfWork uow, IMapper mapper, ICurrentUser currentUser, IAccessGuard access)
+    public DietService(IUnitOfWork uow, ICurrentUser currentUser, IAccessGuard access)
     {
         _uow         = uow;
-        _mapper      = mapper;
         _currentUser = currentUser;
         _access      = access;
     }
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
-    public async Task<IEnumerable<DietDto>> GetByBeehiveIdAsync(int beehiveId)
+    public async Task<IEnumerable<DietDto>> GetAllAsync(int? apiaryId, int? beehiveId, int? year)
     {
-        if (!await _uow.Beehives.ExistsAsync(beehiveId))
-            throw new NotFoundException(nameof(Beehive), beehiveId);
+        if (_currentUser.Role == UserRole.Beekeeper)
+            return await MapDietsWithCostAsync(await GetForBeekeeperAsync(apiaryId, beehiveId, year));
 
-        await _access.EnsureCanAccessBeehiveAsync(beehiveId);
+        if (beehiveId is int bid)
+        {
+            await _access.EnsureCanAccessBeehiveAsync(bid);
+            var diets = (await _uow.Diets.GetByBeehiveAsync(bid))
+                .Where(d => year == null || d.StartDate.Year == year);
+            return await MapDietsWithCostAsync(diets);
+        }
 
-        var diets = await _uow.Diets.GetByBeehiveIdAsync(beehiveId);
+        if (apiaryId is int aid)
+        {
+            await _access.EnsureCanManageApiaryAsync(aid);
+            return await MapDietsWithCostAsync(await _uow.Diets.GetByApiaryAsync(aid, year));
+        }
 
-        return diets.Select(d => MapToDietDto(d));
+        var byRole = _currentUser.Role switch
+        {
+            UserRole.ApiaryAdmin when _currentUser.ApiaryId is int myApiary =>
+                await _uow.Diets.GetByApiaryAsync(myApiary, year),
+            UserRole.OrganizationAdmin when _currentUser.OrganizationId is int orgId =>
+                await _uow.Diets.GetByOrganizationAsync(orgId, year),
+            _ => Enumerable.Empty<Diet>(), // SystemAdmin (no org) must pass a filter
+        };
+        return await MapDietsWithCostAsync(byRole);
+    }
+
+    private async Task<List<Diet>> GetForBeekeeperAsync(int? apiaryId, int? beehiveId, int? year)
+    {
+        var hiveIds = await _access.GetAssignedBeehiveIdsAsync();
+        if (hiveIds.Count == 0) return [];
+
+        var apiaryIds = await _access.GetAssignedApiaryIdsAsync();
+
+        IEnumerable<Diet> diets;
+        if (beehiveId is int bid)
+        {
+            if (!hiveIds.Contains(bid)) throw new ForbiddenAccessException();
+            diets = await _uow.Diets.GetByBeehiveAsync(bid);
+        }
+        else if (apiaryId is int aid)
+        {
+            // They can reach the apiary; an apiary with nothing of theirs on a programme is empty, not 403.
+            if (!apiaryIds.Contains(aid)) throw new ForbiddenAccessException();
+            diets = await _uow.Diets.GetByApiaryAsync(aid, year);
+        }
+        else
+        {
+            diets = await _uow.Diets.GetByApiaryIdsAsync(apiaryIds);
+        }
+
+        return diets
+            .Where(d => year == null || d.StartDate.Year == year)
+            .Where(d => d.Beehives.Any(db => db.RemovedOn == null && hiveIds.Contains(db.BeehiveId)))
+            .ToList();
+    }
+
+    public async Task<IEnumerable<DietActiveInfoDto>> GetActiveAsync(int apiaryId)
+    {
+        var hiveIds = await ResolveReadableHivesOfApiaryAsync(apiaryId);
+        if (hiveIds.Count == 0) return [];
+
+        var byHive = await _uow.Diets.GetActiveForBeehivesAsync(hiveIds);
+
+        return byHive.Values
+            .SelectMany(list => list)
+            .Select(MapToActiveInfoDto)
+            .ToList();
     }
 
     public async Task<DietDetailDto> GetByIdAsync(int id)
@@ -43,102 +108,51 @@ public class DietService : IDietService
         var diet = await _uow.Diets.GetWithEntriesAsync(id)
             ?? throw new NotFoundException(nameof(Diet), id);
 
-        await _access.EnsureCanAccessBeehiveAsync(diet.BeehiveId);
+        await EnsureCanReadAsync(diet);
 
-        return MapToDietDetailDto(diet);
+        return await MapDietDetailWithCostAsync(diet);
     }
 
     // ── Commands ──────────────────────────────────────────────────────────────
 
     public async Task<DietDetailDto> CreateAsync(CreateDietDto dto)
     {
-        if (!await _uow.Beehives.ExistsAsync(dto.BeehiveId))
-            throw new NotFoundException(nameof(Beehive), dto.BeehiveId);
+        if (!await _uow.Apiaries.ExistsAsync(dto.ApiaryId))
+            throw new NotFoundException(nameof(Apiary), dto.ApiaryId);
 
-        await _access.EnsureCanAccessBeehiveAsync(dto.BeehiveId);
+        await _access.EnsureCanManageApiaryAsync(dto.ApiaryId);
+        await EnsureBeehivesBelongToApiaryAsync(dto.ApiaryId, dto.BeehiveIds);
 
         var diet = new Diet
         {
-            Name         = dto.Name,
-            StartDate    = dto.StartDate.Date,
-            Reason       = dto.Reason,
-            CustomReason = dto.CustomReason,
-            DurationDays = dto.DurationDays,
-            FrequencyDays = dto.FrequencyDays,
-            FoodType     = dto.FoodType,
+            ApiaryId       = dto.ApiaryId,
+            Name           = dto.Name.Trim(),
+            StartDate      = dto.StartDate.Date,
+            Reason         = dto.Reason,
+            CustomReason   = dto.CustomReason,
+            DurationDays   = dto.DurationDays,
+            FrequencyDays  = dto.FrequencyDays,
+            FoodType       = dto.FoodType,
             CustomFoodType = dto.CustomFoodType,
-            BeehiveId    = dto.BeehiveId,
-            Status       = CalculateInitialStatus(dto.StartDate),
-            CreatedById  = _currentUser.UserId,
+            AmountPerHive  = dto.AmountPerHive,
+            AmountUnit     = dto.AmountUnit,
+            AmountNote     = string.IsNullOrWhiteSpace(dto.AmountNote) ? null : dto.AmountNote.Trim(),
+            Status         = CalculateInitialStatus(dto.StartDate),
+            CreatedById    = _currentUser.UserId,
         };
 
         diet.FeedingEntries = GenerateEntries(diet.StartDate, dto.DurationDays, dto.FrequencyDays);
+        diet.Beehives = dto.BeehiveIds
+            .Select(bid => new DietBeehive { BeehiveId = bid })
+            .ToList();
 
         await _uow.Diets.AddAsync(diet);
         await _uow.SaveChangesAsync();
 
         var saved = await _uow.Diets.GetWithEntriesAsync(diet.Id)
-            ?? throw new Exception("Failed to reload diet after creation.");
+            ?? throw new InvalidOperationException("Diet was not saved correctly.");
 
-        return MapToDietDetailDto(saved);
-    }
-
-    /// <summary>
-    /// Copies an existing diet's programme (definition + freshly generated schedule) onto one or more
-    /// other beehives. Progress/completed feedings are never carried over — each copy starts clean.
-    /// Access is enforced independently for the source hive and for every target: a single denial
-    /// aborts the whole batch before anything is persisted.
-    /// </summary>
-    public async Task<IEnumerable<DietDto>> CopyToBeehivesAsync(int sourceDietId, CopyDietDto dto)
-    {
-        var source = await _uow.Diets.GetWithEntriesAsync(sourceDietId)
-            ?? throw new NotFoundException(nameof(Diet), sourceDietId);
-
-        // Caller must be able to access the diet they are copying from…
-        await _access.EnsureCanAccessBeehiveAsync(source.BeehiveId);
-
-        // Normalise targets: unique, positive, never the source's own hive.
-        var targetIds = dto.TargetBeehiveIds
-            .Where(id => id > 0 && id != source.BeehiveId)
-            .Distinct()
-            .ToList();
-
-        if (targetIds.Count == 0)
-            throw new BusinessRuleException("Odaberite bar jednu drugu košnicu za kopiranje.");
-
-        var created = new List<Diet>();
-
-        foreach (var targetId in targetIds)
-        {
-            if (!await _uow.Beehives.ExistsAsync(targetId))
-                throw new NotFoundException(nameof(Beehive), targetId);
-
-            // …and able to access every target hive. Never trust the client's list.
-            await _access.EnsureCanAccessBeehiveAsync(targetId);
-
-            var copy = new Diet
-            {
-                Name           = source.Name,
-                StartDate      = source.StartDate,
-                Reason         = source.Reason,
-                CustomReason   = source.CustomReason,
-                DurationDays   = source.DurationDays,
-                FrequencyDays  = source.FrequencyDays,
-                FoodType       = source.FoodType,
-                CustomFoodType = source.CustomFoodType,
-                BeehiveId      = targetId,
-                Status         = CalculateInitialStatus(source.StartDate),
-                CreatedById    = _currentUser.UserId,
-                FeedingEntries = GenerateEntries(source.StartDate, source.DurationDays, source.FrequencyDays),
-            };
-
-            await _uow.Diets.AddAsync(copy);
-            created.Add(copy);
-        }
-
-        await _uow.SaveChangesAsync();
-
-        return created.Select(MapToDietDto);
+        return await MapDietDetailWithCostAsync(saved);
     }
 
     public async Task<DietDetailDto> UpdateAsync(int id, UpdateDietDto dto)
@@ -146,20 +160,23 @@ public class DietService : IDietService
         var diet = await _uow.Diets.GetWithEntriesAsync(id)
             ?? throw new NotFoundException(nameof(Diet), id);
 
-        await _access.EnsureCanAccessBeehiveAsync(diet.BeehiveId);
+        await _access.EnsureCanManageApiaryAsync(diet.ApiaryId);
 
-        if (diet.Status == DietStatus.Completed || diet.Status == DietStatus.StoppedEarly)
+        if (diet.Status is DietStatus.Completed or DietStatus.StoppedEarly)
             throw new BusinessRuleException("A completed or stopped diet cannot be updated.");
 
-        diet.Name          = dto.Name;
-        diet.StartDate     = dto.StartDate.Date;
-        diet.Reason        = dto.Reason;
-        diet.CustomReason  = dto.CustomReason;
-        diet.DurationDays  = dto.DurationDays;
-        diet.FrequencyDays = dto.FrequencyDays;
-        diet.FoodType      = dto.FoodType;
+        diet.Name           = dto.Name.Trim();
+        diet.StartDate      = dto.StartDate.Date;
+        diet.Reason         = dto.Reason;
+        diet.CustomReason   = dto.CustomReason;
+        diet.DurationDays   = dto.DurationDays;
+        diet.FrequencyDays  = dto.FrequencyDays;
+        diet.FoodType       = dto.FoodType;
         diet.CustomFoodType = dto.CustomFoodType;
-        diet.UpdatedAt     = DateTime.UtcNow;
+        diet.AmountPerHive  = dto.AmountPerHive;
+        diet.AmountUnit     = dto.AmountUnit;
+        diet.AmountNote     = string.IsNullOrWhiteSpace(dto.AmountNote) ? null : dto.AmountNote.Trim();
+        diet.UpdatedAt      = DateTime.UtcNow;
 
         // Recalculate entries: keep completed, replace all pending
         RecalculateEntries(diet);
@@ -171,9 +188,9 @@ public class DietService : IDietService
         await _uow.SaveChangesAsync();
 
         var saved = await _uow.Diets.GetWithEntriesAsync(id)
-            ?? throw new Exception("Failed to reload diet after update.");
+            ?? throw new InvalidOperationException("Failed to reload diet after update.");
 
-        return MapToDietDetailDto(saved);
+        return await MapDietDetailWithCostAsync(saved);
     }
 
     public async Task DeleteAsync(int id)
@@ -181,7 +198,7 @@ public class DietService : IDietService
         var diet = await _uow.Diets.GetWithEntriesAsync(id)
             ?? throw new NotFoundException(nameof(Diet), id);
 
-        await _access.EnsureCanAccessBeehiveAsync(diet.BeehiveId);
+        await _access.EnsureCanManageApiaryAsync(diet.ApiaryId);
 
         var today = DateTime.UtcNow.Date;
         var hasCompletedEntries = diet.FeedingEntries.Any(e => e.Status == FeedingEntryStatus.Completed);
@@ -195,39 +212,101 @@ public class DietService : IDietService
         await _uow.SaveChangesAsync();
     }
 
-    public async Task<DietDetailDto> CompleteEarlyAsync(int id, CompleteEarlyDto dto)
+    public async Task<DietDetailDto> AddBeehivesAsync(int id, AddDietBeehivesDto dto)
     {
         var diet = await _uow.Diets.GetWithEntriesAsync(id)
             ?? throw new NotFoundException(nameof(Diet), id);
 
-        await _access.EnsureCanAccessBeehiveAsync(diet.BeehiveId);
+        await _access.EnsureCanManageApiaryAsync(diet.ApiaryId);
 
-        if (diet.Status == DietStatus.Completed || diet.Status == DietStatus.StoppedEarly)
-            throw new BusinessRuleException("Diet is already finished.");
+        if (diet.Status is DietStatus.Completed or DietStatus.StoppedEarly)
+            throw new BusinessRuleException("Košnice se ne mogu dodati na završen ili prekinut program.");
 
-        if (string.IsNullOrWhiteSpace(dto.Comment))
-            throw new BusinessRuleException("A comment is required when completing a diet early.");
+        await EnsureBeehivesBelongToApiaryAsync(diet.ApiaryId, dto.BeehiveIds);
 
-        diet.Status                  = DietStatus.StoppedEarly;
-        diet.EarlyCompletionComment  = dto.Comment;
-        diet.UpdatedAt               = DateTime.UtcNow;
+        var alreadyOn = diet.Beehives
+            .Where(db => db.RemovedOn == null)
+            .Select(db => db.BeehiveId)
+            .ToHashSet();
+
+        // A hive that is already on the programme is a no-op, not an error: the modal builds its list
+        // from a possibly stale read, and re-adding is exactly what the partial unique index allows.
+        foreach (var bid in dto.BeehiveIds.Where(bid => !alreadyOn.Contains(bid)))
+            diet.Beehives.Add(new DietBeehive { DietId = diet.Id, BeehiveId = bid });
+
+        diet.UpdatedAt = DateTime.UtcNow;
 
         await _uow.Diets.UpdateAsync(diet);
         await _uow.SaveChangesAsync();
 
         var saved = await _uow.Diets.GetWithEntriesAsync(id)
-            ?? throw new Exception("Failed to reload diet after completing early.");
-        return MapToDietDetailDto(saved);
+            ?? throw new InvalidOperationException("Failed to reload diet after adding hives.");
+
+        return await MapDietDetailWithCostAsync(saved);
     }
 
-    public async Task<FeedingEntryDto> CompleteFeedingEntryAsync(int dietId, int entryId)
+    public async Task<DietDetailDto> RemoveBeehiveAsync(int id, int beehiveId)
+    {
+        var diet = await _uow.Diets.GetWithEntriesAsync(id)
+            ?? throw new NotFoundException(nameof(Diet), id);
+
+        // Removal is allowed in any status — it is a correction of the record, not field work.
+        await _access.EnsureCanManageApiaryAsync(diet.ApiaryId);
+
+        var link = diet.Beehives.FirstOrDefault(db => db.BeehiveId == beehiveId && db.RemovedOn == null)
+            ?? throw new NotFoundException(nameof(DietBeehive), beehiveId);
+
+        // Always today, never a client-supplied date — that is what keeps RemovedOn from landing in
+        // the future or before the programme started.
+        link.RemovedOn = DateTime.UtcNow.Date;
+        link.UpdatedAt = DateTime.UtcNow;
+        diet.UpdatedAt = DateTime.UtcNow;
+
+        await _uow.Diets.UpdateAsync(diet);
+        await _uow.SaveChangesAsync();
+
+        var saved = await _uow.Diets.GetWithEntriesAsync(id)
+            ?? throw new InvalidOperationException("Failed to reload diet after removing a hive.");
+
+        return await MapDietDetailWithCostAsync(saved);
+    }
+
+    public async Task<DietDetailDto> CompleteEarlyAsync(int id, CompleteEarlyDto dto)
+    {
+        var diet = await _uow.Diets.GetWithEntriesAsync(id)
+            ?? throw new NotFoundException(nameof(Diet), id);
+
+        await _access.EnsureCanManageApiaryAsync(diet.ApiaryId);
+
+        if (diet.Status is DietStatus.Completed or DietStatus.StoppedEarly)
+            throw new BusinessRuleException("Diet is already finished.");
+
+        if (string.IsNullOrWhiteSpace(dto.Comment))
+            throw new BusinessRuleException("A comment is required when completing a diet early.");
+
+        diet.Status                 = DietStatus.StoppedEarly;
+        diet.EarlyCompletionComment = dto.Comment;
+        diet.UpdatedAt              = DateTime.UtcNow;
+
+        await _uow.Diets.UpdateAsync(diet);
+        await _uow.SaveChangesAsync();
+
+        var saved = await _uow.Diets.GetWithEntriesAsync(id)
+            ?? throw new InvalidOperationException("Failed to reload diet after completing early.");
+        return await MapDietDetailWithCostAsync(saved);
+    }
+
+    public async Task<FeedingEntryDto> CompleteFeedingEntryAsync(int dietId, int entryId, CompleteFeedingEntryDto dto)
     {
         var diet = await _uow.Diets.GetWithEntriesAsync(dietId)
             ?? throw new NotFoundException(nameof(Diet), dietId);
 
-        await _access.EnsureCanAccessBeehiveAsync(diet.BeehiveId);
+        // One tick closes the round for the whole group, including hives the caller is not assigned
+        // to. Feeding is field work the Beekeeper physically performs — making them ask an admin to
+        // record it would be worse than what this replaces.
+        await EnsureCanTickRoundAsync(diet);
 
-        if (diet.Status == DietStatus.Completed || diet.Status == DietStatus.StoppedEarly)
+        if (diet.Status is DietStatus.Completed or DietStatus.StoppedEarly)
             throw new BusinessRuleException("Cannot mark feedings on a finished diet.");
 
         var entry = diet.FeedingEntries.FirstOrDefault(e => e.Id == entryId)
@@ -238,6 +317,7 @@ public class DietService : IDietService
 
         entry.Status         = FeedingEntryStatus.Completed;
         entry.CompletionDate = DateTime.UtcNow;
+        entry.Note           = string.IsNullOrWhiteSpace(dto.Note) ? null : dto.Note.Trim();
         entry.UpdatedAt      = DateTime.UtcNow;
 
         // If all entries are now done, mark the diet as completed
@@ -258,11 +338,106 @@ public class DietService : IDietService
         return MapToFeedingEntryDto(entry);
     }
 
+    // ── Authorization helpers ─────────────────────────────────────────────────
+
+    /// <summary>Read access: managers within scope, or a Beekeeper on at least one active hive.</summary>
+    private async Task EnsureCanReadAsync(Diet diet)
+    {
+        if (_currentUser.Role == UserRole.Beekeeper)
+        {
+            var hiveIds = await _access.GetAssignedBeehiveIdsAsync();
+            if (!diet.Beehives.Any(db => db.RemovedOn == null && hiveIds.Contains(db.BeehiveId)))
+                throw new ForbiddenAccessException();
+            return;
+        }
+
+        await _access.EnsureCanManageApiaryAsync(diet.ApiaryId);
+    }
+
+    /// <summary>Same rule as reading — a Beekeeper who may see the programme may record its rounds.</summary>
+    private Task EnsureCanTickRoundAsync(Diet diet) => EnsureCanReadAsync(diet);
+
+    /// <summary>The hives of an apiary the caller may see: all of them for managers, the assigned ones for a Beekeeper.</summary>
+    private async Task<List<int>> ResolveReadableHivesOfApiaryAsync(int apiaryId)
+    {
+        var apiaryHiveIds = (await _uow.Beehives.GetByApiaryIdAsync(apiaryId)).Select(b => b.Id).ToList();
+
+        if (_currentUser.Role != UserRole.Beekeeper)
+        {
+            await _access.EnsureCanManageApiaryAsync(apiaryId);
+            return apiaryHiveIds;
+        }
+
+        var assigned = await _access.GetAssignedBeehiveIdsAsync();
+        var mine = apiaryHiveIds.Where(assigned.Contains).ToList();
+        if (mine.Count == 0) throw new ForbiddenAccessException();
+        return mine;
+    }
+
+    private async Task EnsureBeehivesBelongToApiaryAsync(int apiaryId, IEnumerable<int> beehiveIds)
+    {
+        var apiaryHiveIds = (await _uow.Beehives.GetByApiaryIdAsync(apiaryId))
+            .Select(b => b.Id)
+            .ToHashSet();
+
+        var invalid = beehiveIds.Where(hid => !apiaryHiveIds.Contains(hid)).Distinct().ToList();
+        if (invalid.Count > 0)
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["beehiveIds"] = [$"Košnice ne pripadaju odabranom pčelinjaku: {string.Join(", ", invalid)}."]
+            });
+    }
+
+    // ── Feeding cost (SPEC-12 Phase E) ───────────────────────────────────────────
+
+    /// <summary>Money is not visible to everyone: a Beekeeper has no access to the Expenses module at all.</summary>
+    private bool ShowCostToCaller() => _currentUser.Role != UserRole.Beekeeper;
+
+    private async Task<Dictionary<int, List<(string Currency, decimal Total)>>> LoadCostTotalsAsync(IEnumerable<int> dietIds) =>
+        await _uow.Expenses.GetTotalsByDietsAsync(dietIds);
+
+    private async Task<List<DietDto>> MapDietsWithCostAsync(IEnumerable<Diet> diets)
+    {
+        var list = diets as List<Diet> ?? diets.ToList();
+        var costTotals = await LoadCostTotalsAsync(list.Select(d => d.Id));
+        var showCost = ShowCostToCaller();
+        return list.Select(d => MapToDietDto(d, costTotals, showCost)).ToList();
+    }
+
+    private async Task<DietDetailDto> MapDietDetailWithCostAsync(Diet diet)
+    {
+        var costTotals = await LoadCostTotalsAsync([diet.Id]);
+        return MapToDietDetailDto(diet, costTotals, ShowCostToCaller());
+    }
+
+    /// <summary>
+    /// Exact per-round-date consumption. Comparing raw timestamps would be wrong: CreatedAt carries a
+    /// time of day while ScheduledDate is a midnight date, so a same-day programme's first round would
+    /// otherwise count zero hives. The removal day counts as fed — RemovedOn is clamped to today
+    /// server-side, so a hive removed the morning of a round it was on until then did receive it.
+    /// Recomputed fresh on every read (never stored), which is exactly why removing a hive drops
+    /// the *planned* total for the remaining future rounds immediately.
+    /// </summary>
+    private static (decimal? Planned, decimal? Consumed) ComputeConsumption(Diet d)
+    {
+        if (d.AmountPerHive is not decimal amount) return (null, null);
+
+        decimal Fold(IEnumerable<FeedingEntry> rounds) => rounds.Sum(e =>
+        {
+            var date = e.ScheduledDate.Date;
+            var hivesOn = d.Beehives.Count(db =>
+                db.CreatedAt.Date <= date && (db.RemovedOn == null || db.RemovedOn.Value.Date >= date));
+            return amount * hivesOn;
+        });
+
+        return (Fold(d.FeedingEntries), Fold(d.FeedingEntries.Where(e => e.Status == FeedingEntryStatus.Completed)));
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Generates feeding entries for a schedule starting at <paramref name="startDate"/>
-    /// over <paramref name="durationDays"/> with one feeding every <paramref name="frequencyDays"/> days.
+    /// Generates feeding rounds for a schedule starting at <paramref name="startDate"/>
+    /// over <paramref name="durationDays"/> with one round every <paramref name="frequencyDays"/> days.
     /// </summary>
     private static List<FeedingEntry> GenerateEntries(DateTime startDate, int durationDays, int frequencyDays)
     {
@@ -282,7 +457,7 @@ public class DietService : IDietService
     }
 
     /// <summary>
-    /// Rebuilds pending feeding entries after a diet update, preserving completed ones.
+    /// Rebuilds pending feeding rounds after a diet update, preserving completed ones.
     /// </summary>
     private static void RecalculateEntries(Diet diet)
     {
@@ -335,57 +510,106 @@ public class DietService : IDietService
             : DietStatus.NotStarted;
     }
 
+    /// <summary>Earliest round still ahead of us; if the programme is behind, the oldest overdue one.</summary>
+    private static DateTime? NextFeedingDate(IEnumerable<FeedingEntry> entries)
+    {
+        var pending = entries
+            .Where(e => e.Status == FeedingEntryStatus.Pending)
+            .OrderBy(e => e.ScheduledDate)
+            .Select(e => e.ScheduledDate)
+            .ToList();
+
+        var today = DateTime.UtcNow.Date;
+        foreach (var d in pending)
+            if (d.Date >= today) return d;
+
+        return pending.Count > 0 ? pending[0] : null;
+    }
+
     // ── Mapping helpers (avoid AutoMapper for computed props) ─────────────────
 
-    private static DietDto MapToDietDto(Diet d) => new()
+    private static T MapCommon<T>(
+        T dto, Diet d,
+        IReadOnlyDictionary<int, List<(string Currency, decimal Total)>> costTotals,
+        bool showCost) where T : DietDto
     {
-        Id                     = d.Id,
-        Name                   = d.Name,
-        StartDate              = d.StartDate,
-        Reason                 = d.Reason,
-        ReasonName             = BsLabels.Label(d.Reason),
-        CustomReason           = d.CustomReason,
-        DurationDays           = d.DurationDays,
-        FrequencyDays          = d.FrequencyDays,
-        FoodType               = d.FoodType,
-        FoodTypeName           = BsLabels.Label(d.FoodType),
-        CustomFoodType         = d.CustomFoodType,
-        Status                 = d.Status,
-        StatusName             = BsLabels.Label(d.Status),
-        EarlyCompletionComment = d.EarlyCompletionComment,
-        BeehiveId              = d.BeehiveId,
-        TotalEntries           = d.FeedingEntries.Count,
-        CompletedEntries       = d.FeedingEntries.Count(e => e.Status == FeedingEntryStatus.Completed),
-        CreatedByName          = d.CreatedBy != null ? $"{d.CreatedBy.FirstName} {d.CreatedBy.LastName}" : null,
-        CreatedAt              = d.CreatedAt,
-    };
+        dto.Id                     = d.Id;
+        dto.ApiaryId               = d.ApiaryId;
+        dto.ApiaryName             = d.Apiary?.Name;
+        dto.Name                   = d.Name;
+        dto.StartDate              = d.StartDate;
+        dto.Reason                 = d.Reason;
+        dto.ReasonName             = BsLabels.Label(d.Reason);
+        dto.CustomReason           = d.CustomReason;
+        dto.DurationDays           = d.DurationDays;
+        dto.FrequencyDays          = d.FrequencyDays;
+        dto.FoodType               = d.FoodType;
+        dto.FoodTypeName           = BsLabels.Label(d.FoodType);
+        dto.CustomFoodType         = d.CustomFoodType;
+        dto.AmountPerHive          = d.AmountPerHive;
+        dto.AmountUnit             = d.AmountUnit;
+        dto.AmountUnitName         = d.AmountUnit.HasValue ? BsLabels.Label(d.AmountUnit.Value) : null;
+        dto.AmountNote             = d.AmountNote;
+        dto.Status                 = d.Status;
+        dto.StatusName             = BsLabels.Label(d.Status);
+        dto.EarlyCompletionComment = d.EarlyCompletionComment;
+        dto.HiveCount              = d.Beehives.Count(db => db.RemovedOn == null);
+        dto.TotalEntries           = d.FeedingEntries.Count;
+        dto.CompletedEntries       = d.FeedingEntries.Count(e => e.Status == FeedingEntryStatus.Completed);
+        dto.NextFeedingDate        = NextFeedingDate(d.FeedingEntries);
+        dto.CreatedByName          = d.CreatedBy != null ? $"{d.CreatedBy.FirstName} {d.CreatedBy.LastName}" : null;
+        dto.CreatedAt              = d.CreatedAt;
 
-    private static DietDetailDto MapToDietDetailDto(Diet d) => new()
+        var (planned, consumed) = ComputeConsumption(d);
+        dto.PlannedAmount  = planned;
+        dto.ConsumedAmount = consumed;
+
+        if (showCost)
+        {
+            var totals = costTotals.TryGetValue(d.Id, out var list) ? list : [];
+            if (totals.Count > 0)
+            {
+                dto.CostTotals = totals.Select(t => new CostTotalDto { Currency = t.Currency, Total = t.Total }).ToList();
+                if (totals.Count == 1 && dto.HiveCount > 0)
+                    dto.CostPerHive = totals[0].Total / dto.HiveCount;
+            }
+        }
+        // else: CostTotals/CostPerHive stay null — server-side omission for Beekeepers, not a
+        // hidden-but-transmitted number.
+
+        return dto;
+    }
+
+    private static DietDto MapToDietDto(
+        Diet d, IReadOnlyDictionary<int, List<(string Currency, decimal Total)>> costTotals, bool showCost)
+        => MapCommon(new DietDto(), d, costTotals, showCost);
+
+    private static DietDetailDto MapToDietDetailDto(
+        Diet d, IReadOnlyDictionary<int, List<(string Currency, decimal Total)>> costTotals, bool showCost)
     {
-        Id                     = d.Id,
-        Name                   = d.Name,
-        StartDate              = d.StartDate,
-        Reason                 = d.Reason,
-        ReasonName             = BsLabels.Label(d.Reason),
-        CustomReason           = d.CustomReason,
-        DurationDays           = d.DurationDays,
-        FrequencyDays          = d.FrequencyDays,
-        FoodType               = d.FoodType,
-        FoodTypeName           = BsLabels.Label(d.FoodType),
-        CustomFoodType         = d.CustomFoodType,
-        Status                 = d.Status,
-        StatusName             = BsLabels.Label(d.Status),
-        EarlyCompletionComment = d.EarlyCompletionComment,
-        BeehiveId              = d.BeehiveId,
-        TotalEntries           = d.FeedingEntries.Count,
-        CompletedEntries       = d.FeedingEntries.Count(e => e.Status == FeedingEntryStatus.Completed),
-        CreatedByName          = d.CreatedBy != null ? $"{d.CreatedBy.FirstName} {d.CreatedBy.LastName}" : null,
-        CreatedAt              = d.CreatedAt,
-        FeedingEntries         = d.FeedingEntries
+        var dto = MapCommon(new DietDetailDto(), d, costTotals, showCost);
+
+        dto.FeedingEntries = d.FeedingEntries
             .OrderBy(e => e.ScheduledDate)
             .Select(MapToFeedingEntryDto)
-            .ToList(),
-    };
+            .ToList();
+
+        // Active first, then the removal history — the detail page greys the latter out.
+        dto.Beehives = d.Beehives
+            .OrderBy(db => db.RemovedOn.HasValue)
+            .ThenBy(db => db.Beehive != null ? db.Beehive.Name : string.Empty)
+            .Select(db => new DietBeehiveDto
+            {
+                Id          = db.Id,
+                BeehiveId   = db.BeehiveId,
+                BeehiveName = db.Beehive?.Name ?? $"Košnica {db.BeehiveId}",
+                AddedOn     = db.CreatedAt,
+                RemovedOn   = db.RemovedOn,
+            })
+            .ToList();
+
+        return dto;
+    }
 
     private static FeedingEntryDto MapToFeedingEntryDto(FeedingEntry e) => new()
     {
@@ -394,7 +618,25 @@ public class DietService : IDietService
         Status         = e.Status,
         StatusName     = BsLabels.Label(e.Status),
         CompletionDate = e.CompletionDate,
+        Note           = e.Note,
         DietId         = e.DietId,
     };
 
+    private static DietActiveInfoDto MapToActiveInfoDto(DietActiveInfo i) => new()
+    {
+        BeehiveId       = i.BeehiveId,
+        DietId          = i.DietId,
+        DietName        = i.DietName,
+        FoodType        = i.FoodType,
+        FoodTypeName    = BsLabels.Label(i.FoodType),
+        CustomFoodType  = i.CustomFoodType,
+        AmountPerHive   = i.AmountPerHive,
+        AmountUnit      = i.AmountUnit,
+        AmountUnitName  = i.AmountUnit.HasValue ? BsLabels.Label(i.AmountUnit.Value) : null,
+        AmountNote      = i.AmountNote,
+        StartDate       = i.StartDate,
+        NextFeedingDate = i.NextFeedingDate,
+        CompletedRounds = i.CompletedRounds,
+        TotalRounds     = i.TotalRounds,
+    };
 }

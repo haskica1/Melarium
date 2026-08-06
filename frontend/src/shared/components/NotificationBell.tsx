@@ -30,6 +30,8 @@ const TYPE_ICONS: Record<string, string> = {
   PlanExpiring:            '⏳',
   // Calendar sync (SPEC-11) — daily 08:00 agenda
   DailyAgenda:             '📅',
+  // Apiary feeding (SPEC-12 Phase D)
+  FeedingOverdue:          '🍯',
 }
 
 export default function NotificationBell() {

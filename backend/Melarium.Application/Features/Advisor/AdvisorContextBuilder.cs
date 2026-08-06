@@ -18,7 +18,7 @@ public static class AdvisorContextBuilder
         Beehive hive,
         string apiaryName,
         IReadOnlyList<Inspection> recentInspections,      // newest first, already capped to 5
-        Diet? activeDiet, int dietCompleted, int dietTotal,
+        IReadOnlyList<DietActiveInfo> activeDiets,        // a hive may be on several at once
         IReadOnlyList<Todo> openTodos,                    // already capped to 5
         Queen? activeQueen,
         decimal? seasonYieldKg,
@@ -57,8 +57,16 @@ public static class AdvisorContextBuilder
             }
         }
 
-        if (activeDiet is not null)
-            sb.AppendLine($"- Aktivna prihrana: {BsLabels.Label(activeDiet.FoodType)} ({dietCompleted}/{dietTotal} obroka)");
+        foreach (var d in activeDiets)
+        {
+            var food   = d.FoodType == FoodType.Custom ? (d.CustomFoodType ?? "Vlastito") : BsLabels.Label(d.FoodType);
+            var amount = d.AmountPerHive is decimal a && d.AmountUnit is FeedingAmountUnit u
+                ? $", {a.ToString("0.##", CultureInfo.InvariantCulture)} {BsLabels.Label(u)}"
+                : "";
+            var note   = string.IsNullOrWhiteSpace(d.AmountNote) ? "" : $" ({d.AmountNote})";
+            var next   = d.NextFeedingDate.HasValue ? $", sljedeće {d.NextFeedingDate.Value:dd.MM.yyyy}" : "";
+            sb.AppendLine($"- Aktivna prehrana: {food}{amount}{note} ({d.CompletedRounds}/{d.TotalRounds} rundi{next})");
+        }
 
         if (latestTreatment is not null)
         {

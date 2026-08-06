@@ -23,6 +23,9 @@ export const useCreateExpense = () => {
     mutationFn: (payload: CreateExpensePayload) => expenseService.create(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: expenseQueryKeys.all })
+      // An item may have been attributed to a programme — its cost block is now stale (SPEC-12).
+      qc.invalidateQueries({ queryKey: ['diets'] })
+      qc.invalidateQueries({ queryKey: ['stats'] })
     },
   })
 }
@@ -34,6 +37,8 @@ export const useUpdateExpense = (id: number) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: expenseQueryKeys.all })
       qc.invalidateQueries({ queryKey: expenseQueryKeys.detail(id) })
+      qc.invalidateQueries({ queryKey: ['diets'] })
+      qc.invalidateQueries({ queryKey: ['stats'] })
     },
   })
 }
@@ -44,6 +49,8 @@ export const useDeleteExpense = () => {
     mutationFn: (id: number) => expenseService.remove(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: expenseQueryKeys.all })
+      qc.invalidateQueries({ queryKey: ['diets'] })
+      qc.invalidateQueries({ queryKey: ['stats'] })
     },
   })
 }

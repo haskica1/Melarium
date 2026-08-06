@@ -46,6 +46,9 @@ public class AlertRuleService : IAlertRuleService
         var karencaEnabled = GetBool("Alerts:KarencaEnded:Enabled", true);
         var stripDays      = GetInt("Alerts:StripRemovalDays", 42);
 
+        var feedingEnabled = GetBool("Alerts:FeedingOverdue:Enabled", true);
+        var feedingDays    = GetInt("Alerts:FeedingOverdueDays", 2);
+
         if (GetBool("Alerts:PlanExpiring:Enabled", true))
             await ApplyPlanExpiringAsync(now);
 
@@ -83,6 +86,9 @@ public class AlertRuleService : IAlertRuleService
             if (stripsEnabled || karencaEnabled)
                 await ApplyTreatmentRulesAsync(apiary, now, stripDays, stripsEnabled, karencaEnabled);
 
+            if (feedingEnabled)
+                await ApplyFeedingRulesAsync(apiary, now, feedingDays);
+
             if (frostEnabled) await ApplyFrostAsync(apiary);
         }
     }
@@ -118,7 +124,7 @@ public class AlertRuleService : IAlertRuleService
         var recipients = await HiveRecipientsAsync(hive, apiary);
         await DispatchAsync(recipients,
             "Opada nivo meda",
-            $"Košnici '{hive.Name}' opada nivo meda — razmisli o prihrani.",
+            $"Košnici '{hive.Name}' opada nivo meda — razmisli o prehrani.",
             NotificationType.HoneyLevelDrop, hive.Id, nameof(Beehive), TimeSpan.FromDays(7));
     }
 
@@ -173,6 +179,38 @@ public class AlertRuleService : IAlertRuleService
         }
     }
 
+    // ── Rule 8: feeding overdue (apiary-level) — SPEC-12 Phase D ─────────────────
+
+    private async Task ApplyFeedingRulesAsync(Apiary apiary, DateTime now, int overdueDays)
+    {
+        var diets = (await _uow.Diets.GetByApiaryAsync(apiary.Id))
+            .Where(d => d.Status == DietStatus.InProgress)
+            .ToList();
+        if (diets.Count == 0) return;
+
+        var recipients = await ApiaryRecipientsAsync(apiary);
+        var threshold = now.AddDays(-overdueDays).Date;
+
+        foreach (var d in diets)
+        {
+            // No hives on the programme → nothing to do in the field; same rule the calendar uses.
+            if (!d.Beehives.Any(db => db.RemovedOn == null)) continue;
+
+            // Fire once per DIET, not per round: a programme two weeks behind should produce one
+            // nudge, not seven. The earliest overdue round decides whether it fires at all.
+            var earliestOverdue = d.FeedingEntries
+                .Where(e => e.Status == FeedingEntryStatus.Pending && e.ScheduledDate.Date <= threshold)
+                .OrderBy(e => e.ScheduledDate)
+                .FirstOrDefault();
+            if (earliestOverdue is null) continue;
+
+            await DispatchAsync(recipients,
+                "Hranjenje kasni",
+                $"Hranjenje kasni — pčelinjak '{apiary.Name}': runda zakazana za {earliestOverdue.ScheduledDate:dd.MM.yyyy.} još nije označena.",
+                NotificationType.FeedingOverdue, d.Id, nameof(Diet), TimeSpan.FromDays(3));
+        }
+    }
+
     // ── Rule 3: frost warning (apiary-level) ─────────────────────────────────────
 
     private async Task ApplyFrostAsync(Apiary apiary)
@@ -200,7 +238,7 @@ public class AlertRuleService : IAlertRuleService
         var recipients = await ApiaryRecipientsAsync(apiary);
         await DispatchAsync(recipients,
             "Najavljen mraz",
-            $"Najavljen mraz za pčelinjak '{apiary.Name}' ({minTemp:0.#} °C). Provjeri prihranu i utopljenost.",
+            $"Najavljen mraz za pčelinjak '{apiary.Name}' ({minTemp:0.#} °C). Provjeri prehranu i utopljenost.",
             NotificationType.FrostWarning, apiary.Id, nameof(Apiary), TimeSpan.FromDays(3));
     }
 

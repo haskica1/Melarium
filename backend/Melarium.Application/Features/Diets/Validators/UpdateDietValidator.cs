@@ -24,7 +24,8 @@ public class UpdateDietValidator : AbstractValidator<UpdateDietDto>
             .When(x => x.Reason == DietReason.Custom);
 
         RuleFor(x => x.DurationDays)
-            .GreaterThan(0).WithMessage("Duration must be at least 1 day.");
+            .GreaterThan(0).WithMessage("Duration must be at least 1 day.")
+            .LessThanOrEqualTo(365).WithMessage("Duration must not exceed 365 days.");
 
         RuleFor(x => x.FrequencyDays)
             .GreaterThan(0).WithMessage("Frequency must be at least 1 day.")
@@ -37,5 +38,21 @@ public class UpdateDietValidator : AbstractValidator<UpdateDietDto>
             .NotEmpty().WithMessage("Custom food type text is required when food type is Custom.")
             .MaximumLength(200)
             .When(x => x.FoodType == FoodType.Custom);
+
+        RuleFor(x => x.AmountPerHive)
+            .GreaterThan(0).WithMessage("Količina po košnici mora biti veća od 0.")
+            .LessThanOrEqualTo(100).WithMessage("Količina po košnici ne može biti veća od 100.")
+            .When(x => x.AmountPerHive.HasValue);
+
+        RuleFor(x => x.AmountUnit)
+            .NotNull().WithMessage("Odaberite jedinicu za količinu.")
+            .When(x => x.AmountPerHive.HasValue);
+
+        RuleFor(x => x.AmountUnit)
+            .IsInEnum().WithMessage("Neispravna jedinica količine.")
+            .When(x => x.AmountUnit.HasValue);
+
+        RuleFor(x => x.AmountNote)
+            .MaximumLength(100).WithMessage("Napomena o količini ne može biti duža od 100 znakova.");
     }
 }

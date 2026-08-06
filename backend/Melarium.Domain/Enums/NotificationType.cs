@@ -40,4 +40,7 @@ public enum NotificationType
     // instead, so it is sent once rather than once per admin).
     FeedbackSubmitted      = 21,
     FeedbackStatusUpdated  = 22,
+
+    // ── Apiary feeding (SPEC-12 Phase D) ──
+    FeedingOverdue         = 23,
 }

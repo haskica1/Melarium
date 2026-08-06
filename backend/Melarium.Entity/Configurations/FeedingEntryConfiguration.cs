@@ -12,6 +12,7 @@ public class FeedingEntryConfiguration : IEntityTypeConfiguration<FeedingEntry>
 
         builder.Property(e => e.ScheduledDate).IsRequired();
         builder.Property(e => e.Status).IsRequired();
+        builder.Property(e => e.Note).HasMaxLength(300);
 
         builder.HasIndex(e => e.DietId);
         builder.HasIndex(e => e.ScheduledDate);

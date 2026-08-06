@@ -8,4 +8,7 @@ public class CreateExpenseItemDto
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public int SortOrder { get; set; }
+
+    /// <summary>Optional attribution to a feeding programme (SPEC-12 Phase E).</summary>
+    public int? DietId { get; set; }
 }

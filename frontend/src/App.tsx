@@ -16,6 +16,7 @@ import ApiaryFormPage from './features/apiaries/ApiaryFormPage'
 import BeehiveDetailPage from './features/beehives/BeehiveDetailPage'
 import BeehiveFormPage from './features/beehives/BeehiveFormPage'
 import InspectionFormPage from './features/inspections/InspectionFormPage'
+import FeedingsPage from './features/diets/FeedingsPage'
 import DietFormPage from './features/diets/DietFormPage'
 import DietDetailPage from './features/diets/DietDetailPage'
 import AdminDashboardPage from './features/admin/AdminDashboardPage'
@@ -101,12 +102,15 @@ export default function App() {
               <Route path="inspections/new"        element={<InspectionFormPage />} />
               <Route path="inspections/:id/edit"   element={<InspectionFormPage />} />
 
-              {/* Diet detail — all authenticated users */}
+              {/* Feeding programmes — list + detail for all authenticated users (Beekeeper read-only);
+                  create/edit restricted to hive managers (SPEC-12 narrowed this: a programme is
+                  chosen across an apiary's hives, which a Beekeeper cannot see) */}
+              <Route path="feedings"     element={<FeedingsPage />} />
               <Route path="feedings/:id" element={<DietDetailPage />} />
-
-              {/* Diet create/edit — all authenticated users (User allowed for assigned hives) */}
-              <Route path="feedings/new"      element={<DietFormPage />} />
-              <Route path="feedings/:id/edit" element={<DietFormPage />} />
+              <Route element={<RoleRoute allowedRoles={HIVE_MANAGERS} />}>
+                <Route path="feedings/new"      element={<DietFormPage />} />
+                <Route path="feedings/:id/edit" element={<DietFormPage />} />
+              </Route>
 
               {/* Profile — all authenticated users */}
               <Route path="profile" element={<ProfilePage />} />

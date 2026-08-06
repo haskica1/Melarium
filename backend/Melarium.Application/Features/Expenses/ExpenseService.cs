@@ -44,6 +44,7 @@ public class ExpenseService : IExpenseService
     public async Task<ExpenseDetailDto> CreateAsync(CreateExpenseDto dto)
     {
         var orgId = RequireOrganization();
+        await EnsureItemDietsAttributableAsync(orgId, dto.Items);
 
         var expense = _mapper.Map<Expense>(dto);
         expense.OrganizationId = orgId;
@@ -64,6 +65,7 @@ public class ExpenseService : IExpenseService
     public async Task<ExpenseDetailDto> UpdateAsync(int id, UpdateExpenseDto dto)
     {
         var orgId = RequireOrganization();
+        await EnsureItemDietsAttributableAsync(orgId, dto.Items);
 
         var expense = await _uow.Expenses.GetWithItemsAsync(id)
             ?? throw new NotFoundException(nameof(Expense), id);
@@ -104,4 +106,31 @@ public class ExpenseService : IExpenseService
     private int RequireOrganization() =>
         _currentUser.OrganizationId
             ?? throw new ForbiddenAccessException("You must belong to an organization to manage expenses.");
+
+    /// <summary>
+    /// Every attributed dietId must belong to a diet whose apiary is in the caller's own
+    /// organization. Expense is organization-scoped while Diet is apiary-scoped, so this is the
+    /// boundary check between the two. A cross-organization id is well-formed but simply not
+    /// attributable — that is a <see cref="Melarium.Application.Common.Exceptions.ValidationException"/>
+    /// (400), not a 404 (the diet does exist) and not a 403 (this is a data-shape rule, not a
+    /// per-apiary permission the way managing a diet directly is).
+    /// </summary>
+    private async Task EnsureItemDietsAttributableAsync(int orgId, IEnumerable<CreateExpenseItemDto> items)
+    {
+        var dietIds = items.Where(i => i.DietId.HasValue).Select(i => i.DietId!.Value).Distinct().ToList();
+        if (dietIds.Count == 0) return;
+
+        foreach (var dietId in dietIds)
+        {
+            var diet = await _uow.Diets.GetByIdAsync(dietId)
+                ?? throw new NotFoundException(nameof(Diet), dietId);
+
+            var apiary = await _uow.Apiaries.GetByIdAsync(diet.ApiaryId);
+            if (apiary is null || apiary.OrganizationId != orgId)
+                throw new ValidationException(new Dictionary<string, string[]>
+                {
+                    ["items"] = [$"Program prehrane {dietId} ne pripada vašoj organizaciji."]
+                });
+        }
+    }
 }

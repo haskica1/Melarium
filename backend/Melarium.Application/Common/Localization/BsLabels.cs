@@ -34,6 +34,15 @@ public static class BsLabels
         _                                   => r.ToString(),
     };
 
+    public static string Label(FeedingAmountUnit u) => u switch
+    {
+        FeedingAmountUnit.Litre      => "L",
+        FeedingAmountUnit.Millilitre => "ml",
+        FeedingAmountUnit.Kilogram   => "kg",
+        FeedingAmountUnit.Gram       => "g",
+        _                            => u.ToString(),
+    };
+
     public static string Label(DietStatus s) => s switch
     {
         DietStatus.NotStarted   => "Nije započeto",

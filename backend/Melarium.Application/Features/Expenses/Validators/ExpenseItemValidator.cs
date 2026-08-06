@@ -23,5 +23,11 @@ public class ExpenseItemValidator : AbstractValidator<CreateExpenseItemDto>
         RuleFor(x => x.Unit)
             .MaximumLength(50).WithMessage("Unit label must not exceed 50 characters.")
             .When(x => x.Unit is not null);
+
+        // Whether the id actually belongs to the caller's organization is a service-layer check —
+        // it needs a DB lookup, which validators in this codebase don't do.
+        RuleFor(x => x.DietId)
+            .GreaterThan(0).WithMessage("Neispravan program prehrane.")
+            .When(x => x.DietId.HasValue);
     }
 }

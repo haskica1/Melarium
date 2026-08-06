@@ -30,9 +30,11 @@ public class DailyAgendaServiceTests
 
     private static User Beekeeper(int id = 5) => new() { Id = id, Role = UserRole.Beekeeper, OrganizationId = 1 };
 
+    // Apiary-scoped since SPEC-12: a round covers the whole group, so the obligation carries the
+    // apiary and a hive count and its BeehiveId is null.
     private static CalendarObligation Feeding() => new(
         ObligationKind.Feeding, "feeding-1", DateOnly.FromDateTime(DateTime.UtcNow),
-        "🍯 Prihrana — Košnica 1", null, null, 1, null, false);
+        "🍯 Prehrana — Pčelinjak Sjever (3 košnice)", null, "Pčelinjak Sjever", null, 1, false);
 
     private void GivenUsers(params User[] users) =>
         _uow.Users.GetAllAsync().Returns(users.AsEnumerable());
@@ -55,7 +57,7 @@ public class DailyAgendaServiceTests
         await Service().RunAsync();
 
         await _notifications.Received(1).NotifyAsync(
-            5, "Današnje obaveze", Arg.Is<string>(m => m.Contains("Prihrana")),
+            5, "Današnje obaveze", Arg.Is<string>(m => m.Contains("Prehrana")),
             NotificationType.DailyAgenda, Arg.Any<int?>(), Arg.Any<string?>());
     }
 

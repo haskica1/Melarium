@@ -25,4 +25,12 @@ public class ExpenseItem : BaseEntity
 
     /// <summary>Display order within the expense (0-based).</summary>
     public int SortOrder { get; set; }
+
+    /// <summary>
+    /// Optional attribution to a feeding programme (SPEC-12 Phase E). SET NULL on delete, never
+    /// cascade: an expense is an accounting record of money that actually left the account, and
+    /// deleting a feeding programme must never delete it.
+    /// </summary>
+    public int? DietId { get; set; }
+    public Diet? Diet { get; set; }
 }

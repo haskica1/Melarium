@@ -22,6 +22,7 @@ export const HELP_ROUTES = [
   '/feedings/new',
   '/feedings/:id/edit',
   '/feedings/:id',
+  '/feedings',
   '/harvests/new',
   '/harvests/:id/edit',
   '/harvests',

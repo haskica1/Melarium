@@ -11,6 +11,7 @@ import { useCalendarEvents } from '../../core/services/queries'
 import { FeedingEntryStatus, TodoPriority } from '../../core/models'
 import type { CalendarTodo, CalendarFeedingEntry } from '../../core/models'
 import { ErrorMessage, VitalCard, PageSkeleton } from '../../shared/components'
+import { hivesLabel } from '../../shared/utils/plural'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -424,10 +425,14 @@ function FeedingCard({ entry }: { entry: CalendarFeedingEntry }) {
           {entry.dietName}
         </p>
 
+        {/* One round is one visit covering the whole group, so this names the apiary and the hive
+            count — not a single hive. */}
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
           <span className="text-xs text-gray-500 dark:text-slate-400">
-            Košnica: <span className="font-medium text-gray-700 dark:text-slate-300">{entry.beehiveName}</span>
+            Pčelinjak: <span className="font-medium text-gray-700 dark:text-slate-300">{entry.apiaryName}</span>
           </span>
+          <span className="text-xs text-gray-400 dark:text-slate-500">·</span>
+          <span className="text-xs text-gray-500 dark:text-slate-400">{hivesLabel(entry.hiveCount)}</span>
           <span className="text-xs text-gray-400 dark:text-slate-500">·</span>
           <span className="text-xs text-gray-500 dark:text-slate-400">{entry.foodTypeName}</span>
         </div>

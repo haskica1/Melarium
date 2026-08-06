@@ -59,8 +59,15 @@ public class CalendarService : ICalendarService
 
         // ── Step 3: Load diets with feeding entries ───────────────────────────────
 
-        var diets = accessibleBeehiveIds.Count > 0
-            ? (await _uow.Diets.GetByBeehiveIdsAsync(accessibleBeehiveIds)).ToList()
+        // Loaded by apiary, then narrowed to programmes that actually cover one of the caller's own
+        // hives. The narrowing is not cosmetic: a Beekeeper's ApiaryIds are the apiaries *containing*
+        // their hives, so without it a programme covering only their colleagues' hives would show up
+        // on their calendar — and, through the ICS feed, in their personal Google/Apple calendar.
+        // For managers it is a no-op, since their BeehiveIds already cover the whole apiary.
+        var diets = accessibleApiaryIds.Count > 0 && accessibleBeehiveIds.Count > 0
+            ? (await _uow.Diets.GetByApiaryIdsAsync(accessibleApiaryIds))
+                .Where(d => d.Beehives.Any(db => db.RemovedOn == null && accessibleBeehiveIds.Contains(db.BeehiveId)))
+                .ToList()
             : new List<Melarium.Domain.Entities.Diet>();
 
         // ── Step 4: Build response ────────────────────────────────────────────────
@@ -95,8 +102,9 @@ public class CalendarService : ICalendarService
                 StatusName    = BsLabels.Label(e.Status),
                 DietId        = d.Id,
                 DietName      = d.Name,
-                BeehiveId     = d.BeehiveId,
-                BeehiveName   = beehiveNames.TryGetValue(d.BeehiveId, out var bName) ? bName : $"Košnica {d.BeehiveId}",
+                ApiaryId      = d.ApiaryId,
+                ApiaryName    = apiaryNames.TryGetValue(d.ApiaryId, out var aName) ? aName : $"Pčelinjak {d.ApiaryId}",
+                HiveCount     = d.Beehives.Count(db => db.RemovedOn == null),
                 FoodTypeName  = d.FoodType == FoodType.Custom
                     ? (d.CustomFoodType ?? "Vlastito")
                     : BsLabels.Label(d.FoodType),

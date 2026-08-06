@@ -35,7 +35,7 @@ public static class WeeklyDigestBuilder
         var sb = new StringBuilder();
         sb.AppendLine($"Organizacija: {d.OrganizationName}");
         sb.AppendLine(
-            $"Brojke (zadnjih 7 dana): pregledi={d.InspectionCount}, hranjenja={d.FeedingsDone}, " +
+            $"Brojke (zadnjih 7 dana): pregledi={d.InspectionCount}, obavljena hranjenja={d.FeedingsDone}, " +
             $"novi zadaci={d.TodosCreated}, završeni zadaci={d.TodosCompleted}, zakašnjeli zadaci={d.TodosOverdue}, " +
             $"prinos meda={kg} kg");
 

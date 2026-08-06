@@ -24,6 +24,7 @@ public class MelariumDbContext : DbContext
     public DbSet<QueenEditLog> QueenEditLogs => Set<QueenEditLog>();
     public DbSet<Todo> Todos => Set<Todo>();
     public DbSet<Diet> Diets => Set<Diet>();
+    public DbSet<DietBeehive> DietBeehives => Set<DietBeehive>();
     public DbSet<FeedingEntry> FeedingEntries => Set<FeedingEntry>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<ExpenseItem> ExpenseItems => Set<ExpenseItem>();

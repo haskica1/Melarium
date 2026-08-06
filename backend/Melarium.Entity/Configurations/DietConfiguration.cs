@@ -23,10 +23,21 @@ public class DietConfiguration : IEntityTypeConfiguration<Diet>
         builder.Property(d => d.EarlyCompletionComment)
             .HasMaxLength(1000);
 
+        builder.Property(d => d.AmountPerHive)
+            .HasPrecision(6, 2);
+
+        builder.Property(d => d.AmountNote)
+            .HasMaxLength(100);
+
         builder.Property(d => d.Reason).IsRequired();
         builder.Property(d => d.FoodType).IsRequired();
         builder.Property(d => d.Status).IsRequired();
         builder.Property(d => d.StartDate).IsRequired();
+
+        builder.HasOne(d => d.Apiary)
+            .WithMany()
+            .HasForeignKey(d => d.ApiaryId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(d => d.CreatedBy)
             .WithMany()
@@ -40,7 +51,14 @@ public class DietConfiguration : IEntityTypeConfiguration<Diet>
             .HasForeignKey(e => e.DietId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasIndex(d => d.BeehiveId);
+        // One diet → many hive links; cascade delete
+        builder.HasMany(d => d.Beehives)
+            .WithOne(db => db.Diet)
+            .HasForeignKey(db => db.DietId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(d => d.ApiaryId);
+        builder.HasIndex(d => d.StartDate);
 
         builder.ToTable("Diets");
     }

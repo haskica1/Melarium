@@ -377,7 +377,18 @@ namespace Melarium.Entity.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("BeehiveId")
+                    b.Property<string>("AmountNote")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<decimal?>("AmountPerHive")
+                        .HasPrecision(6, 2)
+                        .HasColumnType("numeric(6,2)");
+
+                    b.Property<int?>("AmountUnit")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ApiaryId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("CreatedAt")
@@ -426,11 +437,49 @@ namespace Melarium.Entity.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("BeehiveId");
+                    b.HasIndex("ApiaryId");
 
                     b.HasIndex("CreatedById");
 
+                    b.HasIndex("StartDate");
+
                     b.ToTable("Diets", (string)null);
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.DietBeehive", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BeehiveId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DietId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("RemovedOn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BeehiveId");
+
+                    b.HasIndex("DietId");
+
+                    b.HasIndex("DietId", "BeehiveId")
+                        .IsUnique()
+                        .HasFilter("\"RemovedOn\" IS NULL");
+
+                    b.ToTable("DietBeehives", (string)null);
                 });
 
             modelBuilder.Entity("Melarium.Domain.Entities.Expense", b =>
@@ -493,6 +542,9 @@ namespace Melarium.Entity.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("DietId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("ExpenseId")
                         .HasColumnType("integer");
 
@@ -521,6 +573,8 @@ namespace Melarium.Entity.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DietId");
 
                     b.HasIndex("ExpenseId");
 
@@ -625,6 +679,10 @@ namespace Melarium.Entity.Migrations
 
                     b.Property<int>("DietId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
 
                     b.Property<DateTime>("ScheduledDate")
                         .HasColumnType("timestamp with time zone");
@@ -1654,9 +1712,9 @@ namespace Melarium.Entity.Migrations
 
             modelBuilder.Entity("Melarium.Domain.Entities.Diet", b =>
                 {
-                    b.HasOne("Melarium.Domain.Entities.Beehive", "Beehive")
-                        .WithMany("Diets")
-                        .HasForeignKey("BeehiveId")
+                    b.HasOne("Melarium.Domain.Entities.Apiary", "Apiary")
+                        .WithMany()
+                        .HasForeignKey("ApiaryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
@@ -1665,9 +1723,28 @@ namespace Melarium.Entity.Migrations
                         .HasForeignKey("CreatedById")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("Beehive");
+                    b.Navigation("Apiary");
 
                     b.Navigation("CreatedBy");
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.DietBeehive", b =>
+                {
+                    b.HasOne("Melarium.Domain.Entities.Beehive", "Beehive")
+                        .WithMany()
+                        .HasForeignKey("BeehiveId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Melarium.Domain.Entities.Diet", "Diet")
+                        .WithMany("Beehives")
+                        .HasForeignKey("DietId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Beehive");
+
+                    b.Navigation("Diet");
                 });
 
             modelBuilder.Entity("Melarium.Domain.Entities.Expense", b =>
@@ -1690,11 +1767,18 @@ namespace Melarium.Entity.Migrations
 
             modelBuilder.Entity("Melarium.Domain.Entities.ExpenseItem", b =>
                 {
+                    b.HasOne("Melarium.Domain.Entities.Diet", "Diet")
+                        .WithMany()
+                        .HasForeignKey("DietId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Melarium.Domain.Entities.Expense", "Expense")
                         .WithMany("Items")
                         .HasForeignKey("ExpenseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Diet");
 
                     b.Navigation("Expense");
                 });
@@ -2013,8 +2097,6 @@ namespace Melarium.Entity.Migrations
                 {
                     b.Navigation("AssignedUsers");
 
-                    b.Navigation("Diets");
-
                     b.Navigation("Inspections");
 
                     b.Navigation("Queens");
@@ -2022,6 +2104,8 @@ namespace Melarium.Entity.Migrations
 
             modelBuilder.Entity("Melarium.Domain.Entities.Diet", b =>
                 {
+                    b.Navigation("Beehives");
+
                     b.Navigation("FeedingEntries");
                 });
 

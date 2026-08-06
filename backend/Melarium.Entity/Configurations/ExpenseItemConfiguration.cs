@@ -28,6 +28,15 @@ public class ExpenseItemConfiguration : IEntityTypeConfiguration<ExpenseItem>
 
         builder.HasIndex(i => i.ExpenseId);
 
+        // SPEC-12 Phase E — attribution to a feeding programme. SET NULL, never cascade: the
+        // expense stays a true accounting record even after the programme it paid for is deleted.
+        builder.HasOne(i => i.Diet)
+            .WithMany()
+            .HasForeignKey(i => i.DietId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasIndex(i => i.DietId);
+
         builder.ToTable("ExpenseItems");
     }
 }

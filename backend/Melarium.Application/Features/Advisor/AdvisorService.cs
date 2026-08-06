@@ -234,19 +234,9 @@ public class AdvisorService : IAdvisorService
 
         var inspections = (await _uow.Inspections.GetByBeehiveIdAsync(beehiveId)).Take(5).ToList();
 
-        var diets = await _uow.Diets.GetByBeehiveIdAsync(beehiveId);
-        var activeDiet = diets.FirstOrDefault(d => d.Status == DietStatus.InProgress)
-                      ?? diets.FirstOrDefault(d => d.Status == DietStatus.NotStarted);
-        int dietCompleted = 0, dietTotal = 0;
-        if (activeDiet is not null)
-        {
-            var withEntries = await _uow.Diets.GetWithEntriesAsync(activeDiet.Id);
-            if (withEntries is not null)
-            {
-                dietTotal = withEntries.FeedingEntries.Count;
-                dietCompleted = withEntries.FeedingEntries.Count(e => e.Status == FeedingEntryStatus.Completed);
-            }
-        }
+        // One query, counts included — same shape as latestTreatment below.
+        var activeDiets = (await _uow.Diets.GetActiveForBeehivesAsync([beehiveId]))
+            .GetValueOrDefault(beehiveId, []);
 
         var openTodos = (await _uow.Todos.GetByBeehiveIdAsync(beehiveId))
             .Where(t => !t.IsCompleted).Take(5).ToList();
@@ -281,7 +271,7 @@ public class AdvisorService : IAdvisorService
         }
 
         return AdvisorContextBuilder.Build(
-            hive, apiaryName, inspections, activeDiet, dietCompleted, dietTotal, openTodos, queen, seasonYield,
+            hive, apiaryName, inspections, activeDiets, openTodos, queen, seasonYield,
             latestTreatment, pastureLine, weatherLine);
     }
 
