@@ -29,6 +29,7 @@ public interface IUnitOfWork : IDisposable
     ICalendarSettingsRepository CalendarSettings { get; }
     IFeedbackRepository Feedbacks { get; }
     IInvitationRepository Invitations { get; }
+    IAiAssistantSessionRepository AiAssistantSessions { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

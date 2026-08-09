@@ -87,6 +87,127 @@ namespace Melarium.Entity.Migrations
                     b.ToTable("AdvisorMessages", (string)null);
                 });
 
+            modelBuilder.Entity("Melarium.Domain.Entities.AiAssistantAction", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("ResultEntityId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResultEntityType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TargetSummary")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("TurnId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TurnId");
+
+                    b.ToTable("AiAssistantActions", (string)null);
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.AiAssistantSession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AiAssistantSessions", (string)null);
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.AiAssistantTurn", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CandidatesJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RawModelJson")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SessionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Transcript")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("Role", "CreatedAt");
+
+                    b.ToTable("AiAssistantTurns", (string)null);
+                });
+
             modelBuilder.Entity("Melarium.Domain.Entities.Apiary", b =>
                 {
                     b.Property<int>("Id")
@@ -1702,6 +1823,39 @@ namespace Melarium.Entity.Migrations
                     b.Navigation("Conversation");
                 });
 
+            modelBuilder.Entity("Melarium.Domain.Entities.AiAssistantAction", b =>
+                {
+                    b.HasOne("Melarium.Domain.Entities.AiAssistantTurn", "Turn")
+                        .WithMany("Actions")
+                        .HasForeignKey("TurnId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Turn");
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.AiAssistantSession", b =>
+                {
+                    b.HasOne("Melarium.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.AiAssistantTurn", b =>
+                {
+                    b.HasOne("Melarium.Domain.Entities.AiAssistantSession", "Session")
+                        .WithMany("Turns")
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Session");
+                });
+
             modelBuilder.Entity("Melarium.Domain.Entities.Apiary", b =>
                 {
                     b.HasOne("Melarium.Domain.Entities.User", "CreatedBy")
@@ -2195,6 +2349,16 @@ namespace Melarium.Entity.Migrations
             modelBuilder.Entity("Melarium.Domain.Entities.AdvisorConversation", b =>
                 {
                     b.Navigation("Messages");
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.AiAssistantSession", b =>
+                {
+                    b.Navigation("Turns");
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.AiAssistantTurn", b =>
+                {
+                    b.Navigation("Actions");
                 });
 
             modelBuilder.Entity("Melarium.Domain.Entities.Apiary", b =>

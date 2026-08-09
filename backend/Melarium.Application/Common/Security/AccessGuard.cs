@@ -1,5 +1,6 @@
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
+using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
 
 namespace Melarium.Application.Common.Security;
@@ -56,6 +57,19 @@ public sealed class AccessGuard : IAccessGuard
         EnsureCanManageApiary(apiaryId, apiary.OrganizationId);
     }
 
+    public async Task<bool> CanManageApiaryAsync(int apiaryId)
+    {
+        try
+        {
+            await EnsureCanManageApiaryAsync(apiaryId);
+            return true;
+        }
+        catch (ForbiddenAccessException)
+        {
+            return false;
+        }
+    }
+
     public async Task EnsureCanAccessBeehiveAsync(int beehiveId)
     {
         if (!await CanAccessBeehiveAsync(beehiveId))
@@ -102,5 +116,61 @@ public sealed class AccessGuard : IAccessGuard
     {
         if (_user.UserId is not int userId) return [];
         return await _uow.Users.GetAssignedApiaryIdsAsync(userId);
+    }
+
+    public async Task<IReadOnlyList<Beehive>> GetAccessibleBeehivesAsync()
+    {
+        switch (_user.Role)
+        {
+            case UserRole.SystemAdmin:
+                return (await _uow.Beehives.GetAllAsync()).ToList();
+
+            case UserRole.Beekeeper:
+            {
+                var assignedIds = await GetAssignedBeehiveIdsAsync();
+                return assignedIds.Count > 0
+                    ? (await _uow.Beehives.FindAsync(b => assignedIds.Contains(b.Id))).ToList()
+                    : [];
+            }
+
+            case UserRole.ApiaryAdmin when _user.ApiaryId is int apiaryId:
+                return (await _uow.Beehives.GetByApiaryIdAsync(apiaryId)).ToList();
+
+            default:
+                return _user.OrganizationId is int orgId
+                    ? (await _uow.Beehives.GetByOrganizationAsync(orgId)).ToList()
+                    : [];
+        }
+    }
+
+    public async Task<IReadOnlyList<Apiary>> GetAccessibleApiariesAsync()
+    {
+        switch (_user.Role)
+        {
+            case UserRole.SystemAdmin:
+                return (await _uow.Apiaries.GetAllAsync()).ToList();
+
+            case UserRole.Beekeeper:
+            {
+                if (_user.OrganizationId is not int beekeeperOrgId) return [];
+                var assignedApiaryIds = await GetAssignedApiaryIdsAsync();
+                return assignedApiaryIds.Count == 0
+                    ? []
+                    : (await _uow.Apiaries.GetAllByOrganizationAsync(beekeeperOrgId))
+                        .Where(a => assignedApiaryIds.Contains(a.Id))
+                        .ToList();
+            }
+
+            case UserRole.ApiaryAdmin when _user.ApiaryId is int apiaryId:
+            {
+                var apiary = await _uow.Apiaries.GetByIdAsync(apiaryId);
+                return apiary is null ? [] : [apiary];
+            }
+
+            default:
+                return _user.OrganizationId is int orgId
+                    ? (await _uow.Apiaries.GetAllByOrganizationAsync(orgId)).ToList()
+                    : [];
+        }
     }
 }

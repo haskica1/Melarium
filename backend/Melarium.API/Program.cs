@@ -113,6 +113,12 @@ builder.Services.AddHttpClient<IAdvisorAiClient, GroqAdvisorAiClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 
+// AI assistant command interpretation (SPEC-17) — Groq Llama constrained to a JSON envelope.
+builder.Services.AddHttpClient<IAssistantAiClient, GroqAssistantAiClient>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+
 // Weekly AI summary — Groq chat (Llama), reuses Groq:ApiKey. Runs from the AlertScanWorker
 // on Mondays; the typed HttpClient keeps the Groq call out of the request path.
 builder.Services.AddHttpClient<IWeeklySummaryService, WeeklySummaryService>(client =>

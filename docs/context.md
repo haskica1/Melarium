@@ -152,6 +152,35 @@
 - UI: "AI Savjetnik" sidebar, `/advisor` (all roles), "Pitaj savjetnika" on hive detail, voice→transcript→review→send
 - `useVoiceInput` moved to `core/hooks/`. Covered by unit tests. See `docs/features/ai-advisor.md`.
 
+### AI Assistant (AI Asistent, SPEC-17 — all three phases)
+- Voice/text command → proposals → **explicit confirmation** → records. Creates, updates, completes or
+  deletes **pregled**/**zadatak**; one sentence may produce several actions, each individually uncheckable
+- **ADR-033:** the executor builds the same DTOs the forms post and calls the **existing** services
+  (`InspectionService`/`TodoService`, incl. their `Update`/`Delete`), never repositories — access, plan
+  limits, auto-temperature and todo notifications all come along; it also runs the controllers'
+  validators itself
+- Targets resolved from `IAccessGuard.GetAccessible{Apiaries,Beehives}Async` only, so an out-of-scope hive
+  is unreachable by construction; `HiveNumberMatcher` reused; "sve košnice" expands over one apiary
+- Pure + unit-tested: `AiEnvelopeParser` (never throws on model output), `AiTargetResolver`,
+  `AssistantPromptBuilder` ("danas" via `AppTimeZone`, not `UtcNow`)
+- Nothing persisted on AI failure; partial batch failure reported per action; double-confirm refused;
+  ceiling `Ai:MaxActionsPerCommand` (50). `PlanFeature.AiAssistant = 5`, Standard+ with a monthly quota
+- UI: floating `Sparkles` launcher in `Layout` (hidden offline), editable `ProposalCard`, `/assistant`
+  history page, "AI Asistent" nav. Reuses `ai-chat`/`voice-parse` limits — no new policy
+- **Conversation:** unresolved apiary/hive/todo/inspection candidates become tappable buttons
+  (`AssistantClarificationBuilder`, pure, capped at 8) on the **latest** assistant turn only
+  (`CandidatesJson`, zeroed on every earlier turn); tapping sends the text as an ordinary new turn.
+  System prompt carries a continuation rule so a short follow-up combines with the fields dictated
+  earlier in the session instead of being read as an isolated command
+- **Update/complete/delete:** `AiTargetResolver` gained existing-record resolution — todos by title
+  (search pool = `ITodoService.GetAllOpenForCurrentUserAsync()`, already role-scoped), inspections by
+  date within one hive, no date = the most recent one. Fetched only when an action actually needs it.
+  The resolved target is **fixed at propose time**, never re-picked from the confirm request. A batch
+  with any update/delete needs a **second, separate confirmation** (`isDestructive` on the action DTO)
+  — `CompleteTodo` is deliberately excluded: it is a one-tap, reversible toggle everywhere else in the
+  app too. `AiActionExecutorTests` tests the real executor directly, not just through a mock.
+  See `docs/features/ai-assistant.md`.
+
 ### Offline Inspections (Offline unos pregleda)
 - Frontend-only (SPEC-07): creating an inspection offline lands in an IndexedDB **outbox**
   (`core/offline/outbox.ts`, keyed by owner email — session has no numeric user id) and syncs

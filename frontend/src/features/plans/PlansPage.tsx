@@ -91,7 +91,7 @@ export default function PlansPage() {
 function UsageMeters({ plan }: { plan: MyPlan }) {
   const u = plan.usage
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Meter label="Košnice" used={u.beehives} limit={u.beehivesLimit} />
       <Meter label="Dodatni članovi" used={u.members} limit={u.membersLimit} />
       {u.advisorMessagesLimit != null && u.advisorMessagesLimit > 0 ? (
@@ -101,6 +101,16 @@ function UsageMeters({ plan }: { plan: MyPlan }) {
           <p className="text-xs text-gray-500 dark:text-slate-400">AI savjetnik</p>
           <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 mt-1">
             {plan.effectivePlan >= PlanType.Pro ? 'Neograničeno' : plan.effectivePlan === PlanType.Standard ? '10 poruka/mj' : 'Nedostupno'}
+          </p>
+        </div>
+      )}
+      {u.aiCommandsLimit != null && u.aiCommandsLimit > 0 ? (
+        <Meter label="Naredbe asistentu ovog mjeseca" used={u.aiCommandsThisMonth} limit={u.aiCommandsLimit} />
+      ) : (
+        <div className="card flex flex-col justify-center">
+          <p className="text-xs text-gray-500 dark:text-slate-400">AI asistent</p>
+          <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 mt-1">
+            {plan.effectivePlan >= PlanType.Pro ? 'Neograničeno' : plan.effectivePlan === PlanType.Standard ? '30 naredbi/mj' : 'Nedostupno'}
           </p>
         </div>
       )}

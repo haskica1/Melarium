@@ -34,6 +34,7 @@
 | 14 | [In-App Help](SPEC-14-in-app-help.md) | Kontekstualna pomoć po stranici (info ikona + panel), uvodni flow za nove korisnike i izvedena "Prvi koraci" lista | M | — (soft-link 06) | ✅ Implemented (2026-07-30) |
 | 15 | [Invite a Friend](SPEC-15-invite-friend.md) | "Pozovi prijatelja": lični link + email pozivnica na platformu. Pozvani dobija 60 dana trial-a umjesto 30, pozivalac +30 dana na svoj paket kad pozvani potvrdi e-poštu, uz plafon od 180 dana po organizaciji | M | — (reuse ADR-021 queue, SPEC-09 planovi) | 🔨 Faza 1 (2026-08-06) · Faza 2 (e-mail kanal) planirana |
 | 16 | [Org Activity & Status](SPEC-16-org-activity-retention.md) | Da li se organizacija *koristi*: heartbeat aktivnosti + izračunat status (Aktivna / Uspavana / Za brisanje) i radne liste za naplatu u admin tabeli, ručni prekidač "Neaktivna" koji blokira prijavu, i popravljeno ručno brisanje organizacije. **Ništa se ne briše automatski** | M | — (extends 09, reuse ADR-021/027) | 📋 Planned — odluke donesene, spremno za Fazu A |
+| 17 | [AI Asistent](SPEC-17-ai-assistant.md) | Glasovna ili tekstualna naredba → AI pokaže šta je razumio → korisnik potvrdi → radnja se izvrši. Sam pronalazi pčelinjak i košnicu, radi više radnji iz jedne rečenice, razgovorom razrješava nejasnoće, i mijenja/briše postojeće zapise uz drugu potvrdu | L | — (reuse 01 Groq stack, 09 paketi) | ✅ Implemented (2026-08-09) |
 
 **Recommended order = index order.** Rationale:
 
@@ -74,6 +75,24 @@
   deliberate: a deactivated organization's users **cannot sign in** (Phase B), and `DeleteOrganizationAsync`
   stops refusing organizations that have users (Phase C). Phase C also fixes a **pre-existing bug it did not
   introduce** — `DeleteUserAsync` throws on an FK when the user has an assigned todo.
+- **SPEC-17** was written 2026-08-08 and shipped complete (all three phases) 2026-08-09. It is the first
+  feature in which **an AI writes to the database**, so the whole spec is arranged around one rule that must
+  not be "optimized" later (§5.1): the executor builds the same DTOs the forms post and calls the **existing**
+  services — `InspectionService.CreateAsync`, `TodoService.CreateAsync`, and by Phase C their `Update`/`Delete`
+  counterparts too — never repositories. Going around them silently drops `IAccessGuard`, the plan limits, the
+  automatic weather temperature and the todo notification cascade, with no compile-time error to catch it. Two
+  consequences of that rule are easy to miss and are called out where they bite: validation in this codebase
+  lives in the **controllers**, so the executor must run the validators itself or AI-authored data passes
+  fewer checks than typed data (§5.2); and the confirm request is **untrusted input** like any form post,
+  because the card is editable and the client can send any hive id (§5.3). Its three phases shipped
+  independently and in order — creation, then the conversational follow-up, then update/delete — deliberately,
+  so the only path that can overwrite or destroy a correct record reached production **after** the prompt and
+  the resolver had met real usage in the first two phases. Phase C also narrowed D5 rather than applying it
+  literally: `CompleteTodo` turned out not to need the second confirmation, because checking a todo off is a
+  one-tap, instantly-reversible toggle everywhere else in the app already — treating it as destructive would
+  have invented risk the rest of the UI does not recognize for the identical action. It does **not** fix the
+  pre-existing `DateTime.UtcNow`-as-local bug in `VoiceParsingService` (§3.1): new code uses `AppTimeZone`, the
+  old bug is tracked separately.
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD

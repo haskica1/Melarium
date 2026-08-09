@@ -19,6 +19,7 @@ import { useHelp } from '../../core/help/useHelp'
 import { HelpProvider } from '../../core/help/HelpContext'
 import { CommandPalette } from './CommandPalette'
 import { Sidebar, getNavItems, type NavRoleFlags } from './Sidebar'
+import AssistantLauncher from '../../features/assistant/AssistantLauncher'
 import { ErrorBoundary } from './ErrorBoundary'
 import { canGoBack as hasHistoryBehind } from '../utils/historyStack'
 
@@ -424,6 +425,10 @@ export default function Layout() {
             </HelpProvider>
           </ErrorBoundary>
         </main>
+
+        {/* AI assistant (SPEC-17) — one floating entry point on every page, so a command can be given
+            without navigating away from the hive being looked at. Hides itself offline. */}
+        <AssistantLauncher />
 
         {/* ── Footer ────────────────────────────────────────────────────────────── */}
         <footer className="border-t border-honey-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-4 text-center text-xs text-gray-400 dark:text-slate-500">

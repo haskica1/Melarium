@@ -26,6 +26,12 @@ public interface IPlanGuard
     /// </summary>
     Task EnsureAdvisorMessageAsync(int organizationId);
 
+    /// <summary>
+    /// AI assistant gate (SPEC-17): feature availability plus the per-organization monthly command
+    /// quota. Counted from the org's user turns in the current UTC calendar month.
+    /// </summary>
+    Task EnsureAiCommandAsync(int organizationId);
+
     /// <summary>Effective plan + limits + usage for DTOs/UI.</summary>
     Task<MyPlanDto> GetMyPlanAsync(int organizationId);
 }

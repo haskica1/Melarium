@@ -31,6 +31,14 @@ public interface IAccessGuard
     void EnsureCanManageApiary(int apiaryId, int organizationId);
 
     /// <summary>
+    /// Non-throwing variant of <see cref="EnsureCanManageApiaryAsync"/>, mirroring
+    /// <see cref="CanAccessBeehiveAsync"/>. Used where a denial is a normal outcome to report rather
+    /// than an error to raise — the assistant's pre-flight, which drops an action it could not perform
+    /// instead of offering the user a card that is certain to fail.
+    /// </summary>
+    Task<bool> CanManageApiaryAsync(int apiaryId);
+
+    /// <summary>
     /// Ensures the caller can access the beehive's data: management rights over its apiary,
     /// or a Beekeeper assigned to the beehive.
     /// </summary>
@@ -44,4 +52,14 @@ public interface IAccessGuard
 
     /// <summary>The set of apiary ids containing at least one beehive assigned to the current Beekeeper.</summary>
     Task<HashSet<int>> GetAssignedApiaryIdsAsync();
+
+    /// <summary>
+    /// Every beehive the caller may see, role-scoped. Shared by the hive list, number matching and the
+    /// AI assistant's target resolution (SPEC-17) — the assistant searches this set and nothing else,
+    /// which is what makes an out-of-scope hive unreachable by construction rather than by a check.
+    /// </summary>
+    Task<IReadOnlyList<Beehive>> GetAccessibleBeehivesAsync();
+
+    /// <summary>Every apiary the caller may see, role-scoped. Same purpose as <see cref="GetAccessibleBeehivesAsync"/>.</summary>
+    Task<IReadOnlyList<Apiary>> GetAccessibleApiariesAsync();
 }

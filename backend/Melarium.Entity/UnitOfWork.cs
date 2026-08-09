@@ -37,6 +37,7 @@ public class UnitOfWork : IUnitOfWork
     private ICalendarSettingsRepository? _calendarSettings;
     private IFeedbackRepository? _feedbacks;
     private IInvitationRepository? _invitations;
+    private IAiAssistantSessionRepository? _aiAssistantSessions;
 
     public UnitOfWork(MelariumDbContext context)
     {
@@ -114,6 +115,9 @@ public class UnitOfWork : IUnitOfWork
 
     public IInvitationRepository Invitations =>
         _invitations ??= new InvitationRepository(_context);
+
+    public IAiAssistantSessionRepository AiAssistantSessions =>
+        _aiAssistantSessions ??= new AiAssistantSessionRepository(_context);
 
     public async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         await _context.SaveChangesAsync(cancellationToken);

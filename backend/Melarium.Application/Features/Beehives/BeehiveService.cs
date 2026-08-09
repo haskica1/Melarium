@@ -191,28 +191,13 @@ public class BeehiveService : IBeehiveService
     public async Task<IEnumerable<BeehiveDto>> GetAllForCurrentUserAsync() =>
         _mapper.Map<IEnumerable<BeehiveDto>>(await GetAccessibleBeehivesAsync());
 
-    /// <summary>Role-scoped set of beehive entities the current caller may see. Shared by the list and number matching.</summary>
-    private async Task<IEnumerable<Beehive>> GetAccessibleBeehivesAsync()
-    {
-        if (_currentUser.Role == UserRole.SystemAdmin)
-            return await _uow.Beehives.GetAllAsync();
-
-        if (_currentUser.Role == UserRole.Beekeeper)
-        {
-            var assignedIds = await _access.GetAssignedBeehiveIdsAsync();
-            return assignedIds.Count > 0
-                ? await _uow.Beehives.FindAsync(b => assignedIds.Contains(b.Id))
-                : [];
-        }
-
-        if (_currentUser.Role == UserRole.ApiaryAdmin && _currentUser.ApiaryId.HasValue)
-            return await _uow.Beehives.GetByApiaryIdAsync(_currentUser.ApiaryId.Value);
-
-        if (_currentUser.OrganizationId.HasValue)
-            return await _uow.Beehives.GetByOrganizationAsync(_currentUser.OrganizationId.Value);
-
-        return [];
-    }
+    /// <summary>
+    /// Role-scoped set of beehive entities the current caller may see. The rules moved to
+    /// <see cref="IAccessGuard.GetAccessibleBeehivesAsync"/> when SPEC-17 needed the same set — one
+    /// source, so the assistant and the hive list can never drift apart.
+    /// </summary>
+    private Task<IReadOnlyList<Beehive>> GetAccessibleBeehivesAsync() =>
+        _access.GetAccessibleBeehivesAsync();
 
     public async Task<BeehiveNumberMatchResult> MatchByNumberAsync(string number)
     {

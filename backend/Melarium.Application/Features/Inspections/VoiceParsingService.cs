@@ -31,27 +31,9 @@ public class VoiceParsingService : IVoiceParsingService
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    private const string SystemMessage =
-        """
-        Ti si stručni asistent za pčelarstvo koji iz neformalnih glasovnih bilješki pčelara
-        izvlači strukturirane podatke o pregledu (inspekciji) košnice.
-
-        Tečno razumiješ bosanski, hrvatski i srpski jezik te pčelarsku terminologiju i žargon:
-        - matica / matičica / kraljica = queen bee
-        - leglo = brood; jaja, larve, poklopljeno (zatvoreno) leglo
-        - okviri / ramovi / satovi / saće = frames / comb
-        - med / medište / medni nastavak / superica / polunastavak = honey / honey super
-        - roj / rojenje / rojevno raspoloženje = swarm / swarming
-        - matičnjak / matičnjaci = queen cell(s)
-        - propolis, vosak, pelud / polen = propolis, wax, pollen
-        - zajednica / društvo = colony
-        - bolesti i nametnici: varoa / varooza, nozemoza, američka/europska gnjiloća, krečno leglo
-        - tretmani: amitraz, oksalna/mravlja kiselina, trake, sublimacija
-
-        Transkript je nastao automatskim prepoznavanjem govora pa može sadržavati greške,
-        pogrešno razdvojene riječi ili fonetske zamjene — tumači ga razumno prema kontekstu.
-        Izvuci SAMO ono što je pčelar stvarno rekao; ništa ne izmišljaj. Što nije spomenuto = null.
-        """;
+    // The text moved to BeekeepingPrompt when SPEC-17 needed the same glossary; it is unchanged,
+    // and BeekeepingPromptTests locks it so the extraction cannot quietly become a retune.
+    private const string SystemMessage = BeekeepingPrompt.VoiceInspectionSystem;
 
     private const string PromptTemplate =
         """

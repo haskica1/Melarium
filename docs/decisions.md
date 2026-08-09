@@ -579,3 +579,105 @@ existing value**, and the first plan change no person approves.
 lifetime per organization**, at most 5 per rolling 30 days, and one reward per invited organization ever.
 The lifetime cap is the only thing bounding what the feature can cost against fraud; the length of the
 referral code is not a control and must never be treated as one.
+
+---
+
+## ADR-033: The AI Proposes DTOs; the Existing Services Execute Them (SPEC-17)
+
+**Status:** Accepted (2026-08-08, Phase A; extended 2026-08-09, Phases B and C)
+
+**Context.** SPEC-17 is the first feature in which an AI writes to the database. The obvious
+implementation — let the assistant build entities and save them — would have been shorter and is the
+one a future refactor is most likely to drift back toward.
+
+**Decision.** `AiActionExecutor` builds the **same DTOs the forms post** (`CreateInspectionDto`,
+`CreateTodoDto`) and calls the **existing** application services. It never touches a repository, and
+`AiAssistantService` never creates an inspection or a todo itself.
+
+**Why this and not the shorter path:**
+
+- **Four behaviours ride on those services and none of them would fail loudly if skipped.**
+  `IAccessGuard` on the target, `IPlanGuard` limits, the automatic temperature from the apiary's
+  weather (`InspectionService.CreateAsync`), and the todo notification cascade to superiors and the
+  assignee (`TodoService`). A repository write compiles fine and silently loses all four.
+- **Validation lives in the controllers here, not the services.** So the executor resolves
+  `IValidator<T>` from DI and runs it itself. Without that one step, data authored by an AI would pass
+  *fewer* checks than data typed by a human — the exact inversion of what anyone would intend.
+- **The proposal is not a capability grant.** The confirmation card is editable, so the confirm request
+  can carry any hive id. It is re-resolved against `IAccessGuard.GetAccessibleBeehivesAsync()` and
+  re-validated. Rule 1 is what makes this true by default rather than by a check somebody remembers.
+
+**The invariant that outranks the rest:** name resolution searches **only** the caller's accessible
+apiaries and hives. An out-of-scope hive is not "forbidden", it is invisible — so the next action kind
+added in Phase C cannot forget an authorization check that was never a separate step.
+
+**Consequences accepted, not overlooked:**
+
+- **Partial failure is reported, not rolled back.** Each service calls `SaveChangesAsync` itself, so a
+  failure on action 3 cannot cleanly undo 1 and 2 — the same shared-`DbContext` trap ADR-032 documents.
+  Pre-flight makes doomed actions non-confirmable; execution then records a status per action and the
+  response names exactly what landed. Never a fake "success".
+- **Confirmation claims the rows before executing.** `Pending → Confirmed` is saved first, so a phone
+  double-tap finds nothing pending and is refused. A row left `Confirmed` with a null `ResultEntityId`
+  therefore means "claimed but never completed" — recoverable information, and strictly better than a
+  silently duplicated inspection.
+- **`ResultEntityId` is not a foreign key.** Deleting the created inspection must not delete the audit
+  row saying the assistant created it.
+
+**Two details that look cosmetic and are not:**
+
+- **"Danas" comes from `AppTimeZone`, never `DateTime.UtcNow`.** Between local midnight and 01:00/02:00
+  the two disagree by a day. `VoiceParsingService` has this bug today; SPEC-17 does not inherit it, and
+  the executor additionally clamps a local midnight that is still future by UTC so
+  `CreateInspectionValidator`'s "no future dates" rule cannot reject a legitimately-today inspection.
+- **Apiary-name normalization maps `đ` to `dj`, not to `d`.** That is the transliteration Whisper and
+  phone keyboards produce, so "Đurđevak" and "Djurdjevak" resolve to one apiary. Mapping to a bare `d`
+  makes exactly that common pair fail to match — caught by a test, not by review.
+
+**Alternatives considered:** native Groq tool-calling instead of one JSON envelope — rejected for now:
+the envelope keeps the parser pure and unit-testable and matches the proven `VoiceParsingService`
+pattern. Merging the assistant into the advisor — rejected: a router guessing "question or command" is
+a new failure mode, and a chat bubble is a poor host for an editable form.
+
+---
+
+### Addendum, 2026-08-09 — Phase C: update and delete extend the same rule, not a new one
+
+**Context.** Phase C added five action kinds that touch an **existing** record instead of proposing a
+new one — `UpdateTodo`, `CompleteTodo`, `UpdateInspection`, `DeleteTodo`, `DeleteInspection`. The
+question was whether this needed new machinery or whether the Phase A design already generalized.
+
+**Decision.** It generalized. `AiActionExecutor` still builds the DTOs the edit forms already post
+(`UpdateTodoDto`, `UpdateInspectionDto` — both pre-existing, unmodified) and calls the **existing**
+`UpdateAsync`/`DeleteAsync` on the same two services. No new repository code, no new validators. The
+one addition is a resolver *stage*, not a new rule: `AiTargetResolver.ResolveExistingTodo`/
+`ResolveExistingInspection` find the record (title for a todo, date within a hive for an inspection —
+absent date defaults to the most recent one), using the same pure, `IAccessGuard`-scoped-set pattern
+apiary/hive resolution already established. Ambiguity produces candidates in the exact shape
+`AssistantClarificationBuilder` (Phase B) already renders as buttons — one more branch, not a parallel
+mechanism.
+
+**One new invariant Phase C introduces:** an existing-record target is **fixed at propose time** and is
+never re-picked from the confirm request — there is no dropdown for "a different todo" the way a create
+action's card lets you swap the apiary/hive. `BuildConfirmedPayloadAsync` short-circuits to `stored with
+{ Fields = fields }` for these kinds, ignoring any `apiaryId`/`beehiveId` the client sends. This does not
+weaken §5.3's untrusted-input rule: the executor still re-fetches the record and the underlying
+service still re-runs its own access check before touching it, so a record that changed or became
+inaccessible between propose and confirm fails exactly as it would from the normal edit form.
+
+**The one place D5 was narrowed on purpose.** D5 (SPEC-17 §1) says an update or delete needs a second,
+separate confirmation. `CompleteTodo` is its own action kind, deliberately **not** counted as
+destructive (`IsDestructive` checks four kinds, not five): checking a todo off is a one-tap, instantly
+reversible toggle everywhere else in this app already — the plain todo checkbox asks nothing. Holding
+the assistant to a stricter bar than the rest of the UI already applies to the identical action would
+have been inventing a risk that is not there, not honoring the spirit of D5. The second-confirmation
+modal itself reuses the shared `Modal` primitive rather than `ConfirmDialog` — that dialog's single
+`message: string` prop cannot hold a per-action old→new diff or a delete's full record — and
+`ProposalCard.tsx` exports `DeletePreview`/`UpdateSummary` so the modal shows the **same** content the
+card already rendered, never a second, driftable copy.
+
+**Consequence accepted, not overlooked:** bulk operations ("obriši sve zadatke o postolju") and moving
+an inspection to a different hive or date via update are both out of scope — each resolver returns at
+most one existing target, and `UpdateInspectionAsync` never applies `fields.date` as a new value (the
+prompt uses it only to say *which* inspection is meant). Recorded in SPEC-17 §12 as decisions, not gaps
+found later.

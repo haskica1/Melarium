@@ -148,7 +148,7 @@ HTTP `200 OK`, `201 Created`, `204 No Content` — response body is the DTO dire
 | GET | `/organizations/my-plan` | `MyPlanDto` — any authenticated org member; org-less SystemAdmin → `404` |
 | PUT | `/admin/organizations/{id}/plan` | `200 + AdminOrganizationDto` — SystemAdmin only; body `{ plan, planValidUntil?, planNotes? }`; accepts all five plans incl. Partner |
 
-**MyPlanDto:** `{ plan, planName, effectivePlan, effectivePlanName, planValidUntil?, planNotes?, usage: { apiaries, apiariesLimit?, beehives, beehivesLimit?, members, membersLimit?, advisorMessagesThisMonth, advisorMessagesLimit? } }` — a null limit means unlimited for the effective plan.
+**MyPlanDto:** `{ plan, planName, effectivePlan, effectivePlanName, planValidUntil?, planNotes?, usage: { apiaries, apiariesLimit?, beehives, beehivesLimit?, members, membersLimit?, advisorMessagesThisMonth, advisorMessagesLimit?, aiCommandsThisMonth, aiCommandsLimit? } }` — a null limit means unlimited for the effective plan.
 
 **PlanType:** `Free=1, Standard=2, Pro=3, Max=4, Partner=5` (Partner is hidden from public UI).
 
@@ -329,6 +329,57 @@ accounts created before the field existed).
 **Grounding:** when `beehiveId` is set, answers are grounded in that hive's data (access checked via
 `IAccessGuard`). Message length 1–4000; 60 messages/conversation cap → `422`. AI outage → `422` with a
 Bosnian message and **nothing persisted**. Reuses `Groq:ApiKey`.
+
+---
+
+### AI Assistant (SPEC-17)
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/assistant/sessions` | `AssistantSessionSummary[]` (own only, newest activity first) |
+| GET | `/assistant/sessions/{id}` | `AssistantSessionDetail` (turns + actions; 404 if not owner) |
+| POST | `/assistant/sessions` | `201 + AssistantSessionDetail` — `{ text, transcript?, apiaryId?, beehiveId? }`; `ai-chat` 10/min |
+| POST | `/assistant/sessions/{id}/turns` | `200 + AssistantSessionDetail`; `ai-chat` 10/min |
+| POST | `/assistant/turns/{id}/confirm` | `200 + { message, results[] }` — `{ actions: [{ id, apiaryId?, beehiveId?, fields }] }` |
+| POST | `/assistant/turns/{id}/reject` | `204` |
+| POST | `/assistant/transcribe` | `{ transcript }` — multipart audio, 15 MB cap, `voice-parse` policy |
+| DELETE | `/assistant/sessions/{id}` | `204` (owner only) |
+
+**Proposals are not writes.** `POST /sessions` only stores `Pending` actions; records are created on
+`confirm`, which returns a result **per action** — a batch can partly fail and the response says so.
+
+**The confirm body is untrusted.** The card is editable, so ids and fields are re-resolved against the
+caller's accessible apiaries/hives and re-validated with the same validators the forms use. Confirming a
+turn whose actions have already left `Pending` → `422` ("Ovaj prijedlog je već obrađen"), which is what
+stops a double-tap from duplicating records.
+
+`apiaryId`/`beehiveId` on the request are the page the user is on; they fill gaps only, and an explicitly
+spoken name always wins. Text length 1–4000; 40 turns/session cap → `422`. AI outage → `422` and
+**nothing persisted**. Plan-gated (Standard+, monthly quota) → `402` with `code: "plan-limit"`.
+Reuses `Groq:ApiKey`; model from `Groq:AssistantModel`.
+
+**Clarification.** Each turn in `AssistantSessionDetail.turns[]` carries a `candidates: [{
+label, text }][]` array — non-empty only on the **latest** assistant turn, and only when the resolver
+had something specific to offer (capped at 8, apiary/hive/todo/inspection ambiguity alike). Tapping a
+candidate is not a distinct endpoint: the client sends `candidates[i].text` to
+`POST /sessions/{id}/turns` exactly as if it had been typed.
+
+**Update, complete and delete.** `action.kind` also takes `UpdateTodo`, `CompleteTodo`,
+`UpdateInspection`, `DeleteTodo`, `DeleteInspection` — each targets an **existing** record the resolver
+found by title (todo) or date (inspection), never a new one. Two fields distinguish these from a create
+action on the wire:
+
+- `isDestructive: bool` — `true` for `UpdateTodo`/`UpdateInspection`/`DeleteTodo`/`DeleteInspection`,
+  `false` for every create kind **and** for `CompleteTodo` (a one-tap, reversible toggle, not held to
+  the same bar as overwriting or destroying a record). The client is expected to require an extra,
+  separate confirmation step before calling `/confirm` for a batch containing a `true`.
+- `previousFields` — the existing record's current values (same shape as `fields`), so the client can
+  show "prije → poslije" without a second request.
+
+For these kinds, `apiaryId`/`beehiveId` on a `POST /turns/{id}/confirm` item are **ignored** — the
+target is the one the resolver found at propose time, not something the client re-picks. Only `fields`
+flows through, and only the fields actually present are applied; the executor keeps everything else
+from the current record (`null` in the request means "do not change this").
 
 ---
 

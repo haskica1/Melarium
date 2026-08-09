@@ -39,6 +39,7 @@ import LearningTopicsAdminPage from './features/admin/LearningTopicsAdminPage'
 import LearningTopicFormPage from './features/admin/LearningTopicFormPage'
 import FeedbackAdminPage from './features/admin/FeedbackAdminPage'
 import AdvisorPage from './features/advisor/AdvisorPage'
+import AssistantPage from './features/assistant/AssistantPage'
 import SmartRedirect from './shared/components/SmartRedirect'
 import NotFoundPage from './shared/components/NotFoundPage'
 import ScanPage from './features/beehives/ScanPage'
@@ -132,6 +133,9 @@ export default function App() {
 
               {/* AI Advisor — all authenticated users */}
               <Route path="advisor" element={<AdvisorPage />} />
+
+              {/* AI Assistant (SPEC-17) — all authenticated users; the plan gate is server-side (402) */}
+              <Route path="assistant" element={<AssistantPage />} />
 
               {/* Learning (Edukacija) — all authenticated users */}
               <Route path="learning"     element={<LearningPage />} />

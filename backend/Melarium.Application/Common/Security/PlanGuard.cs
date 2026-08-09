@@ -80,8 +80,26 @@ public class PlanGuard : IPlanGuard
             PlanFeature.WeeklySummary => "Sedmični AI sažetak je dio plaćenih paketa — nadogradite na Standard.",
             PlanFeature.Pastures      => "Pašnjaci i selidbe su dio plaćenih paketa — nadogradite na Standard.",
             PlanFeature.PhotoAnalysis => "AI analiza fotografija je dio Pro paketa — nadogradite paket.",
+            PlanFeature.AiAssistant   => "AI asistent je dio plaćenih paketa — nadogradite na Standard.",
             _                         => "Ova funkcija nije dostupna u vašem paketu.",
         });
+    }
+
+    public async Task EnsureAiCommandAsync(int organizationId)
+    {
+        if (Bypass()) return;
+        var effective = await GetEffectivePlanAsync(organizationId);
+
+        if (effective == PlanType.Free)
+            throw new PlanLimitException("AI asistent je dio plaćenih paketa — nadogradite na Standard.");
+
+        var quota = Limit(effective, "AiCommandsPerMonth");
+        if (quota is null) return;
+
+        var used = await CountAiCommandsThisMonthAsync(organizationId);
+        if (used >= quota)
+            throw new PlanLimitException(
+                $"Iskoristili ste {quota} naredbi AI asistentu ovog mjeseca — Pro paket nema ograničenja.");
     }
 
     public async Task EnsureAdvisorMessageAsync(int organizationId)
@@ -109,6 +127,7 @@ public class PlanGuard : IPlanGuard
         var effective = PlanHelper.Effective(org.Plan, org.PlanValidUntil, DateTime.UtcNow);
 
         var advisorQuota = effective == PlanType.Free ? 0 : Limit(effective, "AdvisorMessagesPerMonth");
+        var assistantQuota = effective == PlanType.Free ? 0 : Limit(effective, "AiCommandsPerMonth");
 
         return new MyPlanDto
         {
@@ -128,6 +147,8 @@ public class PlanGuard : IPlanGuard
                 MembersLimit = Limit(effective, "MaxMembers"),
                 AdvisorMessagesThisMonth = await CountAdvisorMessagesThisMonthAsync(organizationId),
                 AdvisorMessagesLimit = advisorQuota,
+                AiCommandsThisMonth = await CountAiCommandsThisMonthAsync(organizationId),
+                AiCommandsLimit = assistantQuota,
             },
         };
     }
@@ -167,6 +188,17 @@ public class PlanGuard : IPlanGuard
         var now = DateTime.UtcNow;
         var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         return await _uow.AdvisorConversations.CountUserMessagesForOrganizationSinceAsync(organizationId, monthStart);
+    }
+
+    /// <summary>
+    /// Assistant commands used this month (SPEC-17). Charged on interpretation, not on confirmation —
+    /// a rejected proposal still consumed a Groq call, so it still counts.
+    /// </summary>
+    private async Task<int> CountAiCommandsThisMonthAsync(int organizationId)
+    {
+        var now = DateTime.UtcNow;
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        return await _uow.AiAssistantSessions.CountUserTurnsForOrganizationSinceAsync(organizationId, monthStart);
     }
 
     private static string Label(PlanType plan) => BsLabels.Label(plan);

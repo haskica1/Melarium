@@ -44,6 +44,9 @@ public class MelariumDbContext : DbContext
     public DbSet<CalendarSettings> CalendarSettings => Set<CalendarSettings>();
     public DbSet<Feedback> Feedbacks => Set<Feedback>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
+    public DbSet<AiAssistantSession> AiAssistantSessions => Set<AiAssistantSession>();
+    public DbSet<AiAssistantTurn> AiAssistantTurns => Set<AiAssistantTurn>();
+    public DbSet<AiAssistantAction> AiAssistantActions => Set<AiAssistantAction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

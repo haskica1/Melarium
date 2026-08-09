@@ -442,6 +442,39 @@ export const HELP_CONTENT: Record<HelpKey, HelpEntry> = {
   },
 
   // ── Advisor ─────────────────────────────────────────────────────────────────
+  '/assistant': {
+    title: 'AI Asistent',
+    summary:
+      'Recite ili napišite šta ste uradili, asistent pokaže šta je razumio, a zapis nastaje tek kad potvrdite.',
+    steps: [
+      'Pritisnite dugme sa zvjezdicom (dolje desno) na bilo kojoj stranici, ili otvorite „AI Asistent" u meniju.',
+      'Izgovorite ili napišite naredbu, npr. „Pregledana košnica 2 na pčelinjaku Zlatna dolina, 5 ramova legla, med zadovoljavajući, pregled za 10 dana".',
+      'Provjerite kartice koje asistent ponudi, ispravite šta treba i pritisnite „Potvrdi".',
+    ],
+    tips: [
+      'Ništa se ne upisuje dok ne potvrdite — dotad su to samo prijedlozi.',
+      'Jedna rečenica može napraviti više stvari: pregled i zadatak s rokom odjednom. Karticu koju ne želite jednostavno odčekirajte.',
+      'Možete reći jednu košnicu, nabrojati više njih („košnice 1, 2 i 3"), ili reći „sve košnice na pčelinjaku X".',
+      'Ako asistent nije pogodio pčelinjak ili košnicu, promijenite ih u padajućem meniju na kartici — ne morate ponavljati cijelu naredbu.',
+      'Kad ste na stranici košnice, ne morate je imenovati — asistent uzme tu košnicu.',
+      'Za savjete (šta uraditi, zašto je nešto tako) koristite AI Savjetnika; asistent samo unosi podatke.',
+    ],
+    faq: [
+      {
+        q: 'Šta ako asistent unese nešto pogrešno?',
+        a: 'Ne može — ne upisuje ništa bez vaše potvrde. A i nakon potvrde, zapis se uređuje i briše normalno, kao svaki drugi.',
+      },
+      {
+        q: 'Može li asistent dirati košnice koje nisu moje?',
+        a: 'Ne. Traži samo među pčelinjacima i košnicama kojima ionako imate pristup.',
+      },
+      {
+        q: 'Zašto dugme ne radi kad nemam signal?',
+        a: 'Prepoznavanje govora i razumijevanje naredbe rade na serveru. Bez interneta unesite pregled kroz formu — ona radi offline i pošalje se kad se signal vrati.',
+      },
+    ],
+  },
+
   '/advisor': {
     title: 'AI Savjetnik',
     summary:

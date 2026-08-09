@@ -239,6 +239,19 @@ public static class BsLabels
         _                            => s.ToString(),
     };
 
+    /// <summary>What an AI-assistant action will do, for the proposal card and the history page (SPEC-17).</summary>
+    public static string Label(AiActionKind k) => k switch
+    {
+        AiActionKind.CreateInspection => "Novi pregled",
+        AiActionKind.CreateTodo       => "Novi zadatak",
+        AiActionKind.UpdateTodo       => "Izmjena zadatka",
+        AiActionKind.CompleteTodo     => "Završetak zadatka",
+        AiActionKind.UpdateInspection => "Izmjena pregleda",
+        AiActionKind.DeleteTodo       => "Brisanje zadatka",
+        AiActionKind.DeleteInspection => "Brisanje pregleda",
+        _                             => k.ToString(),
+    };
+
     private static readonly string[] MonthsShort =
         { "jan", "feb", "mar", "apr", "maj", "jun", "jul", "avg", "sep", "okt", "nov", "dec" };
 

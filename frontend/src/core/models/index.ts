@@ -1272,6 +1272,9 @@ export interface PlanUsage {
   membersLimit?: number | null
   advisorMessagesThisMonth: number
   advisorMessagesLimit?: number | null
+  /** AI assistant commands used this month (SPEC-17); 0 = no access, null = unlimited. */
+  aiCommandsThisMonth: number
+  aiCommandsLimit?: number | null
 }
 
 export interface MyPlan {
@@ -1443,4 +1446,127 @@ export interface InvitationSummary {
 export interface ReferralInviter {
   inviterFirstName: string
   trialDays: number
+}
+
+// ── AI Assistant (SPEC-17) ──────────────────────────────────────────────────────
+
+/** Why a proposal card cannot be confirmed as-is. "None" means the target resolved. */
+export type AssistantIssue =
+  | 'None'
+  | 'ApiaryNotFound'
+  | 'ApiaryAmbiguous'
+  | 'HiveNotFound'
+  | 'HiveAmbiguous'
+  | 'NoHivesInApiary'
+  | 'MissingHive'
+  | 'MissingTitle'
+  | 'TodoNotFound'
+  | 'TodoAmbiguous'
+  | 'InspectionNotFound'
+  | 'InspectionAmbiguous'
+
+export type AssistantActionStatus = 'Pending' | 'Confirmed' | 'Rejected' | 'Failed'
+
+export interface AssistantFields {
+  /** ISO date, "yyyy-MM-dd" — a calendar date, not an instant. */
+  date?: string | null
+  honeyLevel?: HoneyLevel | null
+  broodStatus?: string | null
+  notes?: string | null
+  title?: string | null
+  priority?: TodoPriority | null
+  dueDate?: string | null
+}
+
+export type AssistantActionKind =
+  | 'CreateInspection' | 'CreateTodo'
+  | 'UpdateTodo' | 'CompleteTodo' | 'UpdateInspection' | 'DeleteTodo' | 'DeleteInspection'
+
+export interface AssistantAction {
+  id: number
+  kind: AssistantActionKind
+  kindLabel: string
+  status: AssistantActionStatus
+  targetSummary: string
+  issue: AssistantIssue
+  unresolvedHiveNumbers: string[]
+  apiaryId?: number | null
+  apiaryName?: string | null
+  beehiveId?: number | null
+  beehiveName?: string | null
+  fields: AssistantFields
+  resultEntityType?: string | null
+  resultEntityId?: number | null
+  errorMessage?: string | null
+  /** Phase C: true for update/complete/delete — needs a second, separate confirmation. */
+  isDestructive: boolean
+  /** Phase C: the existing record's current values, for an old → new comparison on the card. */
+  previousFields?: AssistantFields | null
+}
+
+/** A tappable follow-up option (Phase B). Tapping sends `text` as the next turn's message. */
+export interface AssistantCandidate {
+  label: string
+  text: string
+}
+
+export interface AssistantTurn {
+  id: number
+  role: 'User' | 'Assistant'
+  content: string
+  transcript?: string | null
+  createdAt: string
+  actions: AssistantAction[]
+  /** Non-empty only on the latest assistant turn, and only when something needed clarifying. */
+  candidates: AssistantCandidate[]
+}
+
+export interface AssistantSessionSummary {
+  id: number
+  title: string
+  lastActivityAt: string
+  createdAt: string
+}
+
+export interface AssistantSessionDetail extends AssistantSessionSummary {
+  turns: AssistantTurn[]
+}
+
+export interface AssistantExecutionResult {
+  actionId: number
+  status: AssistantActionStatus
+  targetSummary: string
+  resultEntityType?: string | null
+  resultEntityId?: number | null
+  errorMessage?: string | null
+}
+
+export interface AssistantConfirmResponse {
+  message: string
+  results: AssistantExecutionResult[]
+}
+
+export interface StartAssistantSessionPayload {
+  text: string
+  transcript?: string | null
+  apiaryId?: number | null
+  beehiveId?: number | null
+}
+
+export interface AssistantTurnPayload {
+  text: string
+  transcript?: string | null
+  apiaryId?: number | null
+  beehiveId?: number | null
+}
+
+export interface ConfirmActionItem {
+  id: number
+  apiaryId?: number | null
+  beehiveId?: number | null
+  fields: AssistantFields
+}
+
+export interface ConfirmActionsPayload {
+  actions: ConfirmActionItem[]
 }
