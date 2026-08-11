@@ -47,8 +47,8 @@ with zero changes to their code. Implemented per [SPEC-10](../specs/SPEC-10-apia
 ## Integrations
 
 - **Weather / frost alert / map links** — untouched by design (coordinate snapshot).
-- **Advisor context (SPEC-01)**: one line "Pašnjak: {name}, od {datum}" (preformatted `pastureLine`,
-  weather-line precedent), omitted when the apiary never moved.
+- **AI Asistent context (SPEC-17/18, originally SPEC-01's advisor)**: one line "Pašnjak: {name}, od
+  {datum}" (preformatted `pastureLine`, weather-line precedent), omitted when the apiary never moved.
 
 ## UI
 

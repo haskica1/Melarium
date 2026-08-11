@@ -14,7 +14,4 @@ public enum PlanFeature
 
     /// <summary>AI frame photo analysis, SPEC-05 (Pro+).</summary>
     PhotoAnalysis = 4,
-
-    /// <summary>AI assistant — voice/text commands that create records, SPEC-17 (Standard+).</summary>
-    AiAssistant = 5,
 }

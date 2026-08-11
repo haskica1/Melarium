@@ -34,7 +34,7 @@ export const useMyPlan = () =>
   })
 
 /** True when the effective plan can't use the given AI/pasture feature (proactive UI gating). */
-export function isFeatureLocked(plan: MyPlan | undefined, feature: 'voice' | 'advisor' | 'pastures' | 'photoAnalysis'): boolean {
+export function isFeatureLocked(plan: MyPlan | undefined, feature: 'voice' | 'pastures' | 'photoAnalysis'): boolean {
   if (!plan) return false // unknown → let the 402 backstop handle it rather than false-blocking
   const eff = plan.effectivePlan
   if (feature === 'photoAnalysis') return eff < PlanType.Pro

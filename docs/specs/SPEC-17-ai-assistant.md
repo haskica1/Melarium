@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | ✅ **Implemented 2026-08-09** — all three phases (ADR-033, `docs/features/ai-assistant.md`) |
+| **Status** | ✅ **Implemented 2026-08-09** — all three phases (ADR-033, `docs/features/ai-assistant.md`). **Extended the same day by SPEC-18**, which merges SPEC-01's Q&A capability in here and retires `/advisor` — see that spec for the addition; this document describes Phases A/B/C unchanged. |
 | **Effort** | L — Phase A ~4 days, Phase B ~1.5 days, Phase C ~2 days |
 | **Depends on** | nothing new. Reuses the Groq stack (SPEC-01: `ITranscriptionService`, the `GroqAdvisorAiClient` pattern), `IAccessGuard`, `IPlanGuard` (SPEC-09), `HiveNumberMatcher` (hive scanning), `AppTimeZone` (SPEC-11), `useVoiceInput` |
 | **New secrets / packages** | **none.** `Groq:ApiKey` is reused. Config only: `Groq:AssistantModel`, `Ai:MaxActionsPerCommand`, `Plans:{Plan}:AiCommandsPerMonth` |

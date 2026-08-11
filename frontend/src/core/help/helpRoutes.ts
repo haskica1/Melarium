@@ -39,7 +39,6 @@ export const HELP_ROUTES = [
   '/calendar/settings',
   '/calendar',
   '/assistant',
-  '/advisor',
   '/learning/:id',
   '/learning',
   '/stats',

@@ -1,4 +1,4 @@
-using Melarium.Application.Features.Advisor;
+using Melarium.Application.Features.Assistant;
 using Melarium.Domain.Common;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
@@ -6,9 +6,10 @@ using Xunit;
 
 namespace Melarium.Application.Tests;
 
-/// <summary>The hive-context block is the grounding the advisor answers from, so its rendering and
-/// truncation must be faithful and deterministic (SPEC-01).</summary>
-public class AdvisorContextBuilderTests
+/// <summary>The hive-context block is the grounding the assistant answers questions from when a hive
+/// is in scope (SPEC-18, originally SPEC-01's advisor), so its rendering and truncation must be
+/// faithful and deterministic.</summary>
+public class HiveContextBuilderTests
 {
     private static Beehive Hive() => new()
     {
@@ -39,7 +40,7 @@ public class AdvisorContextBuilderTests
             Purpose: TreatmentPurpose.Varroa, Method: ApplicationMethod.Strips,
             StartDate: new DateTime(2026, 6, 1), EndDate: null, WithdrawalDays: 0);
 
-        var text = AdvisorContextBuilder.Build(
+        var text = HiveContextBuilder.Build(
             Hive(), "Pčelinjak Sjever", inspections, [ActiveDiet()], todos, queen, seasonYieldKg: 14.5m,
             latestTreatment: treatment, pastureLine: "Kadulja, od 01.06.2026", weatherLine: "12°C trenutno, danas 8–22°C");
 
@@ -61,7 +62,7 @@ public class AdvisorContextBuilderTests
     {
         // "1 L 1:1" and "1 L 2:1" are the same litre and a different intervention — the note has to
         // reach the model, or the advice is grounded in half the fact.
-        var text = AdvisorContextBuilder.Build(
+        var text = HiveContextBuilder.Build(
             Hive(), "A", [], [ActiveDiet(amount: 1.5m, unit: FeedingAmountUnit.Litre, amountNote: "1:1",
                                         next: new DateTime(2026, 7, 12))],
             [], null, null, null, null, null);
@@ -72,7 +73,7 @@ public class AdvisorContextBuilderTests
     [Fact]
     public void Build_TwoOverlappingProgrammes_RendersOneLineEach()
     {
-        var text = AdvisorContextBuilder.Build(
+        var text = HiveContextBuilder.Build(
             Hive(), "A",
             [],
             [ActiveDiet(dietId: 1, food: FoodType.SugarSyrup), ActiveDiet(dietId: 2, food: FoodType.ProteinPatties)],
@@ -85,7 +86,7 @@ public class AdvisorContextBuilderTests
     [Fact]
     public void Build_WithoutData_StatesNoInspectionsAndOmitsOptionalSections()
     {
-        var text = AdvisorContextBuilder.Build(
+        var text = HiveContextBuilder.Build(
             Hive(), "Pčelinjak A", [], [], [], activeQueen: null,
             seasonYieldKg: null, latestTreatment: null, pastureLine: null, weatherLine: null);
 
@@ -107,7 +108,7 @@ public class AdvisorContextBuilderTests
             new() { Date = new DateTime(2026, 7, 1), HoneyLevel = HoneyLevel.Low, BroodStatus = longNote },
         };
 
-        var text = AdvisorContextBuilder.Build(
+        var text = HiveContextBuilder.Build(
             Hive(), "A", inspections, [], [], null, null, null, null, null);
 
         Assert.Contains("…", text);
@@ -122,7 +123,7 @@ public class AdvisorContextBuilderTests
             Purpose: TreatmentPurpose.Varroa, Method: ApplicationMethod.Trickling,
             StartDate: DateTime.UtcNow.AddDays(-10), EndDate: DateTime.UtcNow.AddDays(-2), WithdrawalDays: 30);
 
-        var text = AdvisorContextBuilder.Build(
+        var text = HiveContextBuilder.Build(
             Hive(), "A", [], [], [], null, null, treatment, null, null);
 
         var expectedUntil = treatment.EndDate!.Value.AddDays(30).ToString("dd.MM.yyyy");

@@ -60,13 +60,16 @@ public class AssistantFieldsDto
 
 // ── Responses ─────────────────────────────────────────────────────────────────
 
-public record AssistantSessionSummaryDto(int Id, string Title, DateTime LastActivityAt, DateTime CreatedAt);
+public record AssistantSessionSummaryDto(
+    int Id, string Title, DateTime LastActivityAt, DateTime CreatedAt, int? BeehiveId, string? BeehiveName);
 
 public record AssistantSessionDetailDto(
     int Id,
     string Title,
     DateTime LastActivityAt,
     DateTime CreatedAt,
+    int? BeehiveId,
+    string? BeehiveName,
     IReadOnlyList<AssistantTurnDto> Turns);
 
 /// <summary>

@@ -67,8 +67,9 @@ jsPDF built-in fonts are cp1252 (no č/ć/đ) → **DejaVu Sans embedded** as a 
 - **Alerts (SPEC-04):** two rules in `AlertRuleService` — `StripsLeftIn` (15): strips (`Trake`) with
   no `endDate` in for ≥ `Alerts:StripRemovalDays` (42) days; `KarencaEnded` (16): karenca expired
   within the last 3 days. Both apiary-level recipients, `relatedEntityType = Treatment`, 7-day dedup.
-- **Advisor context (SPEC-01):** one line per hive — "Zadnji tretman: {product} ({substance}),
-  {date}, status: …" via `ITreatmentRepository.GetLatestForBeehivesAsync` (`TreatmentLatestInfo`).
+- **AI Asistent context (SPEC-17/18, originally SPEC-01's advisor):** one line per hive — "Zadnji
+  tretman: {product} ({substance}), {date}, status: …" via
+  `ITreatmentRepository.GetLatestForBeehivesAsync` (`TreatmentLatestInfo`).
 
 ## UI
 
@@ -90,5 +91,5 @@ jsPDF built-in fonts are cp1252 (no č/ć/đ) → **DejaVu Sans embedded** as a 
 `TreatmentStatusHelperTests` — status/karencaUntil derivation incl. `endDate == null`, zero-karenca,
 and boundary days. `TreatmentServiceTests` — foreign-hive create → `ValidationException` (nothing
 saved); duplicate hive → 400 (validator); Beekeeper list filtered to treatments containing assigned
-hives, read-only; Beekeeper with no assignments → empty. `AdvisorContextBuilderTests` — treatment
-line rendering (U toku + Karenca do …).
+hives, read-only; Beekeeper with no assignments → empty. `HiveContextBuilderTests` (renamed from
+`AdvisorContextBuilderTests` by SPEC-18) — treatment line rendering (U toku + Karenca do …).

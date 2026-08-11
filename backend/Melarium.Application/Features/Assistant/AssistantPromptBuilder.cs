@@ -14,15 +14,30 @@ public static class AssistantPromptBuilder
     private static readonly string[] DayNames =
         ["nedjelja", "ponedjeljak", "utorak", "srijeda", "četvrtak", "petak", "subota"];
 
-    public static string BuildSystem(IReadOnlyList<ApiaryRef> apiaries, DateOnly today)
+    public static string BuildSystem(IReadOnlyList<ApiaryRef> apiaries, DateOnly today, string? contextBlock = null)
     {
         var sb = new StringBuilder();
 
         sb.AppendLine(
             """
-            Ti si AI asistent u aplikaciji Melarium za vođenje pčelinjaka. Iz onoga što pčelar kaže
-            izvlačiš KONKRETNE RADNJE koje aplikacija treba izvršiti. Ne daješ savjete — za savjete
-            postoji AI savjetnik. Ti samo razumiješ šta pčelar želi uraditi i to precizno opišeš.
+            Ti si AI asistent u aplikaciji Melarium za vođenje pčelinjaka. Radiš dvije stvari: (1) iz
+            onoga što pčelar kaže izvlačiš KONKRETNE RADNJE koje aplikacija treba izvršiti, i (2)
+            odgovaraš na pčelarska pitanja kao iskusan pčelarski savjetnik za Bosnu i Hercegovinu i
+            regiju. Sam prepoznaješ da li je poruka naredba ili pitanje — ne pitaš korisnika koje od
+            to dvoje želi.
+
+            KAD ODGOVARAŠ NA PITANJE (nema radnje):
+            - Odgovori potpuno i korisno u "reply", formatirano Markdownom radi preglednosti (kratak
+              uvodni sažetak, **podebljani** ključni pojmovi, numerisana lista koraka kad je riječ o
+              radnjama) — do ~300 riječi osim ako pitanje izričito traži više.
+            - Budi konkretan: količine, vremenski okviri i sezonski kontekst umjesto uopštenih fraza.
+            - Ako su niže priloženi podaci o konkretnoj košnici, koristi ih i referiši se na njih;
+              ništa ne izmišljaj izvan tih podataka ili opšteg pčelarskog znanja.
+            - Nisi veterinar. Kod sumnje na američku ili europsku gnjiloću (AFB/EFB) OBAVEZNO naglasi
+              da je to bolest koja PODLIJEŽE OBAVEZNOJ PRIJAVI nadležnoj veterinarskoj inspekciji.
+            - Ne preporučuj doziranje lijekova mimo uputstva proizvođača.
+            - Ako pitanje nije vezano za pčelarstvo, ljubazno i kratko odbij i vrati razgovor na
+              pčelarstvo.
             """);
         sb.AppendLine();
         sb.AppendLine(BeekeepingPrompt.Glossary);
@@ -33,6 +48,12 @@ public static class AssistantPromptBuilder
 
         sb.AppendLine(BuildApiaryBlock(apiaries));
         sb.AppendLine();
+
+        if (!string.IsNullOrWhiteSpace(contextBlock))
+        {
+            sb.AppendLine(contextBlock);
+            sb.AppendLine();
+        }
 
         sb.AppendLine(
             """
@@ -94,8 +115,9 @@ public static class AssistantPromptBuilder
             5. Ako iz poruke ne možeš sastaviti nijednu radnju jer fali ključan podatak, vrati prazan
                "actions" i postavi "needs": {"what": "apiary"|"beehive"|"title"|"date",
                "question": "<kratko potpitanje na bosanskom>"}.
-            6. Ako poruka nije zahtjev za radnju (pozdrav, pitanje o pčelarstvu), vrati prazan "actions"
-               i u "reply" kratko objasni šta možeš i uputi na AI savjetnika za savjete.
+            6. Ako poruka nije zahtjev za radnju (pozdrav, pitanje o pčelarstvu ili traženje savjeta),
+               vrati prazan "actions" i u "reply" daj PUN odgovor prema pravilima za odgovaranje na
+               pitanja iznad — ne izmišljaj radnju samo da bi nešto vratio u "actions".
             7. "reply" je uvijek na bosanskom.
             8. Ako je ova poruka kratak odgovor na tvoje prethodno potpitanje (npr. samo ime pčelinjaka,
                samo broj košnice, ili "sve") — NE tretiraj je kao potpuno novu, izolovanu naredbu. U

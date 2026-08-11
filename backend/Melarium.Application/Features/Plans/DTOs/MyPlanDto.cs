@@ -33,11 +33,8 @@ public class PlanUsageDto
     public int Members { get; set; }
     public int? MembersLimit { get; set; }
 
-    public int AdvisorMessagesThisMonth { get; set; }
-    /// <summary>0 = no advisor access on the effective plan; null = unlimited.</summary>
-    public int? AdvisorMessagesLimit { get; set; }
-
-    public int AiCommandsThisMonth { get; set; }
-    /// <summary>0 = no assistant access on the effective plan; null = unlimited (SPEC-17).</summary>
-    public int? AiCommandsLimit { get; set; }
+    /// <summary>AI assistant interactions this month — questions and commands both (SPEC-18).</summary>
+    public int AiInteractionsThisMonth { get; set; }
+    /// <summary>0 = no AI access on the effective plan; null = unlimited.</summary>
+    public int? AiInteractionsLimit { get; set; }
 }

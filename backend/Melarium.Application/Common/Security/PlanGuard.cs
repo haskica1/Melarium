@@ -80,12 +80,11 @@ public class PlanGuard : IPlanGuard
             PlanFeature.WeeklySummary => "Sedmični AI sažetak je dio plaćenih paketa — nadogradite na Standard.",
             PlanFeature.Pastures      => "Pašnjaci i selidbe su dio plaćenih paketa — nadogradite na Standard.",
             PlanFeature.PhotoAnalysis => "AI analiza fotografija je dio Pro paketa — nadogradite paket.",
-            PlanFeature.AiAssistant   => "AI asistent je dio plaćenih paketa — nadogradite na Standard.",
             _                         => "Ova funkcija nije dostupna u vašem paketu.",
         });
     }
 
-    public async Task EnsureAiCommandAsync(int organizationId)
+    public async Task EnsureAiInteractionAsync(int organizationId)
     {
         if (Bypass()) return;
         var effective = await GetEffectivePlanAsync(organizationId);
@@ -93,27 +92,10 @@ public class PlanGuard : IPlanGuard
         if (effective == PlanType.Free)
             throw new PlanLimitException("AI asistent je dio plaćenih paketa — nadogradite na Standard.");
 
-        var quota = Limit(effective, "AiCommandsPerMonth");
+        var quota = Limit(effective, "AiInteractionsPerMonth");
         if (quota is null) return;
 
-        var used = await CountAiCommandsThisMonthAsync(organizationId);
-        if (used >= quota)
-            throw new PlanLimitException(
-                $"Iskoristili ste {quota} naredbi AI asistentu ovog mjeseca — Pro paket nema ograničenja.");
-    }
-
-    public async Task EnsureAdvisorMessageAsync(int organizationId)
-    {
-        if (Bypass()) return;
-        var effective = await GetEffectivePlanAsync(organizationId);
-
-        if (effective == PlanType.Free)
-            throw new PlanLimitException("AI savjetnik je dio plaćenih paketa — nadogradite na Standard.");
-
-        var quota = Limit(effective, "AdvisorMessagesPerMonth");
-        if (quota is null) return;
-
-        var used = await CountAdvisorMessagesThisMonthAsync(organizationId);
+        var used = await CountAiInteractionsThisMonthAsync(organizationId);
         if (used >= quota)
             throw new PlanLimitException(
                 $"Iskoristili ste {quota} AI poruka ovog mjeseca — Pro paket nema ograničenja.");
@@ -126,8 +108,7 @@ public class PlanGuard : IPlanGuard
 
         var effective = PlanHelper.Effective(org.Plan, org.PlanValidUntil, DateTime.UtcNow);
 
-        var advisorQuota = effective == PlanType.Free ? 0 : Limit(effective, "AdvisorMessagesPerMonth");
-        var assistantQuota = effective == PlanType.Free ? 0 : Limit(effective, "AiCommandsPerMonth");
+        var aiQuota = effective == PlanType.Free ? 0 : Limit(effective, "AiInteractionsPerMonth");
 
         return new MyPlanDto
         {
@@ -145,10 +126,8 @@ public class PlanGuard : IPlanGuard
                 BeehivesLimit = Limit(effective, "MaxBeehives"),
                 Members = await CountAdditionalMembersAsync(organizationId),
                 MembersLimit = Limit(effective, "MaxMembers"),
-                AdvisorMessagesThisMonth = await CountAdvisorMessagesThisMonthAsync(organizationId),
-                AdvisorMessagesLimit = advisorQuota,
-                AiCommandsThisMonth = await CountAiCommandsThisMonthAsync(organizationId),
-                AiCommandsLimit = assistantQuota,
+                AiInteractionsThisMonth = await CountAiInteractionsThisMonthAsync(organizationId),
+                AiInteractionsLimit = aiQuota,
             },
         };
     }
@@ -182,19 +161,12 @@ public class PlanGuard : IPlanGuard
         return Math.Max(0, total - 1);
     }
 
-    /// <summary>Per-organization count, current UTC calendar month — resets implicitly on the 1st.</summary>
-    private async Task<int> CountAdvisorMessagesThisMonthAsync(int organizationId)
-    {
-        var now = DateTime.UtcNow;
-        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        return await _uow.AdvisorConversations.CountUserMessagesForOrganizationSinceAsync(organizationId, monthStart);
-    }
-
     /// <summary>
-    /// Assistant commands used this month (SPEC-17). Charged on interpretation, not on confirmation —
-    /// a rejected proposal still consumed a Groq call, so it still counts.
+    /// AI interactions used this month — questions and commands both (SPEC-18 merged the advisor's
+    /// quota into this one). Charged on interpretation, not on confirmation: a rejected proposal, or a
+    /// question that got a full answer, both still consumed a Groq call, so both still count.
     /// </summary>
-    private async Task<int> CountAiCommandsThisMonthAsync(int organizationId)
+    private async Task<int> CountAiInteractionsThisMonthAsync(int organizationId)
     {
         var now = DateTime.UtcNow;
         var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);

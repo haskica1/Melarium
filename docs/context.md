@@ -144,17 +144,14 @@
   `TreatmentFormPage` (product presets, hive checkboxes), `HiveTreatmentCard`, `ApiaryTreatmentsSection`
 - Covered by unit tests (`TreatmentServiceTests`, `TreatmentStatusHelperTests`). See `docs/features/treatments.md`.
 
-### AI Advisor (AI Savjetnik)
-- Bosnian chat advisor (text + voice) via `/api/advisor`; personal conversations, optionally bound to a hive
-- Hive-bound conversations grounded in real data (`AdvisorContextBuilder`: inspections, diet, todos, queen, yield, latest treatment, weather)
-- Reuses the Groq stack; transcription extracted to shared `ITranscriptionService`, chat via `IAdvisorAiClient`
-- Ownership enforced (404 for others); 60-msg cap; transactional AI (nothing persisted on failure); `ai-chat` 10/min
-- UI: "AI Savjetnik" sidebar, `/advisor` (all roles), "Pitaj savjetnika" on hive detail, voice→transcript→review→send
-- `useVoiceInput` moved to `core/hooks/`. Covered by unit tests. See `docs/features/ai-advisor.md`.
-
-### AI Assistant (AI Asistent, SPEC-17 — all three phases)
+### AI Assistant (AI Asistent, SPEC-17 all three phases + SPEC-18 Q&A merge)
 - Voice/text command → proposals → **explicit confirmation** → records. Creates, updates, completes or
   deletes **pregled**/**zadatak**; one sentence may produce several actions, each individually uncheckable
+- **Also answers beekeeping questions in the same conversation (SPEC-18):** an envelope with empty
+  `actions` and a full `reply` **is** the answer — no separate router step. Grounded in a hive's real
+  data (`HiveContextBuilder`, moved from the retired advisor's `AdvisorContextBuilder`: inspections,
+  diet, todos, queen, yield, latest treatment, weather) when one is in scope; access re-checked before
+  context is built (throws on session start, degrades silently on a later turn)
 - **ADR-033:** the executor builds the same DTOs the forms post and calls the **existing** services
   (`InspectionService`/`TodoService`, incl. their `Update`/`Delete`), never repositories — access, plan
   limits, auto-temperature and todo notifications all come along; it also runs the controllers'
@@ -164,9 +161,13 @@
 - Pure + unit-tested: `AiEnvelopeParser` (never throws on model output), `AiTargetResolver`,
   `AssistantPromptBuilder` ("danas" via `AppTimeZone`, not `UtcNow`)
 - Nothing persisted on AI failure; partial batch failure reported per action; double-confirm refused;
-  ceiling `Ai:MaxActionsPerCommand` (50). `PlanFeature.AiAssistant = 5`, Standard+ with a monthly quota
+  ceiling `Ai:MaxActionsPerCommand` (50). Standard+ with **one combined** monthly interaction quota
+  (`EnsureAiInteractionAsync`, `Plans:{Plan}:AiInteractionsPerMonth`) covering questions and commands
+  alike — merged from the previously separate advisor/assistant quotas
 - UI: floating `Sparkles` launcher in `Layout` (hidden offline), editable `ProposalCard`, `/assistant`
-  history page, "AI Asistent" nav. Reuses `ai-chat`/`voice-parse` limits — no new policy
+  history page, "AI Asistent" nav — the former separate "AI Savjetnik" nav item and `/advisor` route are
+  retired. Assistant replies render as Markdown (`MarkdownMessage`); a vet/AFB-EFB disclaimer footer
+  carried over from the advisor. Reuses `ai-chat`/`voice-parse` limits — no new policy
 - **Conversation:** unresolved apiary/hive/todo/inspection candidates become tappable buttons
   (`AssistantClarificationBuilder`, pure, capped at 8) on the **latest** assistant turn only
   (`CandidatesJson`, zeroed on every earlier turn); tapping sends the text as an ordinary new turn.
@@ -178,8 +179,11 @@
   The resolved target is **fixed at propose time**, never re-picked from the confirm request. A batch
   with any update/delete needs a **second, separate confirmation** (`isDestructive` on the action DTO)
   — `CompleteTodo` is deliberately excluded: it is a one-tap, reversible toggle everywhere else in the
-  app too. `AiActionExecutorTests` tests the real executor directly, not just through a mock.
-  See `docs/features/ai-assistant.md`.
+  app too. `AiActionExecutorTests` tests the real executor directly, not just through a mock
+- **Old advisor conversation history migrated, not discarded:** `deploy/data-migration/advisor-merge/`
+  copies `AdvisorConversations`/`AdvisorMessages` into the unified shape (run by hand against
+  production; dropping the old tables is a separate, later deploy). `useVoiceInput` lives in
+  `core/hooks/` (SPEC-01 precedent, unchanged). See `docs/features/ai-assistant.md`.
 
 ### Offline Inspections (Offline unos pregleda)
 - Frontend-only (SPEC-07): creating an inspection offline lands in an IndexedDB **outbox**
@@ -203,7 +207,7 @@
 - Optional `CertificateNumber` (veterinarska svjedodžba) po selidbi — legal, LOT precedent
 - UI: "Pašnjaci" nav (OrgAdmin+), `PasturesPage` (mapa + `LocationPickerModal`), chip trenutnog
   pašnjaka + "Preseli" modal + "Selidbe" sekcija na `ApiaryDetailPage`, "Prinos po pašnjaku" u Stats
-- Advisor kontekst: linija "Pašnjak: {name}, od {datum}". Testovi: `PastureAttributionTests`,
+- AI Asistent kontekst: linija "Pašnjak: {name}, od {datum}". Testovi: `PastureAttributionTests`,
   `ApiaryMoveServiceTests`, `PastureServiceTests`. See `docs/features/apiary-migration.md`.
 
 ### Learning (Edukacija)
@@ -320,7 +324,7 @@
 
 **All roadmap specs shipped** (see `docs/specs/README.md`).
 
-**Shipped (were specced):** SPEC-01 AI Advisor ✅, SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
+**Shipped (were specced):** SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
 
 **Unspecced ideas:**
 

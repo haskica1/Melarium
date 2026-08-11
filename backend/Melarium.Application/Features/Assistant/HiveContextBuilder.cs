@@ -5,14 +5,15 @@ using Melarium.Domain.Common;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
 
-namespace Melarium.Application.Features.Advisor;
+namespace Melarium.Application.Features.Assistant;
 
 /// <summary>
-/// Builds the compact plain-text hive-context block appended to the advisor's system prompt
-/// (SPEC-01). Pure and unit-testable: it takes already-fetched data and never does I/O. Sections are
-/// additive — a hive with no queen/diet/harvest simply omits those lines.
+/// Builds the compact plain-text hive-context block appended to the assistant's system prompt when a
+/// beehive is in scope (SPEC-18; originally SPEC-01's <c>AdvisorContextBuilder</c>). Pure and
+/// unit-testable: it takes already-fetched data and never does I/O. Sections are additive — a hive
+/// with no queen/diet/harvest simply omits those lines.
 /// </summary>
-public static class AdvisorContextBuilder
+public static class HiveContextBuilder
 {
     public static string Build(
         Beehive hive,

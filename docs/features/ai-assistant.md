@@ -2,15 +2,23 @@
 
 ## Overview
 
-A Bosnian-language command assistant. The beekeeper says or types what they did — *"Pregledana košnica 2
-na pčelinjaku Zlatna dolina, 5 ramova legla, med zadovoljavajući, pregled za 10 dana"* — and the
-assistant finds the apiary and hive itself, proposes the records, and creates them — or updates,
-completes or deletes an existing one it finds by title or date — **only after an explicit
-confirmation**. Implemented per [SPEC-17](../specs/SPEC-17-ai-assistant.md), all three phases; reuses
+A Bosnian-language AI assistant that does two things in one conversation. The beekeeper says or types
+what they did — *"Pregledana košnica 2 na pčelinjaku Zlatna dolina, 5 ramova legla, med zadovoljavajući,
+pregled za 10 dana"* — and the assistant finds the apiary and hive itself, proposes the records, and
+creates them — or updates, completes or deletes an existing one it finds by title or date — **only
+after an explicit confirmation**. Or the beekeeper asks a question — *"Kad se vrca lipov med?"* — and
+gets a full answer immediately, grounded in a specific hive's real data when one is in scope. Implemented
+per [SPEC-17](../specs/SPEC-17-ai-assistant.md) (Phases A/B/C: the command pipeline) and
+[SPEC-18](../specs/SPEC-18-ai-merge.md) (Q&A, merged in from the retired **AI Advisor**/SPEC-01). Reuses
 the Groq stack — no new provider, package or secret.
 
-Distinct from the **AI Advisor** (SPEC-01), which answers questions and writes nothing. Advisor = savjet,
-assistant = radnja.
+There used to be two AI surfaces — the assistant for actions, the advisor for questions — kept apart
+because a router guessing "question or command" seemed like a new failure mode and a chat bubble seemed
+like a poor host for an editable form (SPEC-17 §D2). Neither objection survived contact with how the
+pipeline actually turned out: the model's JSON envelope already allows an empty `actions` array, so a
+question needs no separate router step, and proposal cards were never rendered inside the reply bubble
+to begin with — Q&A just uses the `reply` field the envelope always had. See SPEC-18 §0 and the ADR-033
+addendum for the full reasoning.
 
 ## The rule the whole feature rests on (ADR-033)
 
@@ -29,7 +37,11 @@ miss and are therefore explicit in the code:
 
 - `AssistantPromptBuilder` — **pure**. System prompt: the shared beekeeping glossary, the action
   catalogue, and the org's apiary names in a fenced *data* block. "Today" comes from `AppTimeZone`,
-  never `DateTime.UtcNow`.
+  never `DateTime.UtcNow`. **SPEC-18**: takes an optional `contextBlock` string (a hive's grounding
+  data, when one is in scope — see Q&A below) and instructs the model to answer a non-command message
+  fully in `reply` instead of the old deflection to the (now-retired) advisor; the advisor's safety
+  guardrails (AFB/EFB mandatory reporting, no dosing beyond manufacturer instructions, decline
+  non-beekeeping topics) moved into this prompt verbatim.
 - `IAssistantAiClient` / `GroqAssistantAiClient` (`Features/Ai/`) — `Groq:AssistantModel`
   (default `llama-3.3-70b-versatile`), temp 0, `response_format: json_object`.
 - `AiEnvelopeParser` — **pure and total**. Never throws on model output: an unusable envelope returns
@@ -85,9 +97,35 @@ miss and are therefore explicit in the code:
   holding the assistant to a stricter bar than the rest of the UI would be inventing risk that is not
   there. A batch's second confirmation triggers only when it contains a destructive action.
 
+## Q&A (SPEC-18)
+
+A turn with an empty `actions` array and a full `reply` **is** the answer to a question — no separate
+code path, no classification step before the model call. What SPEC-18 adds is *grounding*:
+
+- **Trigger:** a beehive in scope — `dto.BeehiveId` on the turn, or (new) the session's own stored
+  `BeehiveId` once one has been set. Chosen over gating on "the envelope turned out to have zero
+  actions" because that fact is only known *after* the model call that would need the context — gating
+  on it would mean either a second, slower call, or a pre-call classifier duplicating what the single
+  call already does reliably. This is the exact trigger the advisor used from SPEC-01 onward.
+- **Data:** `HiveContextBuilder.Build(...)` (moved from the advisor's `AdvisorContextBuilder`, pure,
+  unchanged) renders hive + apiary + last 5 inspections + active diets + open todos + queen + season
+  yield + latest treatment + latest apiary move + best-effort weather into a compact Bosnian block,
+  assembled by a new `AiAssistantService.BuildHiveContextBlockAsync` that mirrors
+  `AdvisorService.BuildContextBlockAsync`'s repository calls exactly.
+- **Access control this introduces:** a `beehiveId` was previously only a resolver tie-breaker,
+  harmless if it belonged to someone else — an inaccessible id just failed to match anything. Actively
+  *reading* that hive's data into a prompt is a different trust level, so the same discipline the
+  advisor already had applies: `EnsureCanAccessBeehiveAsync` (throws) when a session is first bound to
+  a hive; `CanAccessBeehiveAsync` (non-throwing) on every later turn, silently dropping context — never
+  failing the turn — if access was withdrawn since.
+- **Session-level hive binding:** `AiAssistantSession` gained a nullable `BeehiveId` (migration
+  `AddAiAssistantSessionBeehive`, `SET NULL` on hive delete, same policy `AdvisorConversation` used) so
+  reopening an old session from history keeps its 🐝 chip and its grounding, not just the turn that
+  first established it.
+
 ## Domain
 
-`AiAssistantSession` (owner, cascade) → `AiAssistantTurn` (`Role`, `Content`, `Transcript?`,
+`AiAssistantSession` (owner, cascade, **`BeehiveId?`** — SPEC-18) → `AiAssistantTurn` (`Role`, `Content`, `Transcript?`,
 `RawModelJson?`, `CandidatesJson?`) → `AiAssistantAction` (`Kind`, `PayloadJson`, `TargetSummary`,
 `Status`, `ResultEntityType?`, `ResultEntityId?`, `ErrorMessage?`). Migrations `AddAiAssistant` (three
 new tables) and `AddAssistantClarification` (`CandidatesJson` column, Phase B) — nothing existing
@@ -101,16 +139,20 @@ already used for an unresolved action's candidates.
 
 ## Plans
 
-`PlanFeature.AiAssistant = 5`; `PlanGuard.EnsureAiCommandAsync` mirrors the advisor gate — Free throws,
-otherwise the org's user turns this UTC month are compared against `Plans:{Plan}:AiCommandsPerMonth`
-(Standard = 30, absent = unlimited). Charged on **interpretation**, not confirmation: a rejected
-proposal still consumed a Groq call. 402 reaches the existing upsell modal through `apiClient`.
+`PlanGuard.EnsureAiInteractionAsync` (SPEC-18; replaces the former separate `EnsureAiCommandAsync` and
+the advisor's `EnsureAdvisorMessageAsync`) — Free throws, otherwise the org's user turns this UTC month
+are compared against **one** combined `Plans:{Plan}:AiInteractionsPerMonth` (Standard = 30, absent =
+unlimited). One counter, not two, because the gate runs *before* the model call — the only point at
+which a turn could be pre-classified as "question" or "command" is after that call returns, so a
+combined pre-flight number is what the ordering actually requires, not just a simplification. Charged
+on **interpretation**, not confirmation: a rejected proposal, or a question that got a full answer,
+both still consumed a Groq call. 402 reaches the existing upsell modal through `apiClient`.
 
 ## API (`/api/assistant`)
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/sessions` | own summaries, newest activity first |
+| GET | `/sessions` | own summaries, newest activity first — each carries `beehiveId`/`beehiveName` (SPEC-18) |
 | GET | `/sessions/{id}` | thread with turns + actions (404 if not owner) |
 | POST | `/sessions` | `{ text, transcript?, apiaryId?, beehiveId? }` → 201; `ai-chat` 10/min |
 | POST | `/sessions/{id}/turns` | continues the thread; `ai-chat` |
@@ -131,8 +173,11 @@ without a second request.
   (transcription and interpretation are server-side) and on `/assistant` itself. Passes the route's
   apiary/hive as context, which fills gaps only.
 - `AssistantThread` — the thread: input (textarea + mic), messages, proposal cards, confirm bar. A
-  spoken command lands in the box for review and is **never** auto-sent, unlike the advisor's — it
-  creates records.
+  spoken command lands in the box for review and is **never** auto-sent — it can create records. An
+  assistant reply renders through the shared `MarkdownMessage` (SPEC-18, moved out of the retired
+  advisor's `ChatThread`) so a Q&A answer's headings/lists/bold render properly; user turns stay plain
+  text. A persistent footer disclaims that advice is informational and points AFB/EFB-type suspicions to
+  a vet — ported from the advisor, since the merged assistant now sometimes gives that class of answer.
 - `ProposalCard` — **editable**: apiary/hive selects plus the per-kind fields; "Potvrdi" stays disabled
   until the target (and, for a todo, the title) is set. When the apiary/hive lists fail to load, the
   card falls back to the names the server sent rather than claiming "Nije određeno". **Phase C**:
@@ -154,7 +199,13 @@ without a second request.
   Phase A. Built on the shared `Modal` primitive, not `ConfirmDialog` — that dialog's single
   `message: string` prop cannot hold a per-action diff or a delete's full record.
 - `AssistantPage` (`/assistant`) — history: every command, the interpretation, and what it created.
-- Sidebar "AI Asistent" (`Sparkles`), all roles. Help entry under `/assistant`.
+  **SPEC-18**: reads a `?beehiveId=` query param (`BeehiveDetailPage`'s **"Pitaj asistenta"** button,
+  formerly "Pitaj savjetnika" → `/advisor`) and passes it as `contextBeehiveId` for a fresh session,
+  clearing the param once one exists; shows a 🐝 hive chip from the deep link before a session exists
+  and from the session's own `beehiveId` afterward — mirroring the retired `AdvisorPage`'s chip exactly.
+- Sidebar "AI Asistent" (`Sparkles`), all roles — the former separate "AI Savjetnik" entry and `/advisor`
+  route are gone (SPEC-18).
+- Help entry under `/assistant` now covers both commands and questions; the old `/advisor` entry is gone.
 - `useVoiceInput` reused unchanged. Requests use `timeout: 60_000` to match the backend's Groq budget.
 
 ## Tests
@@ -169,8 +220,18 @@ the `needs`-only fallback, the ceiling short-circuit, plus Phase C's todo/inspec
 `AiAssistantServiceTests` (404 for non-owners, plan gate before the model, nothing persisted on AI
 failure, pre-flight, untrusted confirm payload, per-action partial failure, double-confirm, the
 candidate/continuation pipeline, plus Phase C's `IsDestructive`/`PreviousFields` wiring and the
-confirm-time target lock). `AiActionExecutorTests` tests the real executor directly (not just through
-the `IAiActionExecutor` mock every other test uses) — field preservation, refusing an already-completed
-todo, and a record that changed or vanished between propose and confirm failing gracefully. Groq mocked
-via `IAssistantAiClient` — no network, no database. `BeekeepingPromptTests` locks the voice-inspection
-prompt byte-for-byte across the glossary extraction. 546/546 backend tests green.
+confirm-time target lock, plus **SPEC-18**'s: a zero-action/no-`needs` turn renders as a plain answer
+with no cards, context is built only when a hive is in scope, an inaccessible `beehiveId` at session
+start is rejected before the model is ever called, and a since-revoked hive on a later turn drops
+context silently instead of failing the turn). `AiActionExecutorTests` tests the real executor directly
+(not just through the `IAiActionExecutor` mock every other test uses) — field preservation, refusing an
+already-completed todo, and a record that changed or vanished between propose and confirm failing
+gracefully. `HiveContextBuilderTests` (moved from the advisor's `AdvisorContextBuilderTests` — full/empty
+data, 200-char truncation) and a new `AssistantPromptBuilderTests` (the Q&A rule present, the old
+advisor deflection gone, the carried-over safety guardrails present, date injection still exact) close a
+gap: the prompt's wording was previously untested despite its own doc comment claiming otherwise. Groq
+mocked via `IAssistantAiClient` — no network, no database. `BeekeepingPromptTests` locks the
+voice-inspection prompt byte-for-byte across the glossary extraction. `PlanGuardTests` covers the merged
+`EnsureAiInteractionAsync` (Free blocks, quota exhausted blocks, under quota passes, absent key
+unlimited, SystemAdmin bypass) — closing a gap where the assistant's own gate previously had no direct
+test, only a mocked `IPlanGuard` in `AiAssistantServiceTests`. 552/552 backend tests green.

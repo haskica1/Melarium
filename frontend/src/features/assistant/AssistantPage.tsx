@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { format } from 'date-fns'
 import { Loader2, MessageSquarePlus, Sparkles, Trash2 } from 'lucide-react'
 import {
@@ -6,6 +7,7 @@ import {
   useAssistantSessions,
   useDeleteAssistantSession,
 } from '../../core/services/assistantQueries'
+import { useBeehive } from '../../core/services/queries'
 import { AssistantThread } from './AssistantThread'
 import type { AssistantSessionDetail } from '../../core/models'
 
@@ -15,15 +17,26 @@ import type { AssistantSessionDetail } from '../../core/models'
  * looking back at what was done.
  */
 export default function AssistantPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialBeehiveId = searchParams.get('beehiveId')
+
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const { data: sessions = [], isLoading } = useAssistantSessions()
   const { data: session } = useAssistantSession(selectedId ?? 0)
+  // Only resolved before a session exists yet, to show the hive's name in the chip early (SPEC-18).
+  const { data: deepLinkHive } = useBeehive(selectedId == null && initialBeehiveId ? Number(initialBeehiveId) : 0)
   const remove = useDeleteAssistantSession()
 
   async function handleDelete(id: number) {
     await remove.mutateAsync(id)
     if (selectedId === id) setSelectedId(null)
   }
+
+  // Before a session exists, the chip shows the hive named in the deep link; once one exists, its
+  // own beehiveId is the source of truth (it may outlive the query param, or the hive since deleted).
+  const chipLabel = selectedId == null
+    ? (initialBeehiveId ? (deepLinkHive?.name ?? `Košnica #${initialBeehiveId}`) : null)
+    : (session?.beehiveId != null ? (session.beehiveName ?? '(obrisana)') : null)
 
   return (
     <div className="h-[calc(100vh-8rem)] flex gap-4">
@@ -93,17 +106,26 @@ export default function AssistantPage() {
             ← Nazad
           </button>
           <Sparkles className="w-5 h-5 text-honey-500" />
-          <h1 className="text-sm font-semibold text-gray-800 dark:text-slate-100 truncate">
+          <h1 className="text-sm font-semibold text-gray-800 dark:text-slate-100 truncate flex-1">
             {session?.title ?? 'AI asistent'}
           </h1>
+          {chipLabel && (
+            <span className="shrink-0 text-xs text-honey-700 dark:text-honey-300 bg-honey-100 dark:bg-honey-500/15 rounded-full px-2.5 py-1">
+              🐝 {chipLabel}
+            </span>
+          )}
         </header>
 
         <div className="flex-1 min-h-0">
           {/* Keyed on the session so switching threads resets the drafts and the input. */}
           <AssistantThread
             key={selectedId ?? 'new'}
+            contextBeehiveId={selectedId == null && initialBeehiveId ? Number(initialBeehiveId) : undefined}
             initialSession={session as AssistantSessionDetail | undefined}
-            onSessionChanged={updated => setSelectedId(updated.id)}
+            onSessionChanged={updated => {
+              setSelectedId(updated.id)
+              if (initialBeehiveId) setSearchParams({}, { replace: true })
+            }}
           />
         </div>
       </section>

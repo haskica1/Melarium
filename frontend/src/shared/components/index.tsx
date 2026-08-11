@@ -6,6 +6,7 @@ export { VitalCard } from './VitalCard'
 export type { VitalCardProps } from './VitalCard'
 export { Modal } from './Modal'
 export type { ModalProps } from './Modal'
+export { MarkdownMessage } from './MarkdownMessage'
 
 // ── LoadingSpinner ─────────────────────────────────────────────────────────────
 

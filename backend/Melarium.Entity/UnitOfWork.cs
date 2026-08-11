@@ -33,7 +33,6 @@ public class UnitOfWork : IUnitOfWork
     private INotificationRepository? _notifications;
     private IRefreshTokenRepository? _refreshTokens;
     private IUserTokenRepository? _userTokens;
-    private IAdvisorConversationRepository? _advisorConversations;
     private ICalendarSettingsRepository? _calendarSettings;
     private IFeedbackRepository? _feedbacks;
     private IInvitationRepository? _invitations;
@@ -103,9 +102,6 @@ public class UnitOfWork : IUnitOfWork
 
     public IUserTokenRepository UserTokens =>
         _userTokens ??= new UserTokenRepository(_context);
-
-    public IAdvisorConversationRepository AdvisorConversations =>
-        _advisorConversations ??= new AdvisorConversationRepository(_context);
 
     public ICalendarSettingsRepository CalendarSettings =>
         _calendarSettings ??= new CalendarSettingsRepository(_context);

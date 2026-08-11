@@ -17,7 +17,7 @@ public class LearningTopicServiceTests
 {
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly INotificationService _notifications = Substitute.For<INotificationService>();
-    private readonly IAdvisorAiClient _ai = Substitute.For<IAdvisorAiClient>();
+    private readonly IProseAiClient _ai = Substitute.For<IProseAiClient>();
 
     private LearningTopicService Service(int? userId = 1) =>
         new(_uow, new TestCurrentUser { UserId = userId, Role = UserRole.Beekeeper }, _notifications, _ai);

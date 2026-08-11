@@ -12,7 +12,7 @@ import {
 } from '../../core/services/assistantQueries'
 import { useApiaries, useAllBeehives } from '../../core/services/queries'
 import { plural } from '../../shared/utils/plural'
-import { Modal } from '../../shared/components'
+import { MarkdownMessage, Modal } from '../../shared/components'
 import type { AssistantAction, AssistantSessionDetail, AssistantTurn } from '../../core/models'
 import { DeletePreview, ProposalCard, UpdateSummary, isDeleteKind, isDraftComplete, type ProposalDraft } from './ProposalCard'
 
@@ -28,6 +28,7 @@ interface AssistantThreadProps {
 const EXAMPLES = [
   'Pregledana košnica 2 na pčelinjaku Zlatna dolina, 5 ramova legla, med zadovoljavajući, pregled za 10 dana.',
   'Na pčelinjaku Zlatna dolina dodaj zadatak Dodaj postolje, srednji prioritet, do sljedeće sedmice.',
+  'Pčele su agresivne i ima dosta matičnjaka, šta da radim?',
 ]
 
 export function AssistantThread({
@@ -216,10 +217,10 @@ export function AssistantThread({
           <div className="text-center py-6">
             <Sparkles className="w-8 h-8 mx-auto text-honey-500" />
             <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-slate-100">
-              Recite šta ste uradili — ja ću pripremiti unos.
+              Recite šta ste uradili ili postavite pitanje o pčelarstvu.
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
-              Ništa se ne upisuje dok ne potvrdite.
+              Naredbe se izvršavaju tek kad ih potvrdite — pitanja dobijaju odgovor odmah.
             </p>
             <div className="mt-4 space-y-2 text-left">
               {EXAMPLES.map(example => (
@@ -245,7 +246,7 @@ export function AssistantThread({
             ) : (
               <div className="space-y-2">
                 <div className="max-w-[95%] rounded-2xl rounded-bl-sm bg-gray-100 dark:bg-slate-800 dark:text-slate-100 px-3.5 py-2 text-sm">
-                  {turn.content}
+                  <MarkdownMessage content={turn.content} />
                 </div>
                 {turn.id === clarification?.id && (
                   <div className="flex flex-wrap gap-1.5 max-w-[95%]">
@@ -350,6 +351,11 @@ export function AssistantThread({
         </div>
       </Modal>
 
+      {/* Disclaimer — the assistant now also gives advice (SPEC-18), not just data entry */}
+      <p className="px-4 py-1.5 text-[11px] leading-snug text-gray-400 dark:text-slate-500 border-t border-honey-50 dark:border-slate-800/60">
+        Savjeti su informativni — za bolesti koje podliježu prijavi obavezno kontaktiraj veterinarsku službu.
+      </p>
+
       {/* Input */}
       <div className="border-t border-honey-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-3">
         {!online && (
@@ -374,7 +380,7 @@ export function AssistantThread({
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send() }
             }}
             rows={1}
-            placeholder="Recite ili napišite šta ste uradili…"
+            placeholder="Recite ili napišite šta ste uradili, ili postavite pitanje…"
             disabled={!online || (busy && !transcribing)}
             className="flex-1 resize-none max-h-40 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-2 focus:ring-honey-100 transition-all"
           />

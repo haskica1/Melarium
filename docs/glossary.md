@@ -21,8 +21,9 @@ Domain terms used in Melarium. Use these names exactly — in code, docs, and UI
 | Harvest Entry | `HarvestEntry` | The per-hive line of a Harvest: kg extracted (and optional frames) from one Beehive. |
 | Yield | `TotalKg` / *prinos* | Honey extracted, in kg — per harvest, per hive/season, or aggregated on the Stats page. |
 | Honey Type | `HoneyType` | Botanical honey variety of a harvest. English enum (`Acacia`…), Bosnian labels via `BsLabels` (Bagrem, Lipa, Kesten, Suncokret, Livadski, Šumski, Uljana repica, Ostalo). |
-| Advisor Conversation | `AdvisorConversation` | A personal AI-advisor chat thread (*AI Savjetnik*), optionally bound to a hive. Owned by one user; never org-shared. |
-| Advisor Message | `AdvisorMessage` | One message in a conversation (`Role` = User or Assistant). |
+| Assistant Session | `AiAssistantSession` | A personal AI Asistent conversation thread (SPEC-17/18), optionally bound to a hive. Owned by one user; never org-shared. Replaced the retired *AI Savjetnik*'s `AdvisorConversation`. |
+| Assistant Turn | `AiAssistantTurn` | One turn in a Session (`Role` = User or Assistant) — a typed/spoken command, a question, or the assistant's reply/answer. May carry proposed Actions (empty for a Q&A turn). |
+| Assistant Action | `AiAssistantAction` | One proposed create/update/complete/delete on a Turn — a `Pending` card until the user confirms or rejects it. |
 | Supersedure | `QueenOrigin.Supersedure` | *Tiha zamjena* — the colony replaces its queen on its own, without beekeeper intervention or swarming. |
 | QR Code | `qrCode` | A Base64 PNG image encoding a Beehive's `uniqueId`. Used for physical hive scanning. |
 | Unique ID | `uniqueId` | A Guid assigned to a Beehive at creation. Stable, never changes. Encoded in the QR code. |

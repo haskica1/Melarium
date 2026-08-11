@@ -148,15 +148,15 @@ HTTP `200 OK`, `201 Created`, `204 No Content` — response body is the DTO dire
 | GET | `/organizations/my-plan` | `MyPlanDto` — any authenticated org member; org-less SystemAdmin → `404` |
 | PUT | `/admin/organizations/{id}/plan` | `200 + AdminOrganizationDto` — SystemAdmin only; body `{ plan, planValidUntil?, planNotes? }`; accepts all five plans incl. Partner |
 
-**MyPlanDto:** `{ plan, planName, effectivePlan, effectivePlanName, planValidUntil?, planNotes?, usage: { apiaries, apiariesLimit?, beehives, beehivesLimit?, members, membersLimit?, advisorMessagesThisMonth, advisorMessagesLimit?, aiCommandsThisMonth, aiCommandsLimit? } }` — a null limit means unlimited for the effective plan.
+**MyPlanDto:** `{ plan, planName, effectivePlan, effectivePlanName, planValidUntil?, planNotes?, usage: { apiaries, apiariesLimit?, beehives, beehivesLimit?, members, membersLimit?, aiInteractionsThisMonth, aiInteractionsLimit? } }` — a null limit means unlimited for the effective plan. `aiInteractionsThisMonth`/`Limit` (SPEC-18) cover both AI questions and commands under one combined quota — previously two separate fields for the advisor and the assistant.
 
 **PlanType:** `Free=1, Standard=2, Pro=3, Max=4, Partner=5` (Partner is hidden from public UI).
 
 **Plan-limit error:** exceeding a plan limit returns **402 Payment Required** with a top-level
 `code: "plan-limit"` and `errors.detail[0]` = Bosnian message (distinct from 403 so the frontend
-renders an upsell). Gated actions: create apiary/beehive/member, voice parse, advisor create/send
-(+ monthly quota on Standard), pasture/move create, photo AI analysis. `AdminOrganizationDto` gained
-`plan`/`planName`/`planValidUntil`/`planNotes`.
+renders an upsell). Gated actions: create apiary/beehive/member, voice parse, AI assistant interaction
+(question or command, + monthly quota on Standard), pasture/move create, photo AI analysis.
+`AdminOrganizationDto` gained `plan`/`planName`/`planValidUntil`/`planNotes`.
 
 ---
 
@@ -315,28 +315,15 @@ accounts created before the field existed).
 
 ---
 
-### AI Advisor
+### AI Assistant (SPEC-17 + SPEC-18)
+
+Merged in SPEC-18 from a formerly separate `/api/advisor` — that endpoint, and the `AdvisorConversation`/
+`AdvisorMessage` data behind it, no longer exist in the running app (old conversation history was
+migrated into the shape below; see `deploy/data-migration/advisor-merge/`).
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/advisor/conversations` | `AdvisorConversationSummary[]` (own only, newest activity first) |
-| GET | `/advisor/conversations/{id}` | `AdvisorConversationDetail` (with messages; 404 if not owner) |
-| POST | `/advisor/conversations` | `201 + AdvisorConversationDetail` — `{ beehiveId?, message }`; `ai-chat` 10/min |
-| POST | `/advisor/conversations/{id}/messages` | `200 + { userMessage, assistantMessage }`; `ai-chat` 10/min |
-| POST | `/advisor/transcribe` | `{ transcript }` — multipart audio, 15 MB cap, `voice-parse` policy |
-| DELETE | `/advisor/conversations/{id}` | `204` (owner only) |
-
-**Grounding:** when `beehiveId` is set, answers are grounded in that hive's data (access checked via
-`IAccessGuard`). Message length 1–4000; 60 messages/conversation cap → `422`. AI outage → `422` with a
-Bosnian message and **nothing persisted**. Reuses `Groq:ApiKey`.
-
----
-
-### AI Assistant (SPEC-17)
-
-| Method | Path | Returns |
-|---|---|---|
-| GET | `/assistant/sessions` | `AssistantSessionSummary[]` (own only, newest activity first) |
+| GET | `/assistant/sessions` | `AssistantSessionSummary[]` (own only, newest activity first) — each carries `beehiveId?`/`beehiveName?` |
 | GET | `/assistant/sessions/{id}` | `AssistantSessionDetail` (turns + actions; 404 if not owner) |
 | POST | `/assistant/sessions` | `201 + AssistantSessionDetail` — `{ text, transcript?, apiaryId?, beehiveId? }`; `ai-chat` 10/min |
 | POST | `/assistant/sessions/{id}/turns` | `200 + AssistantSessionDetail`; `ai-chat` 10/min |
@@ -344,6 +331,14 @@ Bosnian message and **nothing persisted**. Reuses `Groq:ApiKey`.
 | POST | `/assistant/turns/{id}/reject` | `204` |
 | POST | `/assistant/transcribe` | `{ transcript }` — multipart audio, 15 MB cap, `voice-parse` policy |
 | DELETE | `/assistant/sessions/{id}` | `204` (owner only) |
+
+**A turn with an empty `actions` array and a full `reply` is a question's answer, not an unfinished
+proposal (SPEC-18).** There is no separate "ask a question" endpoint or flag — the same `POST /sessions`
+and `POST /sessions/{id}/turns` calls handle both; the model's own envelope decides which this turn was.
+When `beehiveId` resolves to an accessible hive, the answer is grounded in that hive's real data
+(inspections, diet, todos, queen, yield, latest treatment, weather) the same way a command's target
+resolution uses it — the session remembers the hive it was first bound to, so later turns in the same
+session stay grounded even without repeating `beehiveId`.
 
 **Proposals are not writes.** `POST /sessions` only stores `Pending` actions; records are created on
 `confirm`, which returns a result **per action** — a batch can partly fail and the response says so.
@@ -355,8 +350,10 @@ stops a double-tap from duplicating records.
 
 `apiaryId`/`beehiveId` on the request are the page the user is on; they fill gaps only, and an explicitly
 spoken name always wins. Text length 1–4000; 40 turns/session cap → `422`. AI outage → `422` and
-**nothing persisted**. Plan-gated (Standard+, monthly quota) → `402` with `code: "plan-limit"`.
-Reuses `Groq:ApiKey`; model from `Groq:AssistantModel`.
+**nothing persisted**. Plan-gated (Standard+, **one combined** monthly quota covering questions and
+commands alike — `Plans:{Plan}:AiInteractionsPerMonth`, checked before the Groq call since a turn's kind
+is only known after it returns) → `402` with `code: "plan-limit"`. Reuses `Groq:ApiKey`; model from
+`Groq:AssistantModel`.
 
 **Clarification.** Each turn in `AssistantSessionDetail.turns[]` carries a `candidates: [{
 label, text }][]` array — non-empty only on the **latest** assistant turn, and only when the resolver

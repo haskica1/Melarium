@@ -18,7 +18,7 @@
 
 | # | Spec | One-liner | Effort | Depends on | Status |
 |---|------|-----------|--------|------------|--------|
-| 01 | [AI Advisor](SPEC-01-ai-advisor.md) | Chat savjetnik (tekst + glas) koji poznaje korisnikove košnice | M/L | — | ✅ Implemented (2026-07-03) |
+| 01 | [AI Advisor](SPEC-01-ai-advisor.md) | Chat savjetnik (tekst + glas) koji poznaje korisnikove košnice | M/L | — | ✅ Implemented (2026-07-03) — superseded by 18 |
 | 02 | [Harvest Log](SPEC-02-harvests.md) | Evidencija vrcanja: kg meda po košnici/sezoni + profitabilnost | M | — | ✅ Implemented (2026-07-03) |
 | 03 | [Queen Tracking](SPEC-03-queens.md) | Matice: starost, boja oznake, porijeklo, historija zamjena | S/M | — | ✅ Implemented (2026-07-02) |
 | 04 | [Smart Alerts & Weekly Summary](SPEC-04-smart-alerts.md) | Automatska upozorenja (pregledi, med, mraz, matica) + sedmični AI sažetak | M | 03 (partly) | ✅ Implemented (2026-07-03) |
@@ -34,7 +34,8 @@
 | 14 | [In-App Help](SPEC-14-in-app-help.md) | Kontekstualna pomoć po stranici (info ikona + panel), uvodni flow za nove korisnike i izvedena "Prvi koraci" lista | M | — (soft-link 06) | ✅ Implemented (2026-07-30) |
 | 15 | [Invite a Friend](SPEC-15-invite-friend.md) | "Pozovi prijatelja": lični link + email pozivnica na platformu. Pozvani dobija 60 dana trial-a umjesto 30, pozivalac +30 dana na svoj paket kad pozvani potvrdi e-poštu, uz plafon od 180 dana po organizaciji | M | — (reuse ADR-021 queue, SPEC-09 planovi) | 🔨 Faza 1 (2026-08-06) · Faza 2 (e-mail kanal) planirana |
 | 16 | [Org Activity & Status](SPEC-16-org-activity-retention.md) | Da li se organizacija *koristi*: heartbeat aktivnosti + izračunat status (Aktivna / Uspavana / Za brisanje) i radne liste za naplatu u admin tabeli, ručni prekidač "Neaktivna" koji blokira prijavu, i popravljeno ručno brisanje organizacije. **Ništa se ne briše automatski** | M | — (extends 09, reuse ADR-021/027) | 📋 Planned — odluke donesene, spremno za Fazu A |
-| 17 | [AI Asistent](SPEC-17-ai-assistant.md) | Glasovna ili tekstualna naredba → AI pokaže šta je razumio → korisnik potvrdi → radnja se izvrši. Sam pronalazi pčelinjak i košnicu, radi više radnji iz jedne rečenice, razgovorom razrješava nejasnoće, i mijenja/briše postojeće zapise uz drugu potvrdu | L | — (reuse 01 Groq stack, 09 paketi) | ✅ Implemented (2026-08-09) |
+| 17 | [AI Asistent](SPEC-17-ai-assistant.md) | Glasovna ili tekstualna naredba → AI pokaže šta je razumio → korisnik potvrdi → radnja se izvrši. Sam pronalazi pčelinjak i košnicu, radi više radnji iz jedne rečenice, razgovorom razrješava nejasnoće, i mijenja/briše postojeće zapise uz drugu potvrdu | L | — (reuse 01 Groq stack, 09 paketi) | ✅ Implemented (2026-08-09) — Q&A extended by 18 |
+| 18 | [Spajanje AI Savjetnika u AI Asistenta](SPEC-18-ai-merge.md) | Jedan AI umjesto dva: Asistent sad i odgovara na pitanja (uz kontekst košnice kad je u fokusu), ne samo izvršava naredbe. `/advisor` se gasi, stara historija se migrira, mjesečna kvota se spaja u jednu | M | 01, 17 | 🔨 U implementaciji (2026-08-09) |
 
 **Recommended order = index order.** Rationale:
 
@@ -93,6 +94,19 @@
   have invented risk the rest of the UI does not recognize for the identical action. It does **not** fix the
   pre-existing `DateTime.UtcNow`-as-local bug in `VoiceParsingService` (§3.1): new code uses `AppTimeZone`, the
   old bug is tracked separately.
+- **SPEC-18** was written and started 2026-08-09, the day after SPEC-17 shipped. It answers a question
+  SPEC-17 §D2 had itself already asked and rejected — merging the advisor into the assistant — and explains
+  why the two objections that killed it then (a router guessing "question or command", a chat bubble hosting
+  an editable form) no longer apply now that Phases A/B/C actually exist: the envelope's `actions` array was
+  always allowed to be empty, so "this was a question" needs no separate router step, and proposal cards were
+  never rendered inside the reply bubble to begin with. It is deliberately **additive** to SPEC-17's own
+  behaviour (Phases A/B/C are untouched) plus a retirement of SPEC-01's surface. Two decisions were made
+  explicitly rather than inferred: old advisor conversations are **migrated**, not archived or discarded, into
+  the unified history (`deploy/data-migration/advisor-merge/`, run by hand against production, same rigor as
+  the July 2026 old-database import); and the two previously-separate monthly quotas become **one** combined
+  counter, because the quota gate necessarily runs *before* the model call that would reveal whether a turn
+  was a question or a command — a single pre-flight number is not just simpler, it is what that ordering
+  requires.
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD

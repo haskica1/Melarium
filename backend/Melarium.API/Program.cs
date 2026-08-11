@@ -94,7 +94,7 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
-// Shared Groq Whisper transcription (reused by voice inspections and the AI advisor).
+// Shared Groq Whisper transcription (reused by voice inspections and the AI assistant).
 builder.Services.AddHttpClient<ITranscriptionService, GroqTranscriptionService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);
@@ -107,13 +107,14 @@ builder.Services.AddHttpClient<IVoiceParsingService, VoiceParsingService>(client
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 
-// AI advisor chat client — Groq Llama chat completions (plain-text Bosnian answers).
-builder.Services.AddHttpClient<IAdvisorAiClient, GroqAdvisorAiClient>(client =>
+// Free-form Groq prose replies — originally the AI advisor's client (SPEC-01, retired into the
+// assistant by SPEC-18); LearningTopicService also uses it to draft a topic's Bosnian summary.
+builder.Services.AddHttpClient<IProseAiClient, GroqProseAiClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 
-// AI assistant command interpretation (SPEC-17) — Groq Llama constrained to a JSON envelope.
+// AI assistant command interpretation (SPEC-17/18) — Groq Llama constrained to a JSON envelope.
 builder.Services.AddHttpClient<IAssistantAiClient, GroqAssistantAiClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);

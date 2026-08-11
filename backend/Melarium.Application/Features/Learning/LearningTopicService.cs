@@ -22,13 +22,13 @@ public class LearningTopicService : ILearningTopicService
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUser _currentUser;
     private readonly INotificationService _notifications;
-    private readonly IAdvisorAiClient _ai;
+    private readonly IProseAiClient _ai;
 
     public LearningTopicService(
         IUnitOfWork uow,
         ICurrentUser currentUser,
         INotificationService notifications,
-        IAdvisorAiClient ai)
+        IProseAiClient ai)
     {
         _uow           = uow;
         _currentUser   = currentUser;

@@ -11,7 +11,8 @@ namespace Melarium.Application.Tests;
 
 /// <summary>
 /// Plan enforcement (SPEC-09): config-driven limits, feature gates per tier, the per-organization
-/// monthly advisor quota, and the org-less SystemAdmin bypass. Limits mirror the spec's defaults.
+/// monthly AI-interaction quota (SPEC-18, merged from the former separate advisor/assistant quotas),
+/// and the org-less SystemAdmin bypass. Limits mirror the spec's defaults.
 /// </summary>
 public class PlanGuardTests
 {
@@ -25,7 +26,7 @@ public class PlanGuardTests
         ["Plans:Free:MaxMembers"] = "0",
         ["Plans:Standard:MaxBeehives"] = "30",
         ["Plans:Standard:MaxMembers"] = "2",
-        ["Plans:Standard:AdvisorMessagesPerMonth"] = "10",
+        ["Plans:Standard:AiInteractionsPerMonth"] = "30",
         ["Plans:Pro:MaxBeehives"] = "100",
         ["Plans:Pro:MaxMembers"] = "5",
     };
@@ -162,61 +163,61 @@ public class PlanGuardTests
         await Guard().EnsureFeatureAsync(2, PlanFeature.PhotoAnalysis); // no throw
     }
 
-    // ── Advisor monthly quota (per organization) ──────────────────────────────────
+    // ── AI interaction monthly quota (per organization, SPEC-18) ──────────────────
 
     [Fact]
-    public async Task Free_Advisor_Throws()
+    public async Task Free_AiInteraction_Throws()
     {
         OrgOnPlan(1, PlanType.Free);
-        await Assert.ThrowsAsync<PlanLimitException>(() => Guard().EnsureAdvisorMessageAsync(1));
+        await Assert.ThrowsAsync<PlanLimitException>(() => Guard().EnsureAiInteractionAsync(1));
     }
 
     [Fact]
-    public async Task Standard_EleventhMessageInMonth_Throws()
+    public async Task Standard_ThirtyFirstInteractionInMonth_Throws()
     {
         OrgOnPlan(1, PlanType.Standard);
-        _uow.AdvisorConversations
-            .CountUserMessagesForOrganizationSinceAsync(1, Arg.Any<DateTime>())
-            .Returns(10); // quota is 10 → the 11th is blocked
+        _uow.AiAssistantSessions
+            .CountUserTurnsForOrganizationSinceAsync(1, Arg.Any<DateTime>())
+            .Returns(30); // quota is 30 → the 31st is blocked
 
-        var ex = await Assert.ThrowsAsync<PlanLimitException>(() => Guard().EnsureAdvisorMessageAsync(1));
-        Assert.Contains("10 AI poruka", ex.Message);
+        var ex = await Assert.ThrowsAsync<PlanLimitException>(() => Guard().EnsureAiInteractionAsync(1));
+        Assert.Contains("30 AI poruka", ex.Message);
     }
 
     [Fact]
-    public async Task Standard_TenthMessage_Allowed()
+    public async Task Standard_ThirtiethInteraction_Allowed()
     {
         OrgOnPlan(1, PlanType.Standard);
-        _uow.AdvisorConversations
-            .CountUserMessagesForOrganizationSinceAsync(1, Arg.Any<DateTime>())
-            .Returns(9); // sending the 10th
+        _uow.AiAssistantSessions
+            .CountUserTurnsForOrganizationSinceAsync(1, Arg.Any<DateTime>())
+            .Returns(29); // sending the 30th
 
-        await Guard().EnsureAdvisorMessageAsync(1);
+        await Guard().EnsureAiInteractionAsync(1);
     }
 
     [Fact]
-    public async Task Pro_Advisor_Unlimited()
+    public async Task Pro_AiInteraction_Unlimited()
     {
         OrgOnPlan(1, PlanType.Pro);
-        _uow.AdvisorConversations
-            .CountUserMessagesForOrganizationSinceAsync(1, Arg.Any<DateTime>())
+        _uow.AiAssistantSessions
+            .CountUserTurnsForOrganizationSinceAsync(1, Arg.Any<DateTime>())
             .Returns(9_999);
 
-        await Guard().EnsureAdvisorMessageAsync(1); // no quota key for Pro → unlimited
+        await Guard().EnsureAiInteractionAsync(1); // no quota key for Pro → unlimited
     }
 
     [Fact]
     public async Task QuotaCountsFromStartOfCurrentUtcMonth()
     {
         OrgOnPlan(1, PlanType.Standard);
-        _uow.AdvisorConversations.CountUserMessagesForOrganizationSinceAsync(1, Arg.Any<DateTime>()).Returns(0);
+        _uow.AiAssistantSessions.CountUserTurnsForOrganizationSinceAsync(1, Arg.Any<DateTime>()).Returns(0);
 
-        await Guard().EnsureAdvisorMessageAsync(1);
+        await Guard().EnsureAiInteractionAsync(1);
 
         var now = DateTime.UtcNow;
         var expectedMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        await _uow.AdvisorConversations.Received(1)
-            .CountUserMessagesForOrganizationSinceAsync(1, expectedMonthStart);
+        await _uow.AiAssistantSessions.Received(1)
+            .CountUserTurnsForOrganizationSinceAsync(1, expectedMonthStart);
     }
 
     // ── Expiry → Free behaviour ────────────────────────────────────────────────────
@@ -242,7 +243,7 @@ public class PlanGuardTests
         await guard.EnsureCanAddBeehiveAsync(999);
         await guard.EnsureCanAddMemberAsync(999);
         await guard.EnsureFeatureAsync(999, PlanFeature.PhotoAnalysis);
-        await guard.EnsureAdvisorMessageAsync(999);
+        await guard.EnsureAiInteractionAsync(999);
 
         await _uow.Organizations.DidNotReceive().GetByIdAsync(Arg.Any<int>());
     }
@@ -256,7 +257,7 @@ public class PlanGuardTests
         _uow.Apiaries.CountByOrganizationAsync(1).Returns(2);
         _uow.Beehives.CountByOrganizationAsync(1).Returns(12);
         _uow.Users.CountByOrganizationAsync(1).Returns(2);
-        _uow.AdvisorConversations.CountUserMessagesForOrganizationSinceAsync(1, Arg.Any<DateTime>()).Returns(4);
+        _uow.AiAssistantSessions.CountUserTurnsForOrganizationSinceAsync(1, Arg.Any<DateTime>()).Returns(4);
 
         var dto = await Guard().GetMyPlanAsync(1);
 
@@ -266,8 +267,8 @@ public class PlanGuardTests
         Assert.Equal(30, dto.Usage.BeehivesLimit);
         Assert.Equal(1, dto.Usage.Members);         // 2 accounts − owner
         Assert.Equal(2, dto.Usage.MembersLimit);
-        Assert.Equal(4, dto.Usage.AdvisorMessagesThisMonth);
-        Assert.Equal(10, dto.Usage.AdvisorMessagesLimit);
+        Assert.Equal(4, dto.Usage.AiInteractionsThisMonth);
+        Assert.Equal(30, dto.Usage.AiInteractionsLimit);
     }
 
     [Fact]
@@ -277,7 +278,7 @@ public class PlanGuardTests
         _uow.Apiaries.CountByOrganizationAsync(1).Returns(1);
         _uow.Beehives.CountByOrganizationAsync(1).Returns(3);
         _uow.Users.CountByOrganizationAsync(1).Returns(1);
-        _uow.AdvisorConversations.CountUserMessagesForOrganizationSinceAsync(1, Arg.Any<DateTime>()).Returns(0);
+        _uow.AiAssistantSessions.CountUserTurnsForOrganizationSinceAsync(1, Arg.Any<DateTime>()).Returns(0);
 
         var dto = await Guard().GetMyPlanAsync(1);
 
@@ -285,6 +286,6 @@ public class PlanGuardTests
         Assert.Equal(PlanType.Free, dto.EffectivePlan); // but effectively Free
         Assert.Equal(1, dto.Usage.ApiariesLimit);
         Assert.Equal(7, dto.Usage.BeehivesLimit);
-        Assert.Equal(0, dto.Usage.AdvisorMessagesLimit); // Free → no advisor
+        Assert.Equal(0, dto.Usage.AiInteractionsLimit); // Free → no AI access
     }
 }

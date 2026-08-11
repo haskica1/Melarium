@@ -2,7 +2,6 @@ using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Apiaries.Validators;
 using Melarium.Application.Common.Services;
 using Melarium.Application.Features.Admin;
-using Melarium.Application.Features.Advisor;
 using Melarium.Application.Features.Alerts;
 using Melarium.Application.Features.Apiaries;
 using Melarium.Application.Features.Assistant;
@@ -83,10 +82,10 @@ public static class DependencyInjection
         services.AddScoped<ILearningTopicService, LearningTopicService>();
         services.AddScoped<IPastureService, PastureService>();
         services.AddScoped<IApiaryMoveService, ApiaryMoveService>();
-        services.AddScoped<IAdvisorService, AdvisorService>();
 
-        // AI assistant (SPEC-17). The executor is registered separately because it deliberately
-        // depends on the inspection and todo services rather than on repositories — see §5.1.
+        // AI assistant (SPEC-17, merged with the advisor's Q&A in SPEC-18). The executor is
+        // registered separately because it deliberately depends on the inspection and todo services
+        // rather than on repositories — see §5.1.
         services.AddScoped<IAiAssistantService, AiAssistantService>();
         services.AddScoped<IAiActionExecutor, AiActionExecutor>();
 

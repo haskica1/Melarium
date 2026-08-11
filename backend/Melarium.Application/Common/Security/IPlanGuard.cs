@@ -21,16 +21,12 @@ public interface IPlanGuard
     Task EnsureFeatureAsync(int organizationId, PlanFeature feature);
 
     /// <summary>
-    /// Advisor create/send gate: feature availability + the per-organization monthly quota
-    /// (Standard). Counted from the org's user messages in the current UTC calendar month.
+    /// AI assistant gate (SPEC-17, merged with the advisor's own quota in SPEC-18): feature
+    /// availability plus one per-organization monthly interaction quota, covering both questions and
+    /// commands. Counted from the org's user turns in the current UTC calendar month — checked before
+    /// the model is ever called, since a turn's kind is only known after that call returns.
     /// </summary>
-    Task EnsureAdvisorMessageAsync(int organizationId);
-
-    /// <summary>
-    /// AI assistant gate (SPEC-17): feature availability plus the per-organization monthly command
-    /// quota. Counted from the org's user turns in the current UTC calendar month.
-    /// </summary>
-    Task EnsureAiCommandAsync(int organizationId);
+    Task EnsureAiInteractionAsync(int organizationId);
 
     /// <summary>Effective plan + limits + usage for DTOs/UI.</summary>
     Task<MyPlanDto> GetMyPlanAsync(int organizationId);

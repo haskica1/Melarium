@@ -13,7 +13,7 @@ automated payments via Paddle are Phase 2). Implemented 2026-07-05.
 | Dodatni članovi (uz vlasnika) | 0 | 2 | 5 | ∞ | ∞ |
 | Pašnjaci i selidbe | ✗ | ✓ | ✓ | ✓ | ✓ |
 | Glasovni unos, sedmični AI sažetak | ✗ | ✓ | ✓ | ✓ | ✓ |
-| AI savjetnik | ✗ | 10 poruka/mj | ∞ | ∞ | ∞ |
+| AI Asistent (pitanja i naredbe, SPEC-17/18) | ✗ | 30 poruka/mj | ∞ | ∞ | ∞ |
 | Foto + AI analiza okvira (SPEC-05) | ✗ | ✗ | ✓ | ✓ | ✓ |
 | Prioritetna podrška | ✗ | ✗ | ✗ | ✓ | ✓ |
 
@@ -43,8 +43,8 @@ SystemAdmin bypasses all gates.
 | `EnsureCanAddApiaryAsync` | `ApiaryService.CreateAsync` | `MaxApiaries` |
 | `EnsureCanAddBeehiveAsync` | `BeehiveService.CreateAsync` | `MaxBeehives` |
 | `EnsureCanAddMemberAsync` | `OrgManagementService.CreateMemberAsync` | `MaxMembers` (counts accounts beyond the owner) |
-| `EnsureFeatureAsync(feature)` | voice parse; advisor transcribe; pasture/move create; photo analyze; weekly worker | boolean by tier |
-| `EnsureAdvisorMessageAsync` | advisor create/send | `AdvisorMessagesPerMonth` (COUNT org user-messages in current UTC month) |
+| `EnsureFeatureAsync(feature)` | voice parse; assistant transcribe; pasture/move create; photo analyze; weekly worker | boolean by tier |
+| `EnsureAiInteractionAsync` (SPEC-17/18) | assistant session/turn — question or command alike | `AiInteractionsPerMonth` (COUNT org user turns in current UTC month) |
 | `GetMyPlanAsync` | `/organizations/my-plan` | — |
 
 `PlanFeature`: `VoiceInput`/`WeeklySummary`/`Pastures` need Standard+; `PhotoAnalysis` needs Pro+.
@@ -80,7 +80,7 @@ org whose effective plan ≠ Free and `PlanValidUntil` is within 7 days notifies
   usage meters (košnice / članovi / AI poruke X/10) + payment instructions (mailto; **svrha uplate
   = ID organizacije**). A Partner org sees only a "Partner paket — sve uključeno" card. Trial shows
   "Pro (probni period do {datum})".
-- Proactive gating: `AdvisorPage` shows a lock hint (Free) or the remaining-quota counter (Standard).
+- Proactive gating: `PlansPage`'s usage meter shows a lock hint (Free) or the remaining-quota counter (Standard) for the AI assistant.
 - Admin: `OrganizationFormPage` gains a plan section (edit-only: select all 5 incl. Partner +
   validUntil + notes → `useUpdateOrganizationPlan`); the admin org table shows a `PlanBadge` column
   (marks expired plans red).

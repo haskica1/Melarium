@@ -21,8 +21,7 @@ export const assistantService = {
 
   // Both calls below wait on a Groq completion, so they must match the backend's 60 s HttpClient
   // budget. apiClient's 10 s default aborts the request while the server keeps going — the work is
-  // then done and billed but shown to the user as an error. This already happened once with the
-  // advisor; see the same note in advisorService.ts.
+  // then done and billed but shown to the user as an error. This already happened once before.
   async start(payload: StartAssistantSessionPayload): Promise<AssistantSessionDetail> {
     const { data } = await apiClient.post<AssistantSessionDetail>('/assistant/sessions', payload, {
       timeout: 60_000,

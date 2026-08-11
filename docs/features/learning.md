@@ -40,8 +40,10 @@ spec suggested 15, but SPEC-08 shipped first and took 15/16), via
 
 ## AI draft assist (Phase 2)
 
-`generate-draft { title, outline? }` → existing Groq stack via `IAdvisorAiClient`
-(`llama-3.3-70b-versatile`) with an authoring system prompt: Bosnian, practical, regional context,
+`generate-draft { title, outline? }` → existing Groq stack via `IProseAiClient` (renamed from
+`IAdvisorAiClient` when SPEC-18 retired the advisor and repurposed the client as shared free-form-prose
+infrastructure — this is its other consumer) (`llama-3.3-70b-versatile`) with an authoring system
+prompt: Bosnian, practical, regional context,
 markdown `##` sections, no invented regulations (refer readers to the veterinary authority). The
 reply carries the summary after a `---SAŽETAK---` marker; the service splits it (fallback: derive the
 teaser from the body). The draft only prefills the form — **AI never publishes**. Rate limit joins

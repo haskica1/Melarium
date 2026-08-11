@@ -9,6 +9,7 @@ using Melarium.Application.Features.Assistant.DTOs;
 using Melarium.Application.Features.Beehives;
 using Melarium.Application.Features.Inspections;
 using Melarium.Application.Features.Todos;
+using Melarium.Application.Features.Weather;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
 using Microsoft.Extensions.Configuration;
@@ -35,6 +36,7 @@ public class AiAssistantService : IAiAssistantService
     private readonly IPlanGuard _plan;
     private readonly ITodoService _todos;
     private readonly IInspectionService _inspections;
+    private readonly IWeatherService _weather;
     private readonly TimeZoneInfo _tz;
     private readonly int _maxTargets;
 
@@ -48,6 +50,7 @@ public class AiAssistantService : IAiAssistantService
         IPlanGuard plan,
         ITodoService todos,
         IInspectionService inspections,
+        IWeatherService weather,
         IConfiguration config)
     {
         _uow = uow;
@@ -59,6 +62,7 @@ public class AiAssistantService : IAiAssistantService
         _plan = plan;
         _todos = todos;
         _inspections = inspections;
+        _weather = weather;
         _tz = AppTimeZone.Resolve(config);
         _maxTargets = int.TryParse(config["Ai:MaxActionsPerCommand"], out var max) && max > 0 ? max : 50;
     }
@@ -70,7 +74,7 @@ public class AiAssistantService : IAiAssistantService
         var userId = RequireUser();
         var sessions = await _uow.AiAssistantSessions.GetByUserAsync(userId);
         return sessions.Select(s => new AssistantSessionSummaryDto(
-            s.Id, s.Title, s.UpdatedAt ?? s.CreatedAt, s.CreatedAt));
+            s.Id, s.Title, s.UpdatedAt ?? s.CreatedAt, s.CreatedAt, s.BeehiveId, s.Beehive?.Name));
     }
 
     public async Task<AssistantSessionDetailDto> GetSessionAsync(int id) =>
@@ -81,16 +85,18 @@ public class AiAssistantService : IAiAssistantService
     public async Task<AssistantSessionDetailDto> StartSessionAsync(StartAssistantSessionDto dto)
     {
         var userId = RequireUser();
-        await EnsurePlanAllowsCommandAsync();
+        await EnsurePlanAllowsInteractionAsync();
 
         var text = dto.Text.Trim();
-        var (assistantTurn, _) = await InterpretAsync(text, dto.ApiaryId, dto.BeehiveId, history: []);
+        var (assistantTurn, _) = await InterpretAsync(
+            text, dto.ApiaryId, dto.BeehiveId, throwIfHiveInaccessible: true, history: []);
 
         var session = new AiAssistantSession
         {
-            UserId = userId,
-            Title  = TitleFrom(text),
-            Turns  =
+            UserId    = userId,
+            BeehiveId = dto.BeehiveId,
+            Title     = TitleFrom(text),
+            Turns     =
             {
                 new AiAssistantTurn
                 {
@@ -111,7 +117,7 @@ public class AiAssistantService : IAiAssistantService
     public async Task<AssistantSessionDetailDto> AddTurnAsync(int sessionId, AssistantTurnRequestDto dto)
     {
         RequireUser();
-        await EnsurePlanAllowsCommandAsync();
+        await EnsurePlanAllowsInteractionAsync();
 
         var session = await RequireOwnedSessionAsync(sessionId);
 
@@ -124,7 +130,12 @@ public class AiAssistantService : IAiAssistantService
             .Select(t => new ChatMessage(t.Role == AiTurnRole.User ? "user" : "assistant", t.Content))
             .ToList();
 
-        var (assistantTurn, _) = await InterpretAsync(text, dto.ApiaryId, dto.BeehiveId, history);
+        // A hive named on this turn wins; absent that, a session already scoped to one (from its
+        // first turn) still grounds the answer — the same way an Advisor conversation stayed bound
+        // to its hive for its whole lifetime.
+        var effectiveBeehiveId = dto.BeehiveId ?? session.BeehiveId;
+        var (assistantTurn, _) = await InterpretAsync(
+            text, dto.ApiaryId, effectiveBeehiveId, throwIfHiveInaccessible: false, history);
 
         session.Turns.Add(new AiAssistantTurn
         {
@@ -254,14 +265,32 @@ public class AiAssistantService : IAiAssistantService
     /// rows. Nothing is persisted by this method — an AI failure therefore loses none of the user's text.
     /// </summary>
     private async Task<(AiAssistantTurn Turn, AiResolution? Resolution)> InterpretAsync(
-        string text, int? pageApiaryId, int? pageBeehiveId, IReadOnlyList<ChatMessage> history)
+        string text, int? pageApiaryId, int? pageBeehiveId, bool throwIfHiveInaccessible,
+        IReadOnlyList<ChatMessage> history)
     {
         var apiaries = (await _access.GetAccessibleApiariesAsync())
             .Select(a => new ApiaryRef(a.Id, a.Name)).ToList();
         var hives = (await _access.GetAccessibleBeehivesAsync())
             .Select(h => new HiveRef(h.Id, h.Name, h.LabelNumber, h.ApiaryId)).ToList();
 
-        var system = AssistantPromptBuilder.BuildSystem(apiaries, AppTimeZone.Today(_tz));
+        // SPEC-18: a hive in scope also grounds a Q&A answer in its real data — the same trigger the
+        // advisor used, and the same access discipline (throw on a fresh session, degrade silently on
+        // a later turn whose access may have since been revoked).
+        string? contextBlock = null;
+        if (pageBeehiveId is int beehiveId)
+        {
+            if (throwIfHiveInaccessible)
+            {
+                await _access.EnsureCanAccessBeehiveAsync(beehiveId);
+                contextBlock = await BuildHiveContextBlockAsync(beehiveId);
+            }
+            else if (await _access.CanAccessBeehiveAsync(beehiveId))
+            {
+                contextBlock = await BuildHiveContextBlockAsync(beehiveId);
+            }
+        }
+
+        var system = AssistantPromptBuilder.BuildSystem(apiaries, AppTimeZone.Today(_tz), contextBlock);
 
         var chat = new List<ChatMessage> { new("system", system) };
         chat.AddRange(history);
@@ -300,6 +329,62 @@ public class AiAssistantService : IAiAssistantService
                 turn.Actions.Add(row);
 
         return (turn, resolution);
+    }
+
+    /// <summary>
+    /// The same per-hive grounding <c>AdvisorService</c> built (SPEC-01): inspections, active diets,
+    /// open todos, queen, season yield, latest treatment, latest apiary move, best-effort weather —
+    /// rendered by the pure <see cref="HiveContextBuilder"/>. Null on a deleted hive, which degrades
+    /// to a general answer rather than failing the turn.
+    /// </summary>
+    private async Task<string?> BuildHiveContextBlockAsync(int beehiveId)
+    {
+        var hive = await _uow.Beehives.GetByIdAsync(beehiveId);
+        if (hive is null) return null;
+
+        var apiary = await _uow.Apiaries.GetByIdAsync(hive.ApiaryId);
+        var apiaryName = apiary?.Name ?? "—";
+
+        var inspections = (await _uow.Inspections.GetByBeehiveIdAsync(beehiveId)).Take(5).ToList();
+
+        var activeDiets = (await _uow.Diets.GetActiveForBeehivesAsync([beehiveId]))
+            .GetValueOrDefault(beehiveId, []);
+
+        var openTodos = (await _uow.Todos.GetByBeehiveIdAsync(beehiveId))
+            .Where(t => !t.IsCompleted).Take(5).ToList();
+
+        var queen = await _uow.Queens.GetActiveByBeehiveIdAsync(beehiveId);
+
+        var yearly = await _uow.Harvests.GetHiveYearlyTotalsAsync(beehiveId);
+        decimal? seasonYield = yearly.TryGetValue(DateTime.UtcNow.Year, out var kg) ? kg : null;
+
+        var latestTreatment = (await _uow.Treatments.GetLatestForBeehivesAsync([beehiveId]))
+            .GetValueOrDefault(beehiveId);
+
+        var latestMove = await _uow.ApiaryMoves.GetLatestForApiaryAsync(hive.ApiaryId);
+        string? pastureLine = latestMove?.ToPasture is not null
+            ? $"{latestMove.ToPasture.Name}, od {latestMove.MovedAt:dd.MM.yyyy}"
+            : null;
+
+        string? weatherLine = null;
+        if (apiary?.Latitude is double lat && apiary.Longitude is double lon)
+        {
+            try
+            {
+                var forecast = await _weather.GetForecastAsync(lat, lon);
+                var today = forecast.Daily.FirstOrDefault();
+                if (today is not null)
+                {
+                    var current = forecast.CurrentTemperature.HasValue ? $"{forecast.CurrentTemperature:0}°C trenutno, " : "";
+                    weatherLine = $"{current}danas {today.MinTemp:0}–{today.MaxTemp:0}°C";
+                }
+            }
+            catch { /* best-effort, same policy as inspection temperature auto-fill */ }
+        }
+
+        return HiveContextBuilder.Build(
+            hive, apiaryName, inspections, activeDiets, openTodos, queen, seasonYield,
+            latestTreatment, pastureLine, weatherLine);
     }
 
     /// <summary>
@@ -518,7 +603,7 @@ public class AiAssistantService : IAiAssistantService
             if (turns[i].Candidates.Count > 0)
                 turns[i] = turns[i] with { Candidates = [] };
 
-        return new(s.Id, s.Title, s.UpdatedAt ?? s.CreatedAt, s.CreatedAt, turns);
+        return new(s.Id, s.Title, s.UpdatedAt ?? s.CreatedAt, s.CreatedAt, s.BeehiveId, s.Beehive?.Name, turns);
     }
 
     private static AssistantTurnDto ToTurnDto(AiAssistantTurn t) => new(
@@ -592,10 +677,10 @@ public class AiAssistantService : IAiAssistantService
         return turn;
     }
 
-    private async Task EnsurePlanAllowsCommandAsync()
+    private async Task EnsurePlanAllowsInteractionAsync()
     {
         if (_currentUser.OrganizationId is int orgId)
-            await _plan.EnsureAiCommandAsync(orgId);
+            await _plan.EnsureAiInteractionAsync(orgId);
     }
 
     private int RequireUser() =>

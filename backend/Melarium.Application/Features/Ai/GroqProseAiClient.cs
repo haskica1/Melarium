@@ -7,16 +7,17 @@ using Microsoft.Extensions.Configuration;
 namespace Melarium.Application.Features.Ai;
 
 /// <summary>
-/// Groq chat-completions client for the advisor (`llama-3.3-70b-versatile`, plain text). Same endpoint
-/// and auth pattern as inspection voice parsing; no `response_format` (free-form Bosnian answers).
+/// Groq chat-completions client for free-form prose (`llama-3.3-70b-versatile`, plain text). Same
+/// endpoint and auth pattern as inspection voice parsing; no `response_format` — the reply is whatever
+/// prose the caller's prompt asks for (Bosnian advice, a learning-topic summary, ...).
 /// </summary>
-public class GroqAdvisorAiClient : IAdvisorAiClient
+public class GroqProseAiClient : IProseAiClient
 {
     private readonly HttpClient _http;
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
-    public GroqAdvisorAiClient(HttpClient http, IConfiguration config)
+    public GroqProseAiClient(HttpClient http, IConfiguration config)
     {
         _http = http;
         var apiKey = config["Groq:ApiKey"] ?? throw new InvalidOperationException("Groq:ApiKey is not configured.");

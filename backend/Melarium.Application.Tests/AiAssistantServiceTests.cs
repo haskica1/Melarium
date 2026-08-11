@@ -8,6 +8,8 @@ using Melarium.Application.Features.Inspections;
 using Melarium.Application.Features.Inspections.DTOs;
 using Melarium.Application.Features.Todos;
 using Melarium.Application.Features.Todos.DTOs;
+using Melarium.Application.Features.Weather;
+using Melarium.Domain.Common;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
 using Microsoft.Extensions.Configuration;
@@ -33,6 +35,7 @@ public class AiAssistantServiceTests
     private readonly IPlanGuard _plan = Substitute.For<IPlanGuard>();
     private readonly ITodoService _todos = Substitute.For<ITodoService>();
     private readonly IInspectionService _inspections = Substitute.For<IInspectionService>();
+    private readonly IWeatherService _weather = Substitute.For<IWeatherService>();
 
     private static readonly Apiary Zlatna = new() { Id = 1, Name = "Zlatna dolina" };
     private static readonly Beehive Hive2 = new() { Id = 11, Name = "Košnica 2", LabelNumber = "2", ApiaryId = 1 };
@@ -60,7 +63,20 @@ public class AiAssistantServiceTests
     private AiAssistantService Service(int userId = 1, int? orgId = 7, IConfiguration? config = null) =>
         new(_uow, _access,
             new TestCurrentUser { UserId = userId, Role = UserRole.OrganizationAdmin, OrganizationId = orgId },
-            _ai, _transcription, _executor, _plan, _todos, _inspections, config ?? Config());
+            _ai, _transcription, _executor, _plan, _todos, _inspections, _weather, config ?? Config());
+
+    /// <summary>Enough repository setup for <c>BuildHiveContextBlockAsync</c> to run to completion
+    /// without a null reference — apiary stays unresolved (name "—", no coordinates), which also
+    /// skips the weather branch entirely, so <see cref="_weather"/> needs no configuration here.</summary>
+    private void WireEmptyHiveData(int beehiveId)
+    {
+        _uow.Beehives.GetByIdAsync(beehiveId).Returns(new Beehive { Id = beehiveId, Name = "Košnica 2", ApiaryId = 1 });
+        _uow.Inspections.GetByBeehiveIdAsync(beehiveId).Returns(Enumerable.Empty<Inspection>());
+        _uow.Diets.GetActiveForBeehivesAsync(Arg.Any<IReadOnlyCollection<int>>()).Returns(new Dictionary<int, List<DietActiveInfo>>());
+        _uow.Todos.GetByBeehiveIdAsync(beehiveId).Returns(Enumerable.Empty<Todo>());
+        _uow.Harvests.GetHiveYearlyTotalsAsync(beehiveId).Returns(new Dictionary<int, decimal>());
+        _uow.Treatments.GetLatestForBeehivesAsync(Arg.Any<IReadOnlyCollection<int>>()).Returns(new Dictionary<int, TreatmentLatestInfo>());
+    }
 
     private void AiReturns(string json) =>
         _ai.SendAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>()).Returns(json);
@@ -114,7 +130,7 @@ public class AiAssistantServiceTests
     [Fact]
     public async Task The_plan_gate_runs_before_the_model_is_ever_called()
     {
-        _plan.EnsureAiCommandAsync(7).ThrowsAsync(new PlanLimitException("Free"));
+        _plan.EnsureAiInteractionAsync(7).ThrowsAsync(new PlanLimitException("Free"));
 
         await Assert.ThrowsAsync<PlanLimitException>(
             () => Service().StartSessionAsync(new StartAssistantSessionDto { Text = "pregled" }));
@@ -132,7 +148,7 @@ public class AiAssistantServiceTests
 
         await Service(orgId: null).StartSessionAsync(new StartAssistantSessionDto { Text = "pregled" });
 
-        await _plan.DidNotReceive().EnsureAiCommandAsync(Arg.Any<int>());
+        await _plan.DidNotReceive().EnsureAiInteractionAsync(Arg.Any<int>());
     }
 
     // ── Transactional AI ──────────────────────────────────────────────────────
@@ -536,7 +552,7 @@ public class AiAssistantServiceTests
 
         Assert.Equal("pregledana košnica dva", transcript);
         await _plan.Received(1).EnsureFeatureAsync(7, PlanFeature.VoiceInput);
-        await _plan.DidNotReceive().EnsureAiCommandAsync(Arg.Any<int>());
+        await _plan.DidNotReceive().EnsureAiInteractionAsync(Arg.Any<int>());
     }
 
     // ── Phase C: existing-record pipeline ────────────────────────────────────
@@ -695,5 +711,91 @@ public class AiAssistantServiceTests
 
         Assert.Equal(nameof(AiActionStatus.Confirmed), response.Results[0].Status);
         Assert.Equal(501, response.Results[0].ResultEntityId);
+    }
+
+    // ── Q&A (SPEC-18) ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task A_pure_question_with_no_actions_renders_as_a_plain_answer_with_no_cards()
+    {
+        AiReturns("""
+            { "reply": "Med se vrca kad je satje zapečaćeno bar dvije trećine.", "actions": [] }
+            """);
+        AiAssistantSession? saved = null;
+        await _uow.AiAssistantSessions.AddAsync(Arg.Do<AiAssistantSession>(s => saved = s));
+        _uow.AiAssistantSessions.GetWithTurnsAsync(Arg.Any<int>()).Returns(_ => saved);
+
+        var result = await Service().StartSessionAsync(new StartAssistantSessionDto { Text = "Kad se vrca med?" });
+
+        var answer = result.Turns.Last();
+        Assert.Empty(answer.Actions);
+        Assert.Empty(answer.Candidates);
+        Assert.Equal("Med se vrca kad je satje zapečaćeno bar dvije trećine.", answer.Content);
+    }
+
+    [Fact]
+    public async Task Context_is_omitted_when_no_beehive_is_in_scope()
+    {
+        IReadOnlyList<ChatMessage>? sentChat = null;
+        _ai.SendAsync(Arg.Do<IReadOnlyList<ChatMessage>>(c => sentChat = c), Arg.Any<CancellationToken>())
+            .Returns(OneInspection);
+        AiAssistantSession? saved = null;
+        await _uow.AiAssistantSessions.AddAsync(Arg.Do<AiAssistantSession>(s => saved = s));
+        _uow.AiAssistantSessions.GetWithTurnsAsync(Arg.Any<int>()).Returns(_ => saved);
+
+        await Service().StartSessionAsync(new StartAssistantSessionDto { Text = "Pregledana košnica 2" });
+
+        Assert.DoesNotContain("PODACI O KOŠNICI", sentChat![0].Content);
+        await _uow.Beehives.DidNotReceive().GetByIdAsync(Arg.Any<int>());
+    }
+
+    [Fact]
+    public async Task Context_is_built_when_an_accessible_beehive_is_in_scope()
+    {
+        WireEmptyHiveData(beehiveId: 11);
+
+        IReadOnlyList<ChatMessage>? sentChat = null;
+        _ai.SendAsync(Arg.Do<IReadOnlyList<ChatMessage>>(c => sentChat = c), Arg.Any<CancellationToken>())
+            .Returns(OneInspection);
+        AiAssistantSession? saved = null;
+        await _uow.AiAssistantSessions.AddAsync(Arg.Do<AiAssistantSession>(s => saved = s));
+        _uow.AiAssistantSessions.GetWithTurnsAsync(Arg.Any<int>()).Returns(_ => saved);
+
+        await Service().StartSessionAsync(new StartAssistantSessionDto { Text = "Pregledana košnica 2", BeehiveId = 11 });
+
+        Assert.Contains("PODACI O KOŠNICI", sentChat![0].Content);
+        Assert.Equal(11, saved!.BeehiveId); // the session itself remembers the hive, not just the turn
+        await _access.Received(1).EnsureCanAccessBeehiveAsync(11);
+    }
+
+    [Fact]
+    public async Task An_inaccessible_beehive_at_session_start_is_rejected_before_calling_the_model()
+    {
+        _access.EnsureCanAccessBeehiveAsync(7).Returns(Task.FromException(new ForbiddenAccessException()));
+
+        await Assert.ThrowsAsync<ForbiddenAccessException>(
+            () => Service().StartSessionAsync(new StartAssistantSessionDto { Text = "x", BeehiveId = 7 }));
+
+        await _ai.DidNotReceive().SendAsync(Arg.Any<IReadOnlyList<ChatMessage>>(), Arg.Any<CancellationToken>());
+        await _uow.AiAssistantSessions.DidNotReceive().AddAsync(Arg.Any<AiAssistantSession>());
+    }
+
+    [Fact]
+    public async Task A_revoked_hive_on_a_later_turn_drops_context_silently_instead_of_failing()
+    {
+        // The session was bound to a hive on an earlier turn; access to it was withdrawn since.
+        var session = new AiAssistantSession { Id = 5, UserId = 1, BeehiveId = 11 };
+        _uow.AiAssistantSessions.GetWithTurnsAsync(5).Returns(session);
+        _access.CanAccessBeehiveAsync(11).Returns(false);
+
+        IReadOnlyList<ChatMessage>? sentChat = null;
+        _ai.SendAsync(Arg.Do<IReadOnlyList<ChatMessage>>(c => sentChat = c), Arg.Any<CancellationToken>())
+            .Returns(OneInspection);
+
+        var result = await Service().AddTurnAsync(5, new AssistantTurnRequestDto { Text = "još nešto" });
+
+        Assert.DoesNotContain("PODACI O KOŠNICI", sentChat![0].Content);
+        Assert.NotEmpty(result.Turns); // the turn still succeeds — it just answers without grounding
+        await _uow.Beehives.DidNotReceive().GetByIdAsync(Arg.Any<int>());
     }
 }

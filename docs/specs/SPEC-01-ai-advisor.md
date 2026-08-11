@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | ✅ Implemented (2026-07-03) |
+| **Status** | ✅ Implemented (2026-07-03). **Superseded 2026-08-09 by SPEC-18** — its Q&A capability merged into AI Asistent and `/advisor` was retired; this document is kept as the historical record of the standalone advisor and is not updated further. |
 | **Effort** | M/L (~2–3 days) |
 | **Depends on** | nothing (context enrichment from SPEC-02/03 is optional, see §Context) |
 | **New secrets** | none — reuses `Groq:ApiKey` |

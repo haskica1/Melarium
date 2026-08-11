@@ -19,6 +19,13 @@ public class AiAssistantSessionConfiguration : IEntityTypeConfiguration<AiAssist
             .HasForeignKey(s => s.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Deleting a hive keeps the session but detaches it — same policy as AdvisorConversation before it.
+        builder.HasOne(s => s.Beehive)
+            .WithMany()
+            .HasForeignKey(s => s.BeehiveId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
+
         builder.HasMany(s => s.Turns)
             .WithOne(t => t.Session)
             .HasForeignKey(t => t.SessionId)

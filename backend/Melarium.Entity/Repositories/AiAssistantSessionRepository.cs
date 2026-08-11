@@ -12,6 +12,7 @@ public class AiAssistantSessionRepository : Repository<AiAssistantSession>, IAiA
     public async Task<IEnumerable<AiAssistantSession>> GetByUserAsync(int userId) =>
         await _context.AiAssistantSessions
             .AsNoTracking()
+            .Include(s => s.Beehive)
             .Where(s => s.UserId == userId)
             // UpdatedAt is bumped on every turn, so it doubles as "last activity".
             .OrderByDescending(s => s.UpdatedAt ?? s.CreatedAt)
@@ -19,6 +20,7 @@ public class AiAssistantSessionRepository : Repository<AiAssistantSession>, IAiA
 
     public async Task<AiAssistantSession?> GetWithTurnsAsync(int id) =>
         await _context.AiAssistantSessions
+            .Include(s => s.Beehive)
             .Include(s => s.Turns.OrderBy(t => t.Id))
                 .ThenInclude(t => t.Actions.OrderBy(a => a.Id))
             .FirstOrDefaultAsync(s => s.Id == id);

@@ -1070,44 +1070,6 @@ export interface UpdateTreatmentPayload {
   entries: CreateTreatmentEntryPayload[]
 }
 
-// ── AI Advisor (SPEC-01) ────────────────────────────────────────────────────────
-
-export type AdvisorRole = 'User' | 'Assistant'
-
-export interface AdvisorMessage {
-  id: number
-  role: AdvisorRole
-  content: string
-  createdAt: string
-}
-
-export interface AdvisorConversationSummary {
-  id: number
-  title: string
-  beehiveId?: number
-  beehiveName?: string
-  lastMessageAt: string
-  createdAt: string
-}
-
-export interface AdvisorConversationDetail extends AdvisorConversationSummary {
-  messages: AdvisorMessage[]
-}
-
-export interface AdvisorMessagePair {
-  userMessage: AdvisorMessage
-  assistantMessage: AdvisorMessage
-}
-
-export interface CreateConversationPayload {
-  beehiveId?: number | null
-  message: string
-}
-
-export interface SendMessagePayload {
-  message: string
-}
-
 // ── Learning module (SPEC-06) ───────────────────────────────────────────────────
 
 export enum LearningCategory {
@@ -1270,11 +1232,9 @@ export interface PlanUsage {
   beehivesLimit?: number | null
   members: number
   membersLimit?: number | null
-  advisorMessagesThisMonth: number
-  advisorMessagesLimit?: number | null
-  /** AI assistant commands used this month (SPEC-17); 0 = no access, null = unlimited. */
-  aiCommandsThisMonth: number
-  aiCommandsLimit?: number | null
+  /** AI assistant interactions this month — questions and commands both (SPEC-18); 0 = no access, null = unlimited. */
+  aiInteractionsThisMonth: number
+  aiInteractionsLimit?: number | null
 }
 
 export interface MyPlan {
@@ -1526,6 +1486,9 @@ export interface AssistantSessionSummary {
   title: string
   lastActivityAt: string
   createdAt: string
+  /** The hive this session is about, if any (SPEC-18) — null once the hive is deleted. */
+  beehiveId?: number | null
+  beehiveName?: string | null
 }
 
 export interface AssistantSessionDetail extends AssistantSessionSummary {

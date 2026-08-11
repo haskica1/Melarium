@@ -275,6 +275,14 @@ reuses `Groq:ApiKey`.
 - Duplicate the transcription code in the advisor — divergent prompts/behavior over time.
 - Call Groq directly from `AdvisorService` — untestable without hitting the network.
 
+**Addendum, 2026-08-09 (SPEC-18):** the advisor itself is retired, merged into the assistant — but
+`IAdvisorAiClient`/`GroqAdvisorAiClient` were not deleted, only renamed to `IProseAiClient`/
+`GroqProseAiClient` and re-scoped to "free-form Groq prose replies" generally, because
+`LearningTopicService` (SPEC-06) also depends on them to draft a topic's Bosnian summary — a real,
+pre-existing consumer this ADR's "for the Advisor" framing did not anticipate. The transcription half of
+this decision is unaffected; `ITranscriptionService` is still shared by voice inspections and the
+assistant exactly as described above.
+
 ---
 
 ## ADR-025: `react-markdown` for Learning Article Rendering (SPEC-06)
@@ -681,3 +689,52 @@ an inspection to a different hive or date via update are both out of scope — e
 most one existing target, and `UpdateInspectionAsync` never applies `fields.date` as a new value (the
 prompt uses it only to say *which* inspection is meant). Recorded in SPEC-17 §12 as decisions, not gaps
 found later.
+
+---
+
+### Addendum, 2026-08-09 — SPEC-18: the advisor is retired, merged into the assistant
+
+**Context.** This ADR's own "Alternatives considered" (above the Phase A body) already recorded that
+merging the assistant into the advisor was considered and rejected at SPEC-17's design time: *"a router
+guessing 'question or command' is a new failure mode, and a chat bubble is a poor host for an editable
+form."* A day after SPEC-17 shipped complete, the question was asked again — this time the other
+direction, folding the advisor **into** the assistant rather than the reverse — and the answer changed.
+
+**Decision.** `/advisor` (SPEC-01) is retired. `AiAssistantService` now also answers plain questions,
+using the same envelope Phase A already defined: a turn with `actions: []` and a full `reply` **is** the
+answer. No router, no classification step, no new field. `AssistantPromptBuilder`'s system prompt was
+rewritten to say so instead of deflecting to the advisor, and gained an optional `contextBlock` —
+built by `HiveContextBuilder` (renamed from the advisor's `AdvisorContextBuilder`, otherwise unchanged)
+when a hive is in scope, using the same access-check discipline `AdvisorService` already had (throw on
+a fresh binding, degrade silently on a later turn).
+
+**Why the original objections do not hold today:**
+- **"A router guessing 'question or command' is a new failure mode."** There is no router. The
+  classification was never a separate step to begin with — it is a side effect of what the single
+  model call already returns. This was not obvious in the abstract at SPEC-17 design time; it only
+  became visible once Phase A's envelope shape existed to inspect.
+- **"A chat bubble is a poor host for an editable form."** `ProposalCard` was never rendered inside the
+  reply bubble — it is, and always was, a separate element below it (§5 above). A Q&A answer sharing the
+  bubble does not collide with a form that was never there.
+
+**Consequences accepted, not overlooked:**
+- **One combined monthly quota, not two.** `EnsureAiInteractionAsync` replaces both the assistant's own
+  `EnsureAiCommandAsync` and the advisor's `EnsureAdvisorMessageAsync`. Not merely simpler: the quota
+  gate must run *before* the Groq call (so a caller cannot spend past their limit), and before that call
+  returns there is no way to know whether the turn would have been a question or a command — so a
+  single pre-flight number is the only design the ordering actually permits, not a simplification chosen
+  for its own sake.
+- **Old conversations are migrated, not archived or discarded.** `deploy/data-migration/advisor-merge/`
+  copies every `AdvisorConversations`/`AdvisorMessages` row into `AiAssistantSessions`/`AiAssistantTurns`
+  (zero `AiAssistantAction` rows per migrated turn — under the new semantics that is correct, not a
+  gap). Run by hand against production, same rigor as the July 2026 old-database import: `pg_dump`
+  first, an id-map audit trail, a verify pass before the id-map is exported and the staging table
+  dropped. Dropping `AdvisorConversations`/`AdvisorMessages` themselves is a **separate, later** deploy,
+  done only once the backfill is confirmed correct — never in the same sitting as the copy.
+- **`IAdvisorAiClient`/`GroqAdvisorAiClient` survive, renamed.** See ADR-024's addendum — a real,
+  pre-existing consumer (`LearningTopicService`) depended on them for reasons unrelated to the advisor,
+  which this decision's original framing had not anticipated.
+- **`PlanFeature.AiAssistant` is deleted, not merely unused.** It was already vestigial before this
+  change — referenced only inside `EnsureFeatureAsync`'s message switch, never actually passed to that
+  method (the assistant's gate was always the hand-rolled `EnsureAiCommandAsync`/now
+  `EnsureAiInteractionAsync`) — so removing it deletes dead code rather than live surface.
