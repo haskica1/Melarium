@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Notifications;
+using Melarium.Infrastructure.Email;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -73,7 +74,10 @@ public class NotificationsController : ControllerBase
                 emailClaim,
                 "Test User",
                 "Melarium — SMTP Test",
-                "<h2>✅ SMTP is working!</h2><p>If you received this, email delivery is configured correctly.</p>",
+                EmailTemplate.Render(
+                    "Test User",
+                    "SMTP je ispravno podešen ✅",
+                    "Ako ste primili ovaj email, slanje pošte sa Melarium servera radi kako treba."),
                 suppressErrors: false);
         }
         catch (Exception ex)
