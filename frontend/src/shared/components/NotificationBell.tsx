@@ -32,6 +32,8 @@ const TYPE_ICONS: Record<string, string> = {
   DailyAgenda:             '📅',
   // Apiary feeding (SPEC-12 Phase D)
   FeedingOverdue:          '🍯',
+  // Treatment application rounds — parity with FeedingOverdue
+  TreatmentRoundOverdue:   '💊',
 }
 
 export default function NotificationBell() {

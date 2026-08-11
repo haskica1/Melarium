@@ -620,9 +620,24 @@ export interface CalendarFeedingEntry {
   foodTypeName: string
 }
 
+/** A treatment round covers every treated hive, so it carries the apiary and a count. */
+export interface CalendarTreatmentRound {
+  id: number
+  scheduledDate: string
+  status: TreatmentRoundStatus
+  statusName: string
+  treatmentId: number
+  productName: string
+  apiaryId: number
+  apiaryName: string
+  hiveCount: number
+  purposeName: string
+}
+
 export interface CalendarEventsResponse {
   todos: CalendarTodo[]
   feedingEntries: CalendarFeedingEntry[]
+  treatmentRounds: CalendarTreatmentRound[]
 }
 
 // Calendar sync (SPEC-11)

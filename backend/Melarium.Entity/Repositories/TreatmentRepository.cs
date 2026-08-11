@@ -50,6 +50,22 @@ public class TreatmentRepository : Repository<Treatment>, ITreatmentRepository
             .ThenByDescending(t => t.CreatedAt)
             .ToListAsync();
 
+    public async Task<IEnumerable<Treatment>> GetByApiaryIdsAsync(IEnumerable<int> apiaryIds)
+    {
+        var ids = apiaryIds.ToList();
+        if (ids.Count == 0) return [];
+
+        return await _context.Treatments
+            .AsNoTracking()
+            .Include(t => t.Entries)
+                .ThenInclude(e => e.Beehive)
+            .Include(t => t.Rounds)
+            .Include(t => t.Apiary)
+            .Where(t => ids.Contains(t.ApiaryId))
+            .OrderByDescending(t => t.StartDate)
+            .ToListAsync();
+    }
+
     public async Task<Treatment?> GetWithEntriesAsync(int id) =>
         await _context.Treatments
             .Include(t => t.Entries)

@@ -49,6 +49,9 @@ public class AlertRuleService : IAlertRuleService
         var feedingEnabled = GetBool("Alerts:FeedingOverdue:Enabled", true);
         var feedingDays    = GetInt("Alerts:FeedingOverdueDays", 2);
 
+        var roundOverdueEnabled = GetBool("Alerts:TreatmentRoundOverdue:Enabled", true);
+        var roundOverdueDays    = GetInt("Alerts:TreatmentRoundOverdueDays", 2);
+
         if (GetBool("Alerts:PlanExpiring:Enabled", true))
             await ApplyPlanExpiringAsync(now);
 
@@ -85,6 +88,9 @@ public class AlertRuleService : IAlertRuleService
 
             if (stripsEnabled || karencaEnabled)
                 await ApplyTreatmentRulesAsync(apiary, now, stripDays, stripsEnabled, karencaEnabled);
+
+            if (roundOverdueEnabled)
+                await ApplyTreatmentRoundOverdueAsync(apiary, now, roundOverdueDays);
 
             if (feedingEnabled)
                 await ApplyFeedingRulesAsync(apiary, now, feedingDays);
@@ -176,6 +182,33 @@ public class AlertRuleService : IAlertRuleService
                         $"Istekla karenca za pčelinjak '{apiary.Name}' — med se ponovo smije vrcati.",
                         NotificationType.KarencaEnded, t.Id, nameof(Treatment), TimeSpan.FromDays(7));
             }
+        }
+    }
+
+    // ── Rule: treatment application round overdue (apiary-level) — parity with feeding overdue ──
+
+    private async Task ApplyTreatmentRoundOverdueAsync(Apiary apiary, DateTime now, int overdueDays)
+    {
+        var treatments = (await _uow.Treatments.GetByApiaryAsync(apiary.Id, null)).ToList();
+        if (treatments.Count == 0) return;
+
+        var recipients = await ApiaryRecipientsAsync(apiary);
+        var threshold = now.AddDays(-overdueDays).Date;
+
+        foreach (var t in treatments)
+        {
+            // Fire once per TREATMENT, not per round: a protocol several rounds behind should
+            // produce one nudge, not several. The earliest overdue round decides whether it fires.
+            var earliestOverdue = t.Rounds
+                .Where(r => r.Status == TreatmentRoundStatus.Pending && r.ScheduledDate.Date <= threshold)
+                .OrderBy(r => r.ScheduledDate)
+                .FirstOrDefault();
+            if (earliestOverdue is null) continue;
+
+            await DispatchAsync(recipients,
+                "Primjena tretmana kasni",
+                $"Primjena tretmana kasni — pčelinjak '{apiary.Name}': runda zakazana za {earliestOverdue.ScheduledDate:dd.MM.yyyy.} još nije označena.",
+                NotificationType.TreatmentRoundOverdue, t.Id, nameof(Treatment), TimeSpan.FromDays(3));
         }
     }
 

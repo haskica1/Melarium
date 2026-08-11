@@ -70,6 +70,16 @@ public class CalendarService : ICalendarService
                 .ToList()
             : new List<Melarium.Domain.Entities.Diet>();
 
+        // ── Step 3b: Load treatments with rounds ──────────────────────────────────
+        // Same narrowing reasoning as diets above: a colleague's treatment on other hives of the
+        // apiary must not land on a Beekeeper's personal calendar.
+
+        var treatments = accessibleApiaryIds.Count > 0 && accessibleBeehiveIds.Count > 0
+            ? (await _uow.Treatments.GetByApiaryIdsAsync(accessibleApiaryIds))
+                .Where(t => t.Entries.Any(e => accessibleBeehiveIds.Contains(e.BeehiveId)))
+                .ToList()
+            : new List<Melarium.Domain.Entities.Treatment>();
+
         // ── Step 4: Build response ────────────────────────────────────────────────
 
         var calendarTodos = todos
@@ -111,10 +121,27 @@ public class CalendarService : ICalendarService
             }))
             .ToList();
 
+        var calendarRounds = treatments
+            .SelectMany(t => t.Rounds.Select(r => new CalendarTreatmentRoundDto
+            {
+                Id            = r.Id,
+                ScheduledDate = r.ScheduledDate,
+                Status        = (int)r.Status,
+                StatusName    = BsLabels.Label(r.Status),
+                TreatmentId   = t.Id,
+                ProductName   = t.ProductName,
+                ApiaryId      = t.ApiaryId,
+                ApiaryName    = apiaryNames.TryGetValue(t.ApiaryId, out var tName) ? tName : $"Pčelinjak {t.ApiaryId}",
+                HiveCount     = t.Entries.Count,
+                PurposeName   = BsLabels.Label(t.Purpose),
+            }))
+            .ToList();
+
         return new CalendarEventsDto
         {
-            Todos          = calendarTodos,
-            FeedingEntries = calendarEntries,
+            Todos           = calendarTodos,
+            FeedingEntries  = calendarEntries,
+            TreatmentRounds = calendarRounds,
         };
     }
 }

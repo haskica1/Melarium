@@ -9,6 +9,7 @@ public record WeeklyDigestInput(
     int InspectionCount,
     IReadOnlyList<string> InspectionHighlights,
     int FeedingsDone,
+    int TreatmentRoundsDone,
     int TodosCreated,
     int TodosCompleted,
     int TodosOverdue,
@@ -18,7 +19,7 @@ public record WeeklyDigestInput(
 {
     /// <summary>Whether anything happened worth reporting — orgs with no activity get no summary.</summary>
     public bool HasActivity =>
-        InspectionCount > 0 || FeedingsDone > 0 || TodosCreated > 0 || TodosCompleted > 0 || HarvestKg > 0m;
+        InspectionCount > 0 || FeedingsDone > 0 || TreatmentRoundsDone > 0 || TodosCreated > 0 || TodosCompleted > 0 || HarvestKg > 0m;
 }
 
 /// <summary>
@@ -36,6 +37,7 @@ public static class WeeklyDigestBuilder
         sb.AppendLine($"Organizacija: {d.OrganizationName}");
         sb.AppendLine(
             $"Brojke (zadnjih 7 dana): pregledi={d.InspectionCount}, obavljena hranjenja={d.FeedingsDone}, " +
+            $"obavljene primjene tretmana={d.TreatmentRoundsDone}, " +
             $"novi zadaci={d.TodosCreated}, završeni zadaci={d.TodosCompleted}, zakašnjeli zadaci={d.TodosOverdue}, " +
             $"prinos meda={kg} kg");
 

@@ -4,4 +4,5 @@ public class CalendarEventsDto
 {
     public List<CalendarTodoDto> Todos { get; set; } = new();
     public List<CalendarFeedingEntryDto> FeedingEntries { get; set; } = new();
+    public List<CalendarTreatmentRoundDto> TreatmentRounds { get; set; } = new();
 }

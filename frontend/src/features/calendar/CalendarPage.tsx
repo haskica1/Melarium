@@ -4,12 +4,12 @@ import {
   isSameDay, isSameMonth, isToday, isPast, parseISO,
   startOfMonth, startOfWeek, subMonths,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight as ChevronRightIcon, CheckSquare, Droplets, CalendarDays, AlertCircle, Clock, CalendarPlus } from 'lucide-react'
+import { ChevronLeft, ChevronRight as ChevronRightIcon, CheckSquare, Droplets, Pill, CalendarDays, AlertCircle, Clock, CalendarPlus } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import clsx from 'clsx'
 import { useCalendarEvents } from '../../core/services/queries'
-import { FeedingEntryStatus, TodoPriority } from '../../core/models'
-import type { CalendarTodo, CalendarFeedingEntry } from '../../core/models'
+import { FeedingEntryStatus, TreatmentRoundStatus, TodoPriority } from '../../core/models'
+import type { CalendarTodo, CalendarFeedingEntry, CalendarTreatmentRound } from '../../core/models'
 import { ErrorMessage, VitalCard, PageSkeleton } from '../../shared/components'
 import { hivesLabel } from '../../shared/utils/plural'
 
@@ -18,6 +18,7 @@ import { hivesLabel } from '../../shared/utils/plural'
 interface DayEvents {
   todos: CalendarTodo[]
   feedings: CalendarFeedingEntry[]
+  treatments: CalendarTreatmentRound[]
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
@@ -47,27 +48,33 @@ export default function CalendarPage() {
     for (const todo of data.todos) {
       if (!todo.dueDate) continue
       const key = todo.dueDate.slice(0, 10)
-      if (!map.has(key)) map.set(key, { todos: [], feedings: [] })
+      if (!map.has(key)) map.set(key, { todos: [], feedings: [], treatments: [] })
       map.get(key)!.todos.push(todo)
     }
     for (const entry of data.feedingEntries) {
       const key = entry.scheduledDate.slice(0, 10)
-      if (!map.has(key)) map.set(key, { todos: [], feedings: [] })
+      if (!map.has(key)) map.set(key, { todos: [], feedings: [], treatments: [] })
       map.get(key)!.feedings.push(entry)
+    }
+    for (const round of data.treatmentRounds) {
+      const key = round.scheduledDate.slice(0, 10)
+      if (!map.has(key)) map.set(key, { todos: [], feedings: [], treatments: [] })
+      map.get(key)!.treatments.push(round)
     }
     return map
   }, [data])
 
   const monthSummary = useMemo(() => {
-    if (!data) return { todos: 0, feedings: 0 }
+    if (!data) return { todos: 0, feedings: 0, treatments: 0 }
     const prefix = format(currentMonth, 'yyyy-MM')
-    let todos = 0, feedings = 0
+    let todos = 0, feedings = 0, treatments = 0
     for (const [key, events] of eventsByDate) {
       if (!key.startsWith(prefix)) continue
-      todos    += events.todos.length
-      feedings += events.feedings.length
+      todos      += events.todos.length
+      feedings   += events.feedings.length
+      treatments += events.treatments.length
     }
-    return { todos, feedings }
+    return { todos, feedings, treatments }
   }, [data, eventsByDate, currentMonth])
 
   const overdueCount = useMemo(() => {
@@ -75,16 +82,17 @@ export default function CalendarPage() {
     const isOverdue = (dateStr: string) => { const d = parseISO(dateStr); return isPast(d) && !isToday(d) }
     const t = data.todos.filter(td => td.dueDate && !td.isCompleted && isOverdue(td.dueDate)).length
     const f = data.feedingEntries.filter(fe => fe.status !== FeedingEntryStatus.Completed && isOverdue(fe.scheduledDate)).length
-    return t + f
+    const r = data.treatmentRounds.filter(tr => tr.status !== TreatmentRoundStatus.Completed && isOverdue(tr.scheduledDate)).length
+    return t + f + r
   }, [data])
 
   const todayCount = useMemo(() => {
     const ev = eventsByDate.get(format(new Date(), 'yyyy-MM-dd'))
-    return (ev?.todos.length ?? 0) + (ev?.feedings.length ?? 0)
+    return (ev?.todos.length ?? 0) + (ev?.feedings.length ?? 0) + (ev?.treatments.length ?? 0)
   }, [eventsByDate])
 
   const selectedKey    = format(selectedDay, 'yyyy-MM-dd')
-  const selectedEvents = eventsByDate.get(selectedKey) ?? { todos: [], feedings: [] }
+  const selectedEvents = eventsByDate.get(selectedKey) ?? { todos: [], feedings: [], treatments: [] }
 
   if (isLoading) return <PageSkeleton />
   if (isError)   return <ErrorMessage message="Greška pri učitavanju kalendarskih događaja." />
@@ -103,7 +111,7 @@ export default function CalendarPage() {
           </div>
           <div className="min-w-0">
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-gray-900 dark:text-slate-50">Kalendar</h1>
-            <p className="mt-0.5 text-sm text-gray-600 dark:text-slate-400">Vaši zadaci i rasporedi hranjenja na jednom mjestu</p>
+            <p className="mt-0.5 text-sm text-gray-600 dark:text-slate-400">Vaši zadaci, hranjenja i tretmani na jednom mjestu</p>
           </div>
           <Link
             to="/calendar/settings"
@@ -116,9 +124,10 @@ export default function CalendarPage() {
       </div>
 
       {/* ── Vitals strip ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 stagger">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 stagger">
         <VitalCard icon="📋" label="Zadaci"    value={String(monthSummary.todos)}    sub={format(currentMonth, 'MMMM')} gradient="from-honey-400 to-honey-600" />
         <VitalCard icon="🌿" label="Hranjenja" value={String(monthSummary.feedings)} sub={format(currentMonth, 'MMMM')} gradient="from-emerald-400 to-teal-600" />
+        <VitalCard icon="💊" label="Tretmani"  value={String(monthSummary.treatments)} sub={format(currentMonth, 'MMMM')} gradient="from-violet-400 to-indigo-600" />
         <VitalCard icon="⚠️" label="Zakasnjelo" value={String(overdueCount)} sub={overdueCount > 0 ? 'treba pažnju' : 'sve u redu'} gradient={overdueCount > 0 ? 'from-red-400 to-rose-600' : 'from-slate-400 to-slate-500'} />
         <VitalCard icon="📌" label="Danas"     value={String(todayCount)}    sub={format(new Date(), 'EEE, MMM d')} gradient="from-sky-400 to-blue-600" />
       </div>
@@ -165,16 +174,18 @@ export default function CalendarPage() {
         {/* Calendar grid */}
         <div className="grid grid-cols-7 gap-1">
           {calendarDays.map(day => {
-            const key          = format(day, 'yyyy-MM-dd')
-            const events       = eventsByDate.get(key)
-            const todosCount   = events?.todos.length ?? 0
-            const feedingCount = events?.feedings.length ?? 0
-            const inMonth      = isSameMonth(day, currentMonth)
-            const selected     = isSameDay(day, selectedDay)
-            const todayDate    = isToday(day)
+            const key            = format(day, 'yyyy-MM-dd')
+            const events         = eventsByDate.get(key)
+            const todosCount     = events?.todos.length ?? 0
+            const feedingCount   = events?.feedings.length ?? 0
+            const treatmentCount = events?.treatments.length ?? 0
+            const inMonth        = isSameMonth(day, currentMonth)
+            const selected       = isSameDay(day, selectedDay)
+            const todayDate      = isToday(day)
 
             const hasOverdue = events?.todos.some(t => !t.isCompleted && isPast(parseISO(t.dueDate!)))
               || events?.feedings.some(f => f.status !== FeedingEntryStatus.Completed && isPast(parseISO(f.scheduledDate)))
+              || events?.treatments.some(r => r.status !== TreatmentRoundStatus.Completed && isPast(parseISO(r.scheduledDate)))
 
             return (
               <button
@@ -201,7 +212,7 @@ export default function CalendarPage() {
                 </span>
 
                 {/* Event dots */}
-                {(todosCount > 0 || feedingCount > 0) && (
+                {(todosCount > 0 || feedingCount > 0 || treatmentCount > 0) && (
                   <div className="flex items-center justify-center gap-0.5 mt-1.5 flex-wrap">
                     {todosCount > 0 && (
                       <span className={clsx(
@@ -217,6 +228,12 @@ export default function CalendarPage() {
                       <span className={clsx(
                         'w-1.5 h-1.5 rounded-full flex-shrink-0',
                         selected ? 'bg-white/70' : 'bg-emerald-500',
+                      )} />
+                    )}
+                    {treatmentCount > 0 && (
+                      <span className={clsx(
+                        'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                        selected ? 'bg-white/60' : 'bg-violet-500',
                       )} />
                     )}
                   </div>
@@ -235,6 +252,10 @@ export default function CalendarPage() {
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
             <span className="text-xs text-gray-500 dark:text-slate-400">Hranjenja</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-violet-500" />
+            <span className="text-xs text-gray-500 dark:text-slate-400">Tretmani</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
@@ -260,7 +281,7 @@ export default function CalendarPage() {
           )}
         </div>
 
-        {selectedEvents.todos.length === 0 && selectedEvents.feedings.length === 0 ? (
+        {selectedEvents.todos.length === 0 && selectedEvents.feedings.length === 0 && selectedEvents.treatments.length === 0 ? (
           <EmptyDay />
         ) : (
           <div className="space-y-5">
@@ -281,6 +302,16 @@ export default function CalendarPage() {
                 </SectionLabel>
                 <div className="space-y-2 mt-2">
                   {selectedEvents.feedings.map(f => <FeedingCard key={f.id} entry={f} />)}
+                </div>
+              </section>
+            )}
+            {selectedEvents.treatments.length > 0 && (
+              <section>
+                <SectionLabel icon={<Pill className="w-3.5 h-3.5" />} color="violet" count={selectedEvents.treatments.length}>
+                  Tretmani
+                </SectionLabel>
+                <div className="space-y-2 mt-2">
+                  {selectedEvents.treatments.map(r => <TreatmentRoundCard key={r.id} round={r} />)}
                 </div>
               </section>
             )}
@@ -312,13 +343,15 @@ function SectionLabel({
   icon, color, count, children,
 }: {
   icon: React.ReactNode
-  color: 'honey' | 'emerald'
+  color: 'honey' | 'emerald' | 'violet'
   count: number
   children: React.ReactNode
 }) {
   const cls = color === 'honey'
     ? 'text-honey-700 bg-honey-50 border-honey-100 dark:text-honey-300 dark:bg-honey-500/10 dark:border-honey-500/20'
-    : 'text-emerald-700 bg-emerald-50 border-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/20'
+    : color === 'emerald'
+    ? 'text-emerald-700 bg-emerald-50 border-emerald-100 dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/20'
+    : 'text-violet-700 bg-violet-50 border-violet-100 dark:text-violet-300 dark:bg-violet-500/10 dark:border-violet-500/20'
 
   return (
     <div className={clsx('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold uppercase tracking-wide', cls)}>
@@ -449,6 +482,72 @@ function FeedingCard({ entry }: { entry: CalendarFeedingEntry }) {
             </span>
           ) : (
             <span className="flex items-center gap-1 text-xs text-emerald-700 font-semibold">
+              <Clock className="w-3 h-3" /> Na čekanju
+            </span>
+          )}
+        </div>
+      </div>
+
+      <ChevronRightIcon className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-gray-400 dark:group-hover:text-slate-500 flex-shrink-0 mt-0.5 transition-colors" />
+    </Link>
+  )
+}
+
+function TreatmentRoundCard({ round }: { round: CalendarTreatmentRound }) {
+  const completed = round.status === TreatmentRoundStatus.Completed
+  const overdue   = !completed && isPast(parseISO(round.scheduledDate))
+
+  return (
+    <Link
+      to={`/treatments/${round.treatmentId}`}
+      className={clsx(
+        'flex items-start gap-3 p-3.5 rounded-xl border transition-all group',
+        completed ? 'bg-gray-50 border-gray-100 opacity-60 dark:bg-slate-800/50 dark:border-slate-800' :
+        overdue   ? 'bg-red-50 border-red-200 hover:border-red-300 dark:bg-red-500/10 dark:border-red-500/20 dark:hover:border-red-500/40' :
+                    'bg-violet-50 border-violet-200 hover:border-violet-300 dark:bg-violet-500/10 dark:border-violet-500/20 dark:hover:border-violet-500/40',
+      )}
+    >
+      <Pill className={clsx(
+        'w-4 h-4 mt-0.5 flex-shrink-0 transition-transform group-hover:scale-110',
+        completed ? 'text-gray-400 dark:text-slate-500' :
+        overdue   ? 'text-red-500 dark:text-red-400'  :
+                    'text-violet-600 dark:text-violet-400',
+      )} />
+
+      <div className="min-w-0 flex-1">
+        <p className={clsx(
+          'text-sm font-semibold leading-snug',
+          completed ? 'line-through text-gray-400 dark:text-slate-500' :
+          overdue   ? 'text-red-800 dark:text-red-300' :
+                      'text-violet-900 dark:text-violet-200',
+        )}>
+          {round.productName}
+        </p>
+
+        {/* One round is one visit covering the whole treated group, so this names the apiary and the
+            hive count — not a single hive. */}
+        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+          <span className="text-xs text-gray-500 dark:text-slate-400">
+            Pčelinjak: <span className="font-medium text-gray-700 dark:text-slate-300">{round.apiaryName}</span>
+          </span>
+          <span className="text-xs text-gray-400 dark:text-slate-500">·</span>
+          <span className="text-xs text-gray-500 dark:text-slate-400">{hivesLabel(round.hiveCount)}</span>
+          <span className="text-xs text-gray-400 dark:text-slate-500">·</span>
+          <span className="text-xs text-gray-500 dark:text-slate-400">{round.purposeName}</span>
+        </div>
+
+        <div className="flex items-center gap-1.5 mt-1.5">
+          {completed ? (
+            <span className="flex items-center gap-1 text-xs text-green-600 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              Završeno
+            </span>
+          ) : overdue ? (
+            <span className="flex items-center gap-1 text-xs text-red-600 font-semibold">
+              <AlertCircle className="w-3 h-3" /> Zakasnjelo
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-xs text-violet-700 font-semibold">
               <Clock className="w-3 h-3" /> Na čekanju
             </span>
           )}

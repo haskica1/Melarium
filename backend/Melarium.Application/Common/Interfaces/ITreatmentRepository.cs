@@ -15,6 +15,9 @@ public interface ITreatmentRepository : IRepository<Treatment>
     /// <summary>All treatments that include a given hive, newest first; entries + apiary loaded.</summary>
     Task<IEnumerable<Treatment>> GetByBeehiveAsync(int beehiveId);
 
+    /// <summary>Calendar path. Includes rounds so callers can build the day-by-day obligation list.</summary>
+    Task<IEnumerable<Treatment>> GetByApiaryIdsAsync(IEnumerable<int> apiaryIds);
+
     /// <summary>A single treatment with entries (incl. hive names) and apiary — tracked for edits.</summary>
     Task<Treatment?> GetWithEntriesAsync(int id);
 

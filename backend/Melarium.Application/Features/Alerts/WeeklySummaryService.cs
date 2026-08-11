@@ -156,6 +156,13 @@ public class WeeklySummaryService : IWeeklySummaryService
                 apiaryIds.Contains(fe.Diet.ApiaryId))).Count()
             : 0;
 
+        // Same "one round, whatever the hive count" counting as feedings above.
+        var treatmentRoundsDone = apiaryIds.Count > 0
+            ? (await _uow.Treatments.GetByApiaryIdsAsync(apiaryIds))
+                .SelectMany(t => t.Rounds)
+                .Count(r => r.Status == TreatmentRoundStatus.Completed && r.CompletionDate >= weekAgo)
+            : 0;
+
         var todos = (apiaryIds.Count > 0 || hiveIds.Count > 0)
             ? (await _uow.Todos.FindAsync(t =>
                 (t.ApiaryId.HasValue && apiaryIds.Contains(t.ApiaryId.Value)) ||
@@ -187,7 +194,7 @@ public class WeeklySummaryService : IWeeklySummaryService
         }
 
         return new WeeklyDigestInput(
-            org.Name, inspections.Count, highlights, feedingsDone,
+            org.Name, inspections.Count, highlights, feedingsDone, treatmentRoundsDone,
             todosCreated, todosCompleted, todosOverdue, harvestKg, honeyTrend, weatherOutlook);
     }
 

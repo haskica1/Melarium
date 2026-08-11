@@ -8,20 +8,21 @@ namespace Melarium.Application.Tests;
 public class WeeklyDigestBuilderTests
 {
     private static WeeklyDigestInput Input(
-        int inspections = 0, int feedings = 0, int created = 0, int completed = 0,
+        int inspections = 0, int feedings = 0, int treatmentRounds = 0, int created = 0, int completed = 0,
         int overdue = 0, decimal kg = 0m) =>
-        new("Med d.o.o.", inspections, ["Košnica 1 (01.07): Matica uočena"], feedings,
+        new("Med d.o.o.", inspections, ["Košnica 1 (01.07): Matica uočena"], feedings, treatmentRounds,
             created, completed, overdue, kg, ["Pčelinjak A: 2 pregleda, zadnji nivo meda: nizak"],
             ["Pčelinjak A: 8–20°C, kiša 40%"]);
 
     [Fact]
     public void Build_IncludesAllCountsAndSections()
     {
-        var text = WeeklyDigestBuilder.Build(Input(inspections: 3, feedings: 2, created: 4, completed: 1, overdue: 2, kg: 12.5m));
+        var text = WeeklyDigestBuilder.Build(Input(inspections: 3, feedings: 2, treatmentRounds: 1, created: 4, completed: 1, overdue: 2, kg: 12.5m));
 
         Assert.Contains("Med d.o.o.", text);
         Assert.Contains("pregledi=3", text);
         Assert.Contains("hranjenja=2", text);
+        Assert.Contains("primjene tretmana=1", text);
         Assert.Contains("zakašnjeli zadaci=2", text);
         Assert.Contains("prinos meda=12.5 kg", text);
         Assert.Contains("Matica uočena", text);
@@ -35,11 +36,12 @@ public class WeeklyDigestBuilderTests
     }
 
     [Theory]
-    [InlineData(1, 0, 0, 0, 0.0)]
-    [InlineData(0, 0, 0, 0, 5.0)]
-    [InlineData(0, 3, 0, 0, 0.0)]
-    public void HasActivity_TrueWhenAnySignalPresent(int insp, int feed, int created, int completed, double kg)
+    [InlineData(1, 0, 0, 0, 0, 0.0)]
+    [InlineData(0, 0, 0, 0, 0, 5.0)]
+    [InlineData(0, 3, 0, 0, 0, 0.0)]
+    [InlineData(0, 0, 2, 0, 0, 0.0)]
+    public void HasActivity_TrueWhenAnySignalPresent(int insp, int feed, int treatmentRounds, int created, int completed, double kg)
     {
-        Assert.True(Input(inspections: insp, feedings: feed, created: created, completed: completed, kg: (decimal)kg).HasActivity);
+        Assert.True(Input(inspections: insp, feedings: feed, treatmentRounds: treatmentRounds, created: created, completed: completed, kg: (decimal)kg).HasActivity);
     }
 }

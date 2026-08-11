@@ -48,4 +48,7 @@ public enum NotificationType
     // Two moments share one type: the invitee registering, and the reward landing once they
     // verify their e-mail. Both are about the same invitation, so they are one kind of news.
     InvitationAccepted     = 24,
+
+    // ── Treatment application rounds — parity with FeedingOverdue ──
+    TreatmentRoundOverdue  = 25,
 }
