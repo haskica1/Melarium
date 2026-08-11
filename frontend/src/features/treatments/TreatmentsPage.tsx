@@ -179,6 +179,7 @@ export default function TreatmentsPage() {
                     treatment={t}
                     canEdit={canEditDelete}
                     isDeleting={confirmTarget?.id === t.id && isDeleting}
+                    onOpen={() => navigate(`/treatments/${t.id}`)}
                     onEdit={() => navigate(`/treatments/${t.id}/edit`)}
                     onDelete={() => setConfirmTarget(t)}
                   />
@@ -210,17 +211,21 @@ interface TreatmentCardProps {
   treatment: Treatment
   canEdit: boolean
   isDeleting: boolean
+  onOpen: () => void
   onEdit: () => void
   onDelete: () => void
 }
 
-function TreatmentCard({ treatment: t, canEdit, isDeleting, onEdit, onDelete }: TreatmentCardProps) {
+function TreatmentCard({ treatment: t, canEdit, isDeleting, onOpen, onEdit, onDelete }: TreatmentCardProps) {
   const karencaText = t.status === TreatmentStatus.Karenca
     ? `Karenca do ${format(new Date(t.karencaUntil), 'dd.MM.yyyy')}`
     : t.statusName
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none px-4 py-3.5 sm:px-5 sm:py-4 flex items-start gap-3 sm:gap-4 hover:border-honey-200 dark:hover:border-slate-700 transition-colors">
+    <div
+      onClick={onOpen}
+      className="bg-white dark:bg-slate-900 rounded-2xl border border-honey-100 dark:border-slate-800 shadow-sm dark:shadow-none px-4 py-3.5 sm:px-5 sm:py-4 flex items-start gap-3 sm:gap-4 hover:border-honey-200 dark:hover:border-slate-700 transition-colors cursor-pointer"
+    >
       <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 bg-honey-50 text-honey-600 dark:bg-honey-500/15 dark:text-honey-300">
         <Pill className="w-4 h-4 sm:w-5 sm:h-5" />
       </div>
@@ -233,6 +238,11 @@ function TreatmentCard({ treatment: t, canEdit, isDeleting, onEdit, onDelete }: 
         <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
           <span className={`text-xs rounded-full px-2 py-0.5 whitespace-nowrap ${STATUS_STYLE[t.status]}`}>{karencaText}</span>
           <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-800 rounded-full px-2 py-0.5 whitespace-nowrap">{t.purposeName}</span>
+          {t.totalRounds > 1 && (
+            <span className="text-xs text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-800 rounded-full px-2 py-0.5 whitespace-nowrap">
+              {t.completedRounds}/{t.totalRounds} primjena
+            </span>
+          )}
         </div>
 
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] sm:text-sm text-gray-500 dark:text-slate-400">
@@ -243,10 +253,10 @@ function TreatmentCard({ treatment: t, canEdit, isDeleting, onEdit, onDelete }: 
       </div>
       {canEdit && (
         <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 -mr-1.5 -mt-1 sm:mr-0 sm:mt-0">
-          <button onClick={onEdit} className="p-2 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors" aria-label="Uredi tretman">
+          <button onClick={e => { e.stopPropagation(); onEdit() }} className="p-2 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors" aria-label="Uredi tretman">
             <PencilLine className="w-4 h-4" />
           </button>
-          <button onClick={onDelete} disabled={isDeleting} className="p-2 rounded-lg text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50" aria-label="Obriši tretman">
+          <button onClick={e => { e.stopPropagation(); onDelete() }} disabled={isDeleting} className="p-2 rounded-lg text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-50" aria-label="Obriši tretman">
             {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
           </button>
         </div>

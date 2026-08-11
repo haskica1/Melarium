@@ -38,6 +38,11 @@ public class TreatmentConfiguration : IEntityTypeConfiguration<Treatment>
             .HasForeignKey(e => e.TreatmentId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(t => t.Rounds)
+            .WithOne(r => r.Treatment)
+            .HasForeignKey(r => r.TreatmentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasIndex(t => t.ApiaryId);
         builder.HasIndex(t => t.StartDate);
 

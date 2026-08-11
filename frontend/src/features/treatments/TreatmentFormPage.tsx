@@ -35,6 +35,8 @@ interface TreatmentCommonPayload {
   startDate: string
   endDate: string | null
   withdrawalDays: number
+  totalRounds: number
+  intervalDays: number
   batchNumber: string | null
   supplier: string | null
   notes: string | null
@@ -63,6 +65,8 @@ export default function TreatmentFormPage() {
   const [startDate, setStartDate] = useState<string>(today())
   const [endDate, setEndDate] = useState<string>('')
   const [withdrawalDays, setWithdrawalDays] = useState<string>('0')
+  const [totalRounds, setTotalRounds] = useState<string>('1')
+  const [intervalDays, setIntervalDays] = useState<string>('14')
   const [batchNumber, setBatchNumber] = useState<string>('')
   const [supplier, setSupplier] = useState<string>('')
   const [notes, setNotes] = useState<string>('')
@@ -90,6 +94,8 @@ export default function TreatmentFormPage() {
       setStartDate(existing.startDate.split('T')[0])
       setEndDate(existing.endDate ? existing.endDate.split('T')[0] : '')
       setWithdrawalDays(String(existing.withdrawalDays))
+      setTotalRounds(String(existing.totalRounds))
+      setIntervalDays(String(existing.intervalDays || 14))
       setBatchNumber(existing.batchNumber ?? '')
       setSupplier(existing.supplier ?? '')
       setNotes(existing.notes ?? '')
@@ -171,6 +177,13 @@ export default function TreatmentFormPage() {
     if (endDate && endDate < startDate) { setFormError('Kraj tretmana ne može biti prije početka.'); return }
     const karenca = parseInt(withdrawalDays)
     if (isNaN(karenca) || karenca < 0 || karenca > 365) { setFormError('Karenca mora biti između 0 i 365 dana.'); return }
+    const rounds = parseInt(totalRounds)
+    if (isNaN(rounds) || rounds < 1 || rounds > 10) { setFormError('Broj primjena mora biti između 1 i 10.'); return }
+    const interval = parseInt(intervalDays)
+    if (rounds > 1 && (isNaN(interval) || interval < 1 || interval > 90)) {
+      setFormError('Razmak između primjena mora biti između 1 i 90 dana.')
+      return
+    }
 
     const common: TreatmentCommonPayload = {
       purpose,
@@ -181,6 +194,8 @@ export default function TreatmentFormPage() {
       startDate,
       endDate: endDate || null,
       withdrawalDays: karenca,
+      totalRounds: rounds,
+      intervalDays: rounds > 1 ? interval : 0,
       batchNumber: batchNumber.trim() || null,
       supplier: supplier.trim() || null,
       notes: notes.trim() || null,
@@ -302,6 +317,32 @@ export default function TreatmentFormPage() {
               <label className={labelClass}>Karenca (dana)</label>
               <input type="number" min="0" max="365" step="1" value={withdrawalDays} onChange={e => setWithdrawalDays(e.target.value)} className={inputClass} />
             </div>
+          </div>
+
+          {/* Raspored primjena — većina tretmana je jednokratna (trake, nakapavanje); preparati poput
+              Apiguarda traže više primjena u razmaku, otuda odvojeno polje umjesto uvijek-vidljivog. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Broj primjena</label>
+              <input
+                type="number" min="1" max="10" step="1"
+                value={totalRounds}
+                onChange={e => setTotalRounds(e.target.value)}
+                className={inputClass}
+              />
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">npr. Apiguard = 2 tretmana.</p>
+            </div>
+            {parseInt(totalRounds) > 1 && (
+              <div>
+                <label className={labelClass}>Razmak između primjena (dana)</label>
+                <input
+                  type="number" min="1" max="90" step="1"
+                  value={intervalDays}
+                  onChange={e => setIntervalDays(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            )}
           </div>
 
           {/* Hive selection */}

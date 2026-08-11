@@ -20,15 +20,18 @@ public class TreatmentsController : ControllerBase
     private readonly ITreatmentService _service;
     private readonly IValidator<CreateTreatmentDto> _createValidator;
     private readonly IValidator<UpdateTreatmentDto> _updateValidator;
+    private readonly IValidator<CompleteTreatmentRoundDto> _completeRoundValidator;
 
     public TreatmentsController(
         ITreatmentService service,
         IValidator<CreateTreatmentDto> createValidator,
-        IValidator<UpdateTreatmentDto> updateValidator)
+        IValidator<UpdateTreatmentDto> updateValidator,
+        IValidator<CompleteTreatmentRoundDto> completeRoundValidator)
     {
-        _service         = service;
-        _createValidator = createValidator;
-        _updateValidator = updateValidator;
+        _service                = service;
+        _createValidator        = createValidator;
+        _updateValidator        = updateValidator;
+        _completeRoundValidator = completeRoundValidator;
     }
 
     /// <summary>Role-scoped treatments, optionally filtered by apiary, hive, and/or year.</summary>
@@ -91,5 +94,29 @@ public class TreatmentsController : ControllerBase
     {
         await _service.DeleteAsync(id);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Ticks one scheduled application round. Returns the full treatment because the tick also moves
+    /// the round-progress count shown on the detail page. The body is optional: ticking without a note
+    /// is the normal case.
+    /// </summary>
+    [HttpPost("{treatmentId:int}/rounds/{roundId:int}/complete")]
+    [ProducesResponseType(typeof(TreatmentDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> CompleteRound(int treatmentId, int roundId, [FromBody] CompleteTreatmentRoundDto? dto = null)
+    {
+        dto ??= new CompleteTreatmentRoundDto();
+
+        var validation = await _completeRoundValidator.ValidateAsync(dto);
+        if (!validation.IsValid)
+            return BadRequest(validation.ToDictionary());
+
+        await _service.CompleteTreatmentRoundAsync(treatmentId, roundId, dto);
+        var updated = await _service.GetByIdAsync(treatmentId);
+        return Ok(updated);
     }
 }

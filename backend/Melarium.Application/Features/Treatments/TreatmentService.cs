@@ -113,12 +113,16 @@ public class TreatmentService : ITreatmentService
             StartDate       = dto.StartDate,
             EndDate         = dto.EndDate,
             WithdrawalDays  = dto.WithdrawalDays,
+            TotalRounds     = dto.TotalRounds,
+            IntervalDays    = dto.IntervalDays,
             BatchNumber     = dto.BatchNumber,
             Supplier        = dto.Supplier,
             Notes           = dto.Notes,
             CreatedById     = _currentUser.UserId,
             Entries         = dto.Entries.Select(ToEntity).ToList(),
         };
+
+        treatment.Rounds = GenerateRounds(treatment.StartDate, dto.TotalRounds, dto.IntervalDays);
 
         await _uow.Treatments.AddAsync(treatment);
         await _uow.SaveChangesAsync();
@@ -144,6 +148,8 @@ public class TreatmentService : ITreatmentService
         treatment.StartDate       = dto.StartDate;
         treatment.EndDate         = dto.EndDate;
         treatment.WithdrawalDays  = dto.WithdrawalDays;
+        treatment.TotalRounds     = dto.TotalRounds;
+        treatment.IntervalDays    = dto.IntervalDays;
         treatment.BatchNumber     = dto.BatchNumber;
         treatment.Supplier        = dto.Supplier;
         treatment.Notes           = dto.Notes;
@@ -151,6 +157,9 @@ public class TreatmentService : ITreatmentService
         treatment.Entries.Clear();
         foreach (var e in dto.Entries)
             treatment.Entries.Add(ToEntity(e));
+
+        // Recalculate rounds: keep completed, replace all pending
+        RecalculateRounds(treatment);
 
         treatment.UpdatedAt = DateTime.UtcNow;
 
@@ -170,6 +179,32 @@ public class TreatmentService : ITreatmentService
 
         await _uow.Treatments.DeleteAsync(treatment);
         await _uow.SaveChangesAsync();
+    }
+
+    public async Task<TreatmentRoundDto> CompleteTreatmentRoundAsync(int treatmentId, int roundId, CompleteTreatmentRoundDto dto)
+    {
+        var treatment = await _uow.Treatments.GetWithEntriesAsync(treatmentId)
+            ?? throw new NotFoundException(nameof(Treatment), treatmentId);
+
+        // Same rule as reading — a Beekeeper who may see the treatment physically applies it in the
+        // field, so they may tick its rounds too (mirrors Diet's feeding-round rule).
+        await EnsureCanReadAsync(treatment);
+
+        var round = treatment.Rounds.FirstOrDefault(r => r.Id == roundId)
+            ?? throw new NotFoundException(nameof(TreatmentRound), roundId);
+
+        if (round.Status == TreatmentRoundStatus.Completed)
+            throw new BusinessRuleException("This treatment round is already completed.");
+
+        round.Status         = TreatmentRoundStatus.Completed;
+        round.CompletionDate = DateTime.UtcNow;
+        round.Note           = string.IsNullOrWhiteSpace(dto.Note) ? null : dto.Note.Trim();
+        round.UpdatedAt      = DateTime.UtcNow;
+
+        await _uow.Treatments.UpdateAsync(treatment);
+        await _uow.SaveChangesAsync();
+
+        return MapToRoundDto(round);
     }
 
     // ── Authorization helpers ────────────────────────────────────────────────────
@@ -209,6 +244,66 @@ public class TreatmentService : ITreatmentService
         DoseNote  = string.IsNullOrWhiteSpace(e.DoseNote) ? null : e.DoseNote.Trim(),
     };
 
+    /// <summary>
+    /// Generates <paramref name="totalRounds"/> application rounds, one every <paramref name="intervalDays"/>
+    /// days starting at <paramref name="startDate"/>. <paramref name="totalRounds"/> == 1 (the common case —
+    /// strips, trickling) always produces exactly one round on the start date, whatever the interval.
+    /// </summary>
+    private static List<TreatmentRound> GenerateRounds(DateTime startDate, int totalRounds, int intervalDays)
+    {
+        var rounds = new List<TreatmentRound>();
+        var count = totalRounds < 1 ? 1 : totalRounds;
+
+        for (int i = 0; i < count; i++)
+        {
+            rounds.Add(new TreatmentRound
+            {
+                ScheduledDate = startDate.Date.AddDays(i * intervalDays),
+                Status        = TreatmentRoundStatus.Pending,
+            });
+        }
+        return rounds;
+    }
+
+    /// <summary>Rebuilds pending rounds after a treatment update, preserving completed ones.</summary>
+    private static void RecalculateRounds(Treatment treatment)
+    {
+        var completedDates = treatment.Rounds
+            .Where(r => r.Status == TreatmentRoundStatus.Completed)
+            .Select(r => r.ScheduledDate.Date)
+            .ToHashSet();
+
+        var pending = treatment.Rounds.Where(r => r.Status == TreatmentRoundStatus.Pending).ToList();
+        foreach (var p in pending)
+            treatment.Rounds.Remove(p);
+
+        var count = treatment.TotalRounds < 1 ? 1 : treatment.TotalRounds;
+        for (int i = 0; i < count; i++)
+        {
+            var date = treatment.StartDate.Date.AddDays(i * treatment.IntervalDays);
+            if (!completedDates.Contains(date))
+            {
+                treatment.Rounds.Add(new TreatmentRound
+                {
+                    ScheduledDate = date,
+                    Status        = TreatmentRoundStatus.Pending,
+                    TreatmentId   = treatment.Id,
+                });
+            }
+        }
+    }
+
+    private static TreatmentRoundDto MapToRoundDto(TreatmentRound r) => new()
+    {
+        Id             = r.Id,
+        ScheduledDate  = r.ScheduledDate,
+        Status         = r.Status,
+        StatusName     = BsLabels.Label(r.Status),
+        CompletionDate = r.CompletionDate,
+        Note           = r.Note,
+        TreatmentId    = r.TreatmentId,
+    };
+
     private static T MapCommon<T>(T dto, Treatment t) where T : TreatmentDto
     {
         var status = TreatmentStatusHelper.Status(t.StartDate, t.EndDate, t.WithdrawalDays, DateTime.UtcNow);
@@ -227,6 +322,9 @@ public class TreatmentService : ITreatmentService
         dto.StartDate           = t.StartDate;
         dto.EndDate             = t.EndDate;
         dto.WithdrawalDays      = t.WithdrawalDays;
+        dto.TotalRounds         = t.TotalRounds;
+        dto.IntervalDays        = t.IntervalDays;
+        dto.CompletedRounds     = t.Rounds.Count(r => r.Status == TreatmentRoundStatus.Completed);
         dto.BatchNumber         = t.BatchNumber;
         dto.Supplier            = t.Supplier;
         dto.Notes               = t.Notes;
@@ -254,6 +352,10 @@ public class TreatmentService : ITreatmentService
                 BeehiveName = e.Beehive?.Name,
                 DoseNote    = e.DoseNote,
             })
+            .ToList();
+        dto.Rounds = t.Rounds
+            .OrderBy(r => r.ScheduledDate)
+            .Select(MapToRoundDto)
             .ToList();
         return dto;
     }

@@ -4,4 +4,5 @@ namespace Melarium.Application.Features.Treatments.DTOs;
 public class TreatmentDetailDto : TreatmentDto
 {
     public List<TreatmentEntryDto> Entries { get; set; } = [];
+    public List<TreatmentRoundDto> Rounds { get; set; } = [];
 }

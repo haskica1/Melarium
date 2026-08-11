@@ -28,6 +28,12 @@ public class Treatment : BaseEntity
     /// <summary>Withdrawal period (karenca) in days; 0 = none.</summary>
     public int WithdrawalDays { get; set; }
 
+    /// <summary>Number of applications, e.g. Apiguard = 2. 1 = single application (strips, trickling).</summary>
+    public int TotalRounds { get; set; } = 1;
+
+    /// <summary>Days between applications. Irrelevant when <see cref="TotalRounds"/> == 1.</summary>
+    public int IntervalDays { get; set; }
+
     /// <summary>LOT / batch number — legally expected.</summary>
     public string? BatchNumber { get; set; }
     public string? Supplier { get; set; }
@@ -37,4 +43,7 @@ public class Treatment : BaseEntity
     public User? CreatedBy { get; set; }
 
     public List<TreatmentEntry> Entries { get; set; } = [];
+
+    /// <summary>Scheduled application rounds — see <see cref="TotalRounds"/>/<see cref="IntervalDays"/>.</summary>
+    public List<TreatmentRound> Rounds { get; set; } = [];
 }

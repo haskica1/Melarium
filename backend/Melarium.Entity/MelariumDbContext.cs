@@ -32,6 +32,7 @@ public class MelariumDbContext : DbContext
     public DbSet<HarvestEntry> HarvestEntries => Set<HarvestEntry>();
     public DbSet<Treatment> Treatments => Set<Treatment>();
     public DbSet<TreatmentEntry> TreatmentEntries => Set<TreatmentEntry>();
+    public DbSet<TreatmentRound> TreatmentRounds => Set<TreatmentRound>();
     public DbSet<LearningTopic> LearningTopics => Set<LearningTopic>();
     public DbSet<LearningTopicRead> LearningTopicReads => Set<LearningTopicRead>();
     public DbSet<Pasture> Pastures => Set<Pasture>();

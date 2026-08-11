@@ -14,6 +14,7 @@ public class TreatmentRepository : Repository<Treatment>, ITreatmentRepository
             .AsNoTracking()
             .Include(t => t.Entries)
                 .ThenInclude(e => e.Beehive)
+            .Include(t => t.Rounds)
             .Include(t => t.Apiary)
             .Include(t => t.CreatedBy)
             .Where(t => t.Apiary.OrganizationId == organizationId)
@@ -27,6 +28,7 @@ public class TreatmentRepository : Repository<Treatment>, ITreatmentRepository
             .AsNoTracking()
             .Include(t => t.Entries)
                 .ThenInclude(e => e.Beehive)
+            .Include(t => t.Rounds)
             .Include(t => t.Apiary)
             .Include(t => t.CreatedBy)
             .Where(t => t.ApiaryId == apiaryId)
@@ -40,6 +42,7 @@ public class TreatmentRepository : Repository<Treatment>, ITreatmentRepository
             .AsNoTracking()
             .Include(t => t.Entries)
                 .ThenInclude(e => e.Beehive)
+            .Include(t => t.Rounds)
             .Include(t => t.Apiary)
             .Include(t => t.CreatedBy)
             .Where(t => t.Entries.Any(e => e.BeehiveId == beehiveId))
@@ -51,6 +54,7 @@ public class TreatmentRepository : Repository<Treatment>, ITreatmentRepository
         await _context.Treatments
             .Include(t => t.Entries)
                 .ThenInclude(e => e.Beehive)
+            .Include(t => t.Rounds)
             .Include(t => t.Apiary)
             .Include(t => t.CreatedBy)
             .FirstOrDefaultAsync(t => t.Id == id);

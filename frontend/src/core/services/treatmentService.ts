@@ -4,6 +4,7 @@ import type {
   TreatmentDetail,
   CreateTreatmentPayload,
   UpdateTreatmentPayload,
+  CompleteTreatmentRoundPayload,
 } from '../models'
 
 export interface TreatmentFilters {
@@ -35,5 +36,17 @@ export const treatmentService = {
 
   async remove(id: number): Promise<void> {
     await apiClient.delete(`/treatments/${id}`)
+  },
+
+  async completeRound(
+    treatmentId: number,
+    roundId: number,
+    payload: CompleteTreatmentRoundPayload = {},
+  ): Promise<TreatmentDetail> {
+    const { data } = await apiClient.post<TreatmentDetail>(
+      `/treatments/${treatmentId}/rounds/${roundId}/complete`,
+      payload,
+    )
+    return data
   },
 }

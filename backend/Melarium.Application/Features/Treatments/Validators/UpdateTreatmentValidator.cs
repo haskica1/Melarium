@@ -30,6 +30,13 @@ public class UpdateTreatmentValidator : AbstractValidator<UpdateTreatmentDto>
         RuleFor(x => x.WithdrawalDays)
             .InclusiveBetween(0, 365).WithMessage("Karenca mora biti između 0 i 365 dana.");
 
+        RuleFor(x => x.TotalRounds)
+            .InclusiveBetween(1, 10).WithMessage("Broj primjena mora biti između 1 i 10.");
+
+        RuleFor(x => x.IntervalDays)
+            .InclusiveBetween(1, 90).WithMessage("Razmak između primjena mora biti između 1 i 90 dana.")
+            .When(x => x.TotalRounds > 1);
+
         RuleFor(x => x.BatchNumber).MaximumLength(50).When(x => x.BatchNumber is not null);
         RuleFor(x => x.Supplier).MaximumLength(100).When(x => x.Supplier is not null);
         RuleFor(x => x.Notes).MaximumLength(500).When(x => x.Notes is not null);

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { treatmentService, type TreatmentFilters } from './treatmentService'
-import type { CreateTreatmentPayload, UpdateTreatmentPayload } from '../models'
+import type { CreateTreatmentPayload, UpdateTreatmentPayload, CompleteTreatmentRoundPayload } from '../models'
 
 export const treatmentQueryKeys = {
   all: ['treatments'] as const,
@@ -42,6 +42,15 @@ export const useDeleteTreatment = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => treatmentService.remove(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: treatmentQueryKeys.all }),
+  })
+}
+
+export const useCompleteTreatmentRound = (treatmentId: number) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { roundId: number; payload?: CompleteTreatmentRoundPayload }) =>
+      treatmentService.completeRound(treatmentId, vars.roundId, vars.payload),
     onSuccess: () => qc.invalidateQueries({ queryKey: treatmentQueryKeys.all }),
   })
 }

@@ -13,6 +13,13 @@ public class CreateTreatmentDto
     public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; }
     public int WithdrawalDays { get; set; }
+
+    /// <summary>Number of applications, e.g. Apiguard = 2. Default 1 = single application.</summary>
+    public int TotalRounds { get; set; } = 1;
+
+    /// <summary>Days between applications. Only meaningful when <see cref="TotalRounds"/> > 1.</summary>
+    public int IntervalDays { get; set; }
+
     public string? BatchNumber { get; set; }
     public string? Supplier { get; set; }
     public string? Notes { get; set; }

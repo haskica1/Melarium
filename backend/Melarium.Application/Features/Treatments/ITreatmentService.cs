@@ -11,4 +11,7 @@ public interface ITreatmentService
     Task<TreatmentDetailDto> CreateAsync(CreateTreatmentDto dto);
     Task<TreatmentDetailDto> UpdateAsync(int id, UpdateTreatmentDto dto);
     Task DeleteAsync(int id);
+
+    /// <summary>Ticks one scheduled application round. Never touches the legal StartDate/EndDate record.</summary>
+    Task<TreatmentRoundDto> CompleteTreatmentRoundAsync(int treatmentId, int roundId, CompleteTreatmentRoundDto dto);
 }

@@ -31,6 +31,7 @@ import HarvestsPage from './features/harvests/HarvestsPage'
 import HarvestFormPage from './features/harvests/HarvestFormPage'
 import TreatmentsPage from './features/treatments/TreatmentsPage'
 import TreatmentFormPage from './features/treatments/TreatmentFormPage'
+import TreatmentDetailPage from './features/treatments/TreatmentDetailPage'
 import LearningPage from './features/learning/LearningPage'
 import LearningTopicPage from './features/learning/LearningTopicPage'
 import OutboxPage from './features/offline/OutboxPage'
@@ -168,6 +169,7 @@ export default function App() {
               {/* Treatments — list for all authenticated users (Beekeeper read-only);
                   create/edit restricted to hive managers */}
               <Route path="treatments" element={<TreatmentsPage />} />
+              <Route path="treatments/:id" element={<TreatmentDetailPage />} />
               <Route element={<RoleRoute allowedRoles={HIVE_MANAGERS} />}>
                 <Route path="treatments/new"      element={<TreatmentFormPage />} />
                 <Route path="treatments/:id/edit" element={<TreatmentFormPage />} />

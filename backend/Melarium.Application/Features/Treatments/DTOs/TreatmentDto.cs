@@ -22,6 +22,11 @@ public class TreatmentDto
     public DateTime? EndDate { get; set; }
     public int WithdrawalDays { get; set; }
 
+    public int TotalRounds { get; set; }
+    public int IntervalDays { get; set; }
+    /// <summary>Completed rounds out of <see cref="TotalRounds"/> — drives the progress bar on the list.</summary>
+    public int CompletedRounds { get; set; }
+
     public string? BatchNumber { get; set; }
     public string? Supplier { get; set; }
     public string? Notes { get; set; }

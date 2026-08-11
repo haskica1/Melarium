@@ -1002,6 +1002,27 @@ export interface TreatmentEntry {
   doseNote?: string
 }
 
+export enum TreatmentRoundStatus {
+  Pending   = 1,
+  Completed = 2,
+}
+
+export const TreatmentRoundStatusLabels: Record<TreatmentRoundStatus, string> = {
+  [TreatmentRoundStatus.Pending]:   'Na čekanju',
+  [TreatmentRoundStatus.Completed]: 'Završeno',
+}
+
+export interface TreatmentRound {
+  id: number
+  scheduledDate: string
+  status: TreatmentRoundStatus
+  statusName: string
+  completionDate?: string
+  /** Optional note recorded when the round was ticked. */
+  note?: string
+  treatmentId: number
+}
+
 export interface Treatment {
   id: number
   apiaryId: number
@@ -1017,6 +1038,11 @@ export interface Treatment {
   startDate: string
   endDate?: string
   withdrawalDays: number
+  /** Number of applications, e.g. Apiguard = 2. 1 = single application (strips, trickling). */
+  totalRounds: number
+  /** Days between applications. Irrelevant when totalRounds == 1. */
+  intervalDays: number
+  completedRounds: number
   batchNumber?: string
   supplier?: string
   notes?: string
@@ -1031,6 +1057,7 @@ export interface Treatment {
 
 export interface TreatmentDetail extends Treatment {
   entries: TreatmentEntry[]
+  rounds: TreatmentRound[]
 }
 
 export interface CreateTreatmentEntryPayload {
@@ -1048,6 +1075,8 @@ export interface CreateTreatmentPayload {
   startDate: string
   endDate?: string | null
   withdrawalDays: number
+  totalRounds: number
+  intervalDays: number
   batchNumber?: string | null
   supplier?: string | null
   notes?: string | null
@@ -1064,10 +1093,16 @@ export interface UpdateTreatmentPayload {
   startDate: string
   endDate?: string | null
   withdrawalDays: number
+  totalRounds: number
+  intervalDays: number
   batchNumber?: string | null
   supplier?: string | null
   notes?: string | null
   entries: CreateTreatmentEntryPayload[]
+}
+
+export interface CompleteTreatmentRoundPayload {
+  note?: string | null
 }
 
 // ── Learning module (SPEC-06) ───────────────────────────────────────────────────

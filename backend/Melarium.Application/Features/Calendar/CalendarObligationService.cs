@@ -128,6 +128,27 @@ public class CalendarObligationService : ICalendarObligationService
                 var apiaryName = scope.ApiaryNames.TryGetValue(t.ApiaryId, out var an) ? an : $"Pčelinjak {t.ApiaryId}";
                 var link = Link(null, t.ApiaryId);
 
+                // Scheduled application rounds (multi-round protocols, e.g. Apiguard = 2 tretmana).
+                // One round is one visit covering the whole treated group, same de-duplication reasoning
+                // as the Feedings block above.
+                var orderedRounds = t.Rounds.OrderBy(r => r.ScheduledDate).ToList();
+                for (int i = 0; i < orderedRounds.Count; i++)
+                {
+                    var round = orderedRounds[i];
+                    if (round.Status != TreatmentRoundStatus.Pending) continue;
+
+                    var date = DateOnly.FromDateTime(round.ScheduledDate);
+                    if (!InRange(date)) continue;
+
+                    var desc = $"Preparat: {t.ProductName}\nRunda: {i + 1}/{orderedRounds.Count}";
+                    if (link != null) desc += $"\nOtvori: {link}";
+
+                    result.Add(new CalendarObligation(
+                        ObligationKind.TreatmentRound, $"treatment-round-{round.Id}", date,
+                        $"💊 Tretman — {apiaryName} (runda {i + 1}/{orderedRounds.Count})",
+                        desc, apiaryName, null, t.ApiaryId, false));
+                }
+
                 if (t.Method == ApplicationMethod.Strips && t.EndDate is null)
                 {
                     var date = DateOnly.FromDateTime(t.StartDate.AddDays(stripDays));

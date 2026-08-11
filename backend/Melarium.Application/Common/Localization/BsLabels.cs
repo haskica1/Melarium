@@ -59,6 +59,13 @@ public static class BsLabels
         _                            => s.ToString(),
     };
 
+    public static string Label(TreatmentRoundStatus s) => s switch
+    {
+        TreatmentRoundStatus.Pending   => "Na čekanju",
+        TreatmentRoundStatus.Completed => "Završeno",
+        _                              => s.ToString(),
+    };
+
     public static string Label(HoneyLevel h) => h switch
     {
         HoneyLevel.Low    => "Nisko",

@@ -2,11 +2,12 @@ namespace Melarium.Application.Features.Calendar;
 
 public enum ObligationKind
 {
-    Feeding       = 1,
-    Todo          = 2,
-    StripRemoval  = 3,
-    KarencaEnd    = 4,
-    InspectionDue = 5,
+    Feeding        = 1,
+    Todo           = 2,
+    StripRemoval   = 3,
+    KarencaEnd     = 4,
+    InspectionDue  = 5,
+    TreatmentRound = 6,
 }
 
 /// <summary>

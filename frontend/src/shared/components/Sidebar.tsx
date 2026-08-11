@@ -31,15 +31,16 @@ export function getNavItems(flags: NavRoleFlags): NavItemDef[] {
       ? { to: '/admin', icon: <LayoutDashboard className="w-4 h-4" />, label: 'Kontrolna ploča', visible: true }
       : { to: '/apiaries', icon: <Home className="w-4 h-4" />, label: 'Pčelinjaci', visible: true },
     { to: '/members', icon: <Users className="w-4 h-4" />, label: 'Članovi', visible: flags.canManageMembers },
-    { to: '/pastures', icon: <Tent className="w-4 h-4" />, label: 'Pašnjaci', visible: flags.canSeePastures },
-    { to: '/expenses', icon: <ReceiptText className="w-4 h-4" />, label: 'Troškovi', visible: flags.canSeeExpenses },
-    { to: '/harvests', icon: <Droplets className="w-4 h-4" />, label: 'Vrcanja', visible: true },
-    { to: '/feedings', icon: <Leaf className="w-4 h-4" />, label: 'Prehrana', visible: true },
-    { to: '/treatments', icon: <Pill className="w-4 h-4" />, label: 'Tretmani', visible: true },
-    { to: '/assistant', icon: <Sparkles className="w-4 h-4" />, label: 'AI Asistent', visible: true },
+    // Pčelinjak/organizacija-vezane stavke — SystemAdmin nema svoju organizaciju, pa mu ove stranice ne služe.
+    { to: '/pastures', icon: <Tent className="w-4 h-4" />, label: 'Pašnjaci', visible: flags.canSeePastures && !flags.isSystemAdmin },
+    { to: '/expenses', icon: <ReceiptText className="w-4 h-4" />, label: 'Troškovi', visible: flags.canSeeExpenses && !flags.isSystemAdmin },
+    { to: '/harvests', icon: <Droplets className="w-4 h-4" />, label: 'Vrcanja', visible: !flags.isSystemAdmin },
+    { to: '/feedings', icon: <Leaf className="w-4 h-4" />, label: 'Prehrana', visible: !flags.isSystemAdmin },
+    { to: '/treatments', icon: <Pill className="w-4 h-4" />, label: 'Tretmani', visible: !flags.isSystemAdmin },
+    { to: '/assistant', icon: <Sparkles className="w-4 h-4" />, label: 'AI Asistent', visible: !flags.isSystemAdmin },
     { to: '/learning', icon: <GraduationCap className="w-4 h-4" />, label: 'Edukacija', visible: true },
-    { to: '/calendar', icon: <CalendarDays className="w-4 h-4" />, label: 'Kalendar', visible: true },
-    { to: '/stats', icon: <BarChart2 className="w-4 h-4" />, label: 'Statistike', visible: true },
+    { to: '/calendar', icon: <CalendarDays className="w-4 h-4" />, label: 'Kalendar', visible: !flags.isSystemAdmin },
+    { to: '/stats', icon: <BarChart2 className="w-4 h-4" />, label: 'Statistike', visible: !flags.isSystemAdmin },
     {
       to: '/admin/feedback',
       icon: <MessageSquareHeart className="w-4 h-4" />,
@@ -75,12 +76,15 @@ export function Sidebar({ flags }: SidebarProps) {
         expanded ? 'w-56' : 'w-16',
       )}
     >
-      <div className={clsx('h-14 flex items-center border-b border-honey-100 dark:border-slate-800 shrink-0', expanded ? 'px-4 gap-2' : 'justify-center')}>
+      <NavLink
+        to={flags.isSystemAdmin ? '/admin' : '/apiaries'}
+        className={clsx('h-14 flex items-center border-b border-honey-100 dark:border-slate-800 shrink-0', expanded ? 'px-4 gap-2' : 'justify-center')}
+      >
         <span className="text-2xl leading-none">🐝</span>
         {expanded && (
           <span className="font-display text-lg font-bold text-honey-800 dark:text-honey-300 truncate">Melarium</span>
         )}
-      </div>
+      </NavLink>
 
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
         {getNavItems(flags).map(item => (
