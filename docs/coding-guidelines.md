@@ -153,3 +153,21 @@ if (isError) return <div>Error loading data.</div>;
 ```
 
 Every page that fetches data must handle both states before rendering content.
+
+**`apiClient` does not display anything.** Its interceptors normalise the server's Bosnian message and
+then *reject* with it — the only thing it renders is the `plan-limit` upsell event. So a `catch {}`
+around a mutation shows the user nothing at all: the request failed, the spinner stopped, and the
+screen is unchanged. This is how the AI assistant appeared "broken" while the backend was returning a
+correct explanation every time (`features/ai-assistant.md`).
+
+```tsx
+try {
+  await mutation.mutateAsync(payload)
+} catch (error) {
+  // isPlanLimit → UpsellModal already showed it; a toast on top would be a second dialog.
+  if (!isPlanLimit(error)) toast.error(errorMessage(error))
+}
+```
+
+An empty `catch` is only correct when the failure is genuinely not worth telling the user about
+(a best-effort side call) — and then it says so in a comment.

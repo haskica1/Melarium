@@ -4,6 +4,7 @@ import { useVoiceInput } from '../../core/hooks/useVoiceInput'
 import { useOnlineStatus } from '../../core/hooks/useOnlineStatus'
 import { useToast } from '../../core/context/ToastContext'
 import { assistantService } from '../../core/services/assistantService'
+import { errorMessage, isPlanLimit } from '../../core/services/apiClient'
 import {
   useAddAssistantTurn,
   useConfirmAssistantActions,
@@ -46,7 +47,7 @@ export function AssistantThread({
   const online = useOnlineStatus()
   const voice = useVoiceInput()
   const { toast } = useToast()
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const threadRef = useRef<HTMLDivElement>(null)
   // The transcript is kept beside the text so an edit before sending does not erase what was heard.
   const transcriptRef = useRef<string | null>(null)
 
@@ -91,8 +92,13 @@ export function AssistantThread({
     })
   }, [pendingTurn])
 
+  // Scroll the thread itself, not `scrollIntoView` on a bottom marker: that walks up and scrolls
+  // *every* scrollable ancestor, so inside the mobile sheet it dragged the page behind the overlay
+  // along with it — one half of the "content behind moves" report.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    const thread = threadRef.current
+    if (!thread) return
+    thread.scrollTo({ top: thread.scrollHeight, behavior: 'smooth' })
   }, [session, confirm.isPending])
 
   // A new turn means a stale review — never leave the second-confirmation modal open over cards
@@ -124,8 +130,12 @@ export function AssistantThread({
       applySession(updated)
       setText('')             // only on success — a failed send keeps the text for retry
       transcriptRef.current = null
-    } catch {
-      /* apiClient surfaces the message; the text stays so nothing dictated is lost */
+    } catch (error) {
+      // This used to swallow the rejection on the belief that apiClient displayed it. It does not —
+      // it only *rejects* with the message. So a rate limit, an expired plan, a Groq outage or a
+      // timeout all looked identical from the phone: tap Pošalji, spinner stops, nothing happens.
+      // The text is deliberately kept, so nothing dictated is lost on a failed send.
+      if (!isPlanLimit(error)) toast.error(errorMessage(error))
     }
   }
 
@@ -194,8 +204,8 @@ export function AssistantThread({
       if (failed.length === 0) toast.success(response.message)
       else toast.error(response.message)
       applySession(await assistantService.getSession(session.id))
-    } catch {
-      /* message surfaced by the interceptor */
+    } catch (error) {
+      if (!isPlanLimit(error)) toast.error(errorMessage(error))
     }
   }
 
@@ -204,15 +214,16 @@ export function AssistantThread({
     try {
       await reject.mutateAsync(pendingTurn.id)
       applySession(await assistantService.getSession(session.id))
-    } catch {
-      /* message surfaced by the interceptor */
+    } catch (error) {
+      if (!isPlanLimit(error)) toast.error(errorMessage(error))
     }
   }
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      {/* Thread */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-4">
+      {/* Thread. `overscroll-contain` stops the gesture from chaining to the page once this hits its
+          top or bottom — the other half of "content behind scrolls". */}
+      <div ref={threadRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 space-y-4">
         {!session && (
           <div className="text-center py-6">
             <Sparkles className="w-8 h-8 mx-auto text-honey-500" />
@@ -292,7 +303,6 @@ export function AssistantThread({
           </div>
         )}
 
-        <div ref={bottomRef} />
       </div>
 
       {/* Confirmation bar — only while something is awaiting a decision */}

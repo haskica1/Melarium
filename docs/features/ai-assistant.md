@@ -172,6 +172,24 @@ without a second request.
 - `AssistantSheet` — the sheet itself, mounted once in `Layout`, on every page. Passes the route's
   apiary/hive as context, which fills gaps only. Closes on navigation (its context would otherwise be
   stale) and when the assistant stops being available mid-session.
+- **On a phone it is a real bottom sheet** (2026-08-17): grab handle, drag down past ~110 px to
+  dismiss, spring back below that. Three things it had been getting wrong, all reported as "izgleda
+  loše / sadržaj iza se skrolla":
+  - It was the **only overlay in the app not using `useDialogBehavior`**, so it alone had no body
+    scroll lock, no focus trap and no focus restore. It uses the shared hook now — do not hand-roll
+    a bare Escape listener here again.
+  - **`h-[85dvh]`, never `vh`.** On a phone `vh` measures the viewport with the URL bar *hidden*, so
+    `85vh` reached past the visible area and pushed the input row — the entire point of the sheet —
+    off the bottom of the screen.
+  - `overscroll-contain` on the thread, and the auto-scroll sets the thread's own `scrollTop`
+    instead of `scrollIntoView` on a bottom marker: `scrollIntoView` walks up and scrolls **every**
+    scrollable ancestor, which is what dragged the page behind the overlay along with it.
+
+  The drag transform is applied **only while a drag is in progress**, deliberately: a transform makes
+  the panel a containing block, and `AssistantThread` renders a `fixed inset-0` confirmation modal
+  inside it. It also must not call `onClose()` from inside a `setState` updater — that runs during
+  render, so it updates `Layout` mid-render (React warns; StrictMode can fire it twice). The drag
+  distance is mirrored in a ref for exactly that reason.
 - **Opening it belongs to `Layout`, not to this component** (was `AssistantLauncher`, which owned its
   own button and `open` state until 2026-08-17). The button shares the bottom-right corner with the QR
   scanner, and two components each placing themselves `fixed` there is exactly how they ended up on top
@@ -186,6 +204,17 @@ without a second request.
   advisor's `ChatThread`) so a Q&A answer's headings/lists/bold render properly; user turns stay plain
   text. A persistent footer disclaims that advice is informational and points AFB/EFB-type suspicions to
   a vet — ported from the advisor, since the merged assistant now sometimes gives that class of answer.
+- **Every failure must be reported to the user here.** Until 2026-08-17 `send`, `confirmSelected` and
+  `rejectAll` each swallowed the rejection under a comment claiming apiClient displayed it. It does
+  not — `apiClient` only *rejects with* the message; nothing in it renders anything except the
+  `plan-limit` upsell event. So a rate limit, an expired plan, a Groq outage or a timeout all looked
+  identical from a phone: tap Pošalji, spinner stops, **nothing happens** — reported as "the AI
+  assistant doesn't work". The backend was already sending a perfectly good Bosnian message
+  (`AiAssistantService.CallAiAsync` turns any upstream failure into
+  *"AI servis trenutno nije dostupan…"*); the UI was throwing it away.
+  Use `errorMessage(e)` from `apiClient` to toast it, and skip it when `isPlanLimit(e)` — that one is
+  already shown by `UpsellModal` and would otherwise stack a toast on top of a modal. The assistant
+  was the only place in the app doing this; every other `catch` sets an error state or toasts.
 - `ProposalCard` — **editable**: apiary/hive selects plus the per-kind fields; "Potvrdi" stays disabled
   until the target (and, for a todo, the title) is set. When the apiary/hive lists fail to load, the
   card falls back to the names the server sent rather than claiming "Nije određeno". **Phase C**:

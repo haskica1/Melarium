@@ -37,7 +37,9 @@ apiClient.interceptors.response.use(
       window.dispatchEvent(new CustomEvent('plan-limit', { detail }))
       // Reject with the Bosnian message so any inline form error shows it too (instead of the
       // generic English "Payment Required" title the downstream interceptor would derive).
-      return Promise.reject(new Error(detail))
+      // Flagged, because `UpsellModal` already explains this one: a caller that reports its own
+      // errors needs a way to stay quiet here and not stack a toast on top of the modal.
+      return Promise.reject(Object.assign(new Error(detail), { planLimit: true as const }))
     }
     return Promise.reject(error)
   },
@@ -112,5 +114,21 @@ apiClient.interceptors.response.use(
     return Promise.reject(new Error(message))
   },
 )
+
+/**
+ * The message every interceptor above ends up rejecting with. Nothing in this file *displays* it —
+ * a caller that swallows the rejection shows the user nothing at all, which is how the AI assistant
+ * managed to fail in complete silence.
+ */
+export function errorMessage(error: unknown): string {
+  return error instanceof Error && error.message
+    ? error.message
+    : 'Došlo je do greške. Pokušajte ponovo.'
+}
+
+/** True for a 402 plan limit, which `UpsellModal` has already shown — do not report it twice. */
+export function isPlanLimit(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { planLimit?: boolean }).planLimit === true
+}
 
 export default apiClient
