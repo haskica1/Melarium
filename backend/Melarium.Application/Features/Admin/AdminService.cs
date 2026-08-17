@@ -27,14 +27,23 @@ public class AdminService : IAdminService
     public async Task<IEnumerable<AdminOrganizationDto>> GetAllOrganizationsAsync()
     {
         var orgs = await _uow.Organizations.GetAllWithDetailsAsync();
-        return orgs.Select(MapOrganization);
+        var beehiveCounts = await _uow.Organizations.GetBeehiveCountsAsync();
+        var lastActivity  = await _uow.Organizations.GetLastActivityAsync();
+
+        return orgs
+            .Select(o => MapOrganization(o, beehiveCounts, lastActivity))
+            .ToList();
     }
 
     public async Task<AdminOrganizationDto> GetOrganizationByIdAsync(int id)
     {
         var org = await _uow.Organizations.GetWithDetailsAsync(id)
             ?? throw new NotFoundException(nameof(Organization), id);
-        return MapOrganization(org);
+
+        var beehiveCounts = await _uow.Organizations.GetBeehiveCountsAsync(id);
+        var lastActivity  = await _uow.Organizations.GetLastActivityAsync(id);
+
+        return MapOrganization(org, beehiveCounts, lastActivity);
     }
 
     public async Task<AdminOrganizationDto> CreateOrganizationAsync(CreateOrganizationDto dto, int? createdById)
@@ -50,8 +59,7 @@ public class AdminService : IAdminService
         await _uow.Organizations.AddAsync(org);
         await _uow.SaveChangesAsync();
 
-        var saved = await _uow.Organizations.GetWithDetailsAsync(org.Id) ?? org;
-        return MapOrganization(saved);
+        return await GetOrganizationByIdAsync(org.Id);
     }
 
     public async Task<AdminOrganizationDto> UpdateOrganizationAsync(int id, UpdateOrganizationDto dto)
@@ -65,7 +73,7 @@ public class AdminService : IAdminService
         await _uow.Organizations.UpdateAsync(org);
         await _uow.SaveChangesAsync();
 
-        return MapOrganization(org);
+        return await GetOrganizationByIdAsync(id);
     }
 
     public async Task<AdminOrganizationDto> UpdateOrganizationPlanAsync(int id, UpdateOrganizationPlanDto dto)
@@ -82,7 +90,7 @@ public class AdminService : IAdminService
         await _uow.Organizations.UpdateAsync(org);
         await _uow.SaveChangesAsync();
 
-        return MapOrganization(org);
+        return await GetOrganizationByIdAsync(id);
     }
 
     public async Task DeleteOrganizationAsync(int id)
@@ -469,13 +477,23 @@ public class AdminService : IAdminService
 
     // ── Mappers ────────────────────────────────────────────────────────────────
 
-    private static AdminOrganizationDto MapOrganization(Organization o) => new()
+    /// <summary>
+    /// Hive count and last activity are absent from the dictionaries for an organization that has
+    /// neither, which is why they are looked up rather than read off the entity: 0 hives and "never
+    /// active" are real answers, not missing data.
+    /// </summary>
+    private static AdminOrganizationDto MapOrganization(
+        Organization o,
+        Dictionary<int, int> beehiveCounts,
+        Dictionary<int, DateTime> lastActivity) => new()
     {
         Id = o.Id,
         Name = o.Name,
         Description = o.Description,
         UserCount = o.Users.Count,
         ApiaryCount = o.Apiaries.Count,
+        BeehiveCount = beehiveCounts.GetValueOrDefault(o.Id),
+        LastActivityAt = lastActivity.TryGetValue(o.Id, out var at) ? at : null,
         CreatedByName = o.CreatedBy != null ? $"{o.CreatedBy.FirstName} {o.CreatedBy.LastName}" : null,
         CreatedAt = o.CreatedAt,
         Plan = o.Plan,

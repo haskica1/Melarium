@@ -305,6 +305,14 @@ pasture or a foreign-org pasture → `400`; `movedAt` max +1 day. `GET /api/stat
 | PUT | `/admin/users/{id}` | Update user — `phone` optional; blank leaves it unchanged |
 | DELETE | `/admin/users/{id}` | Delete user |
 
+**AdminOrganizationDto** additionally carries `beehiveCount` and `lastActivityAt` (nullable). Both are
+**derived, never stored**: the hive count resolves through the owning apiary, and `lastActivityAt` is the
+newest create-or-update across everything the organization owns (apiary, hive, inspection, queen, diet +
+feeding rounds, treatment + rounds, harvest, expense, pasture, member, apiary/hive todo) plus refresh-token
+issue, i.e. sign-in and session refresh. `null` = no sign of life beyond the row's own creation. Every
+endpoint in the table above that returns an `AdminOrganizationDto` fills both, so the two fields never
+carry a placeholder zero. See `features/org-activity.md`.
+
 **Phone on user payloads.** Every endpoint that creates an account (`/auth/register`,
 `/admin/users`, org member creation) requires a `phone`; every endpoint that updates one
 (`/admin/users/{id}`, `/profile`) takes it optionally, where **blank means "leave the stored number

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, CloudOff, CreditCard, LogOut, Menu, MessageSquarePlus, Moon, QrCode, Search, Settings, Sun, UserPlus, X } from 'lucide-react'
+import { ArrowLeft, CloudOff, CreditCard, LogOut, Menu, MessageSquarePlus, Moon, QrCode, Search, Settings, Sparkles, Sun, UserPlus, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../../core/context/AuthContext'
 import { usePermissions } from '../../core/hooks/usePermissions'
@@ -19,7 +19,8 @@ import { useHelp } from '../../core/help/useHelp'
 import { HelpProvider } from '../../core/help/HelpContext'
 import { CommandPalette } from './CommandPalette'
 import { Sidebar, getNavItems, type NavRoleFlags } from './Sidebar'
-import AssistantLauncher from '../../features/assistant/AssistantLauncher'
+import FabDock, { type FabAction } from './FabDock'
+import AssistantSheet from '../../features/assistant/AssistantSheet'
 import { ErrorBoundary } from './ErrorBoundary'
 import { canGoBack as hasHistoryBehind } from '../utils/historyStack'
 
@@ -32,6 +33,7 @@ export default function Layout() {
   const [scannerOpen, setScannerOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
   const { user, logout } = useAuth()
   const { isDark, toggleTheme } = useTheme()
@@ -66,6 +68,35 @@ export default function Layout() {
 
   // navigate(-1) mirrors real browser back — re-evaluated on every route change via useLocation().
   const canGoBack = !ROOT_PATHS.includes(pathname) && hasHistoryBehind()
+
+  // ── The floating corner (bottom right) ────────────────────────────────────────
+  // Both of these used to place themselves independently and landed on top of each other on a
+  // phone. FabDock owns the corner now; everything that wants to float there is an entry here.
+  //
+  // The assistant needs the server for transcription and interpretation, so it hides offline (the
+  // SPEC-07 precedent: voice input disappears rather than failing on tap), and it hides on its own
+  // page, where a shortcut to where you already are is just noise.
+  const assistantAvailable = online && !pathname.startsWith('/assistant')
+
+  const fabActions: FabAction[] = [
+    // Scan is mobile-only here because the desktop header already carries it. Hidden while the
+    // hamburger panel is open: the panel reaches the bottom of the viewport and this sits over the
+    // right-hand end of its last row, so a tap there used to open the scanner instead of signing
+    // out. The panel has its own "Skeniraj" entry, so nothing is lost.
+    ...(!mobileOpen ? [{
+      key: 'scan',
+      mobileOnly: true,
+      label: 'Skeniraj QR kod košnice',
+      icon: <QrCode className="w-6 h-6" />,
+      onClick: () => setScannerOpen(true),
+    }] : []),
+    ...(assistantAvailable ? [{
+      key: 'assistant',
+      label: 'Otvori AI asistenta',
+      icon: <Sparkles className="w-6 h-6" />,
+      onClick: () => setAssistantOpen(true),
+    }] : []),
+  ]
 
   const avatarClass = isSystemAdmin
     ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300'
@@ -108,6 +139,13 @@ export default function Layout() {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [])
+
+  // Close the assistant sheet on navigation (its context is the page it was opened from, and
+  // carrying that to the next page would make it a lie) and when the assistant stops being
+  // available mid-session — dropping offline used to unmount the whole thing.
+  useEffect(() => {
+    setAssistantOpen(false)
+  }, [pathname, assistantAvailable])
 
   return (
     <div className="min-h-screen flex">
@@ -426,30 +464,19 @@ export default function Layout() {
           </ErrorBoundary>
         </main>
 
-        {/* AI assistant (SPEC-17) — one floating entry point on every page, so a command can be given
-            without navigating away from the hive being looked at. Hides itself offline. */}
-        <AssistantLauncher />
-
         {/* ── Footer ────────────────────────────────────────────────────────────── */}
         <footer className="border-t border-honey-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-4 text-center text-xs text-gray-400 dark:text-slate-500">
           Melarium App © {new Date().getFullYear()} — Čuvajte vaše kolonije zdravim 🍯
         </footer>
       </div>
 
-      {/* ── Mobile FAB (scan) ─────────────────────────────────────────────────── */}
-      {/* Hidden while the hamburger panel is open: the panel now ends exactly at the bottom of the
-          viewport, and this button (z-40, above the z-30 header) sits over the right-hand end of
-          its last row — a tap there opened the scanner instead of signing out. The panel has its
-          own "Skeniraj" entry, so nothing is lost by hiding it. */}
-      {!mobileOpen && (
-        <button
-          onClick={() => setScannerOpen(true)}
-          className="sm:hidden fixed bottom-6 right-6 z-40 flex items-center justify-center w-14 h-14 rounded-full bg-honey-500 hover:bg-honey-600 active:bg-honey-700 text-white shadow-honey shadow-lg transition-colors"
-          aria-label="Skeniraj QR kod košnice"
-        >
-          <QrCode className="w-6 h-6" />
-        </button>
-      )}
+      {/* ── Floating actions: scan + AI assistant, one capsule ────────────────── */}
+      <FabDock actions={fabActions} />
+
+      {/* AI assistant (SPEC-17) — reachable from every page, so a command can be given without
+          navigating away from the hive being looked at. Closes on navigation: its context is the
+          page you were on, and carrying that to the next page would make it a lie. */}
+      <AssistantSheet open={assistantOpen} onClose={() => setAssistantOpen(false)} />
 
       {/* ── QR Scanner Modal ──────────────────────────────────────────────────── */}
       {scannerOpen && <QrScannerModal onClose={() => setScannerOpen(false)} />}

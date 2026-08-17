@@ -1,5 +1,7 @@
 ﻿import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { differenceInDays, format, formatDistanceToNow } from 'date-fns'
+import { bs } from 'date-fns/locale'
 import { Building2, Users, Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react'
 import {
   useAdminOrganizations,
@@ -133,6 +135,8 @@ export default function AdminDashboardPage() {
                   <Th className="text-center">Paket</Th>
                   <Th className="text-center">Korisnici</Th>
                   <Th className="text-center">Pčelinjaci</Th>
+                  <Th className="text-center">Košnice</Th>
+                  <Th className="text-center">Zadnja aktivnost</Th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -145,6 +149,8 @@ export default function AdminDashboardPage() {
                     </td>
                     <td className="px-4 py-3 text-center text-gray-700 dark:text-slate-300">{org.userCount}</td>
                     <td className="px-4 py-3 text-center text-gray-700 dark:text-slate-300">{org.apiaryCount}</td>
+                    <td className="px-4 py-3 text-center text-gray-700 dark:text-slate-300">{org.beehiveCount}</td>
+                    <td className="px-4 py-3 text-center"><ActivityCell at={org.lastActivityAt} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <RowAction kind="edit" onClick={() => navigate(`/admin/organizations/${org.id}/edit`)} />
@@ -323,6 +329,38 @@ function PlanBadge({ org }: { org: AdminOrganization }) {
           {expired ? 'isteklo' : `do ${new Date(org.planValidUntil).toLocaleDateString('bs-BA')}`}
         </span>
       )}
+    </span>
+  )
+}
+
+/**
+ * "Koristi li se ova organizacija?" — the server derives the moment from the org's own records and
+ * sign-ins, this only colours it. 30/90 days: 90 is the dormancy threshold agreed in SPEC-16 §0 D1,
+ * and 30 splits "working normally" off from "worth a look" so the two never share a colour.
+ *
+ * Reads as a label, not a verdict: an organization is never *declared* abandoned here — deciding
+ * that is a person looking at the date, which is exactly what SPEC-16 D2 reserves for a human.
+ */
+function ActivityCell({ at }: { at?: string | null }) {
+  if (!at) {
+    return <span className="text-[11px] font-semibold text-red-600 dark:text-red-400">nikad</span>
+  }
+
+  const date = new Date(at)
+  const days = differenceInDays(new Date(), date)
+  const tone =
+    days <= 30 ? 'text-emerald-600 dark:text-emerald-400'
+    : days <= 90 ? 'text-amber-600 dark:text-amber-400'
+    : 'text-red-600 dark:text-red-400'
+
+  return (
+    <span className="inline-flex flex-col items-center">
+      <span className={`text-[11px] font-semibold ${tone}`}>
+        {formatDistanceToNow(date, { addSuffix: true, locale: bs })}
+      </span>
+      <span className="text-[10px] mt-0.5 text-gray-400 dark:text-slate-500">
+        {format(date, 'dd.MM.yyyy.')}
+      </span>
     </span>
   )
 }

@@ -2,12 +2,35 @@
 
 | | |
 |---|---|
-| **Status** | 📋 Planned — sve odluke donesene (§0), spremno za Fazu A |
+| **Status** | 🔨 Djelimično — kolona "Zadnja aktivnost" isporučena 2026-08-17 **drugom metodom** (vidi ↓); ostatak Faze A, te B i C, i dalje planirani |
 | **Effort** | M (~2–3 days) — jedna kolona aktivnosti + heartbeat, jedan izračunati status, jedan ručni prekidač, popravka brisanja |
 | **Depends on** | ništa novo; koristi SPEC-09 (`PlanHelper`), ADR-021 (queue + worker), ADR-027 (`IFileStorage`), `ISessionRevoker` |
 | **New secrets / packages** | nema. Samo config: `Activity:*` |
 | **Breaking** | ne. Jedina promjena ponašanja je namjerna: korisnik deaktivirane organizacije se ne može prijaviti |
 | **Ništa se ne briše automatski** | nema workera koji briše, nema odbrojavanja, nema e-maila korisniku. Sistem samo **označi**; briše čovjek. |
+
+> ### ⚠️ Izmjena 2026-08-17 — §3 je zamijenjen, ne implementiran
+>
+> Kolona **"Zadnja aktivnost"** (i uz nju **broj košnica**) je isporučena, ali **bez ijedne stvari
+> iz §3**: nema `LastActivityAt` kolone, nema `IActivityTracker`-a, nema `ActivityTrackingWorker`-a,
+> nema `ActivityTrackingMiddleware`-a, nema `Activity:*` konfiguracije, nema migracije.
+>
+> Vrijednost se **računa pri čitanju** iz samih podataka: `MAX(UpdatedAt ?? CreatedAt)` po
+> organizaciji preko četrnaest tabela koje organizacija posjeduje, plus `RefreshToken.CreatedAt`
+> (prijava i rotacija sesije — signal zbog kojeg je §3 uopšte htio heartbeat).
+>
+> **Zašto:** §3.3 sam navodi slabost pohranjene kolone — kreće prazna i prvih 90 dana ne govori
+> ništa o prošlosti. Izračun iz podataka opisuje **cijelu postojeću historiju od prvog dana**, a za
+> tabelu čija je svrha odlučivanje o *starim* organizacijama to je sama funkcija, ne detalj.
+> Puno obrazloženje: **ADR-034**. Opis implementacije: `docs/features/org-activity.md`.
+>
+> **Šta iz ovog speca i dalje NIJE napravljeno:** `IsActive` + ručni prekidač i blokada prijave
+> (§6, Faza B), `FirstPaidAt` (§4), izračunati `OrgStatus` badge Aktivna/Uspavana/Za brisanje (§4),
+> radne liste za naplatu (§5), `IOrgPurgeService` i popravka brisanja (§7, Faza C).
+> §0, §4–§7 i §10–§13 ostaju važeći za taj ostatak.
+>
+> **Ko nastavi Fazu A — ne vraćati `LastActivityAt` kolonu.** Izračunati status iz §4 treba čitati
+> `lastActivityAt` iz DTO-a, koji već postoji.
 
 ## 0. Odluke (Asim, 2026-07-31)
 

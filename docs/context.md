@@ -56,6 +56,12 @@
 - Full CRUD via `/api/admin/organizations` and `/api/admin/users`
   (`OrganizationsAdminController` + `UsersAdminController`)
 - Role/org/apiary consistency rules enforced in `AdminService`
+- Org table columns **Košnice** and **Zadnja aktivnost** — both derived on read, no stored column and
+  no migration: hive count through the owning apiary, activity as `MAX(UpdatedAt ?? CreatedAt)` across
+  the 14 tables an org owns plus `RefreshToken.CreatedAt` (sign-in / session refresh). Coloured by
+  freshness (≤30 d / ≤90 d / older or never). **ADR-034** — replaces SPEC-16 §3's heartbeat design;
+  the rest of SPEC-16 (IsActive lock, OrgStatus badge, billing lists, purge) is still unbuilt.
+  See `docs/features/org-activity.md`.
 - Demo data (2 orgs, apiaries, hives) seeded via EF `HasData` migrations
 
 ### Organization Members (`/api/org/*`)
@@ -164,7 +170,8 @@
   ceiling `Ai:MaxActionsPerCommand` (50). Standard+ with **one combined** monthly interaction quota
   (`EnsureAiInteractionAsync`, `Plans:{Plan}:AiInteractionsPerMonth`) covering questions and commands
   alike — merged from the previously separate advisor/assistant quotas
-- UI: floating `Sparkles` launcher in `Layout` (hidden offline), editable `ProposalCard`, `/assistant`
+- UI: `Sparkles` half of the `FabDock` capsule in `Layout` (hidden offline; shares the bottom-right
+  corner with the QR scanner instead of overlapping it), editable `ProposalCard`, `/assistant`
   history page, "AI Asistent" nav — the former separate "AI Savjetnik" nav item and `/advisor` route are
   retired. Assistant replies render as Markdown (`MarkdownMessage`); a vet/AFB-EFB disclaimer footer
   carried over from the advisor. Reuses `ai-chat`/`voice-parse` limits — no new policy
@@ -220,6 +227,9 @@
 - UI: "Edukacija" nav (all users), `LearningPage` + `LearningTopicPage` (react-markdown, ADR-025;
   **"Poslušaj"** TTS via `useSpeech` — bs→hr→sr voice pick, stops on navigation), admin list+form
   with markdown preview and AI draft panel
+- **Search by title** on `LearningPage` — client-side over the already-loaded list, diacritic-insensitive
+  and word-order-free (`shared/utils/search.ts`); composes with the category chips and flattens the
+  month/category sections into one results list while a query is present
 - Dev-only seed: 6 starter topics (`SeedLearningTopicsAsync`). Tests in `LearningTopicServiceTests`.
   See `docs/features/learning.md`.
 

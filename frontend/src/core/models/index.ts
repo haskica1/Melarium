@@ -663,8 +663,11 @@ export interface AdminOrganization {
   description?: string
   userCount: number
   apiaryCount: number
+  beehiveCount: number
   createdByName?: string
   createdAt: string
+  /** Newest sign of life, derived server-side from the org's own records + sign-ins. Null = never. */
+  lastActivityAt?: string | null
   // Subscription plan (SPEC-09)
   plan: PlanType
   planName: string

@@ -291,6 +291,8 @@ Session cap **40 turns** and message length 1–4000, mirroring the advisor's 60
 `features/assistant/`:
 
 - `AssistantLauncher.tsx` — the floating mic button, mounted once in `Layout.tsx`; hidden offline.
+  *(Renamed `AssistantSheet.tsx` on 2026-08-17: the button moved into `shared/components/FabDock`,
+  which `Layout` owns, so the assistant and the QR scanner stop overlapping on a phone.)*
 - `AssistantSheet.tsx` — the thread: input (mic + text), messages, cards.
 - `ProposalCard.tsx` — **editable**. Apiary and hive are selects populated from the entities the user
   can reach; an unresolved field is required and keeps "Potvrdi" disabled.

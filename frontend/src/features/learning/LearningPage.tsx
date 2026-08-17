@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, GraduationCap, Paperclip, Video } from 'lucide-react'
+import { CheckCircle2, GraduationCap, Paperclip, Search, Video, X } from 'lucide-react'
 import { useLearningTopics } from '../../core/services/learningQueries'
 import { LearningCategory, LearningCategoryLabels, MonthLabels } from '../../core/models'
 import type { LearningTopicSummary } from '../../core/models'
 import { EmptyState, ErrorState, VitalsSkeleton } from '../../shared/components'
+import { matchesQuery } from '../../shared/utils/search'
 
 const CATEGORIES = Object.values(LearningCategory).filter(v => typeof v === 'number') as LearningCategory[]
 
@@ -25,11 +26,16 @@ export default function LearningPage() {
     return CATEGORIES.includes(raw) ? (raw as LearningCategory) : 0
   })
 
+  const [query, setQuery] = useState('')
+  const searching = query.trim().length > 0
+
   const currentMonth = new Date().getMonth() + 1
 
   const filtered = useMemo(
-    () => topics.filter(t => category === 0 || t.category === category),
-    [topics, category],
+    () => topics.filter(t =>
+      (category === 0 || t.category === category) && matchesQuery(t.title, query),
+    ),
+    [topics, category, query],
   )
   const aktuelno = filtered.filter(t => t.months?.includes(currentMonth))
   const readCount = topics.filter(t => t.isRead).length
@@ -66,6 +72,29 @@ export default function LearningPage() {
         </div>
       </div>
 
+      {/* Search by topic title */}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-slate-500 pointer-events-none" />
+        <input
+          type="search"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Pretraži teme…"
+          aria-label="Pretraži edukativne teme po nazivu"
+          className="form-input pl-10 pr-10"
+        />
+        {searching && (
+          <button
+            type="button"
+            onClick={() => setQuery('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+            aria-label="Obriši pretragu"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {/* Category filter chips */}
       <div className="flex items-center gap-2 flex-wrap">
         <FilterChip label="Sve" active={category === 0} onClick={() => setCategory(0)} />
@@ -91,13 +120,43 @@ export default function LearningPage() {
       )}
 
       {!isLoading && !isError && topics.length > 0 && filtered.length === 0 && (
-        <EmptyState
-          title="Ova kategorija nema tema."
-          description="Odaberite drugu kategoriju ili pogledajte sve teme."
-        />
+        searching ? (
+          <EmptyState
+            title={`Nema teme za „${query.trim()}“.`}
+            description={category === 0
+              ? 'Pokušajte s drugom riječju iz naziva teme.'
+              : 'Pretražuje se samo odabrana kategorija — probajte "Sve".'}
+            action={
+              <button onClick={() => setQuery('')} className="btn-secondary text-sm">
+                Obriši pretragu
+              </button>
+            }
+          />
+        ) : (
+          <EmptyState
+            title="Ova kategorija nema tema."
+            description="Odaberite drugu kategoriju ili pogledajte sve teme."
+          />
+        )
       )}
 
-      {!isLoading && aktuelno.length > 0 && (
+      {/* While searching, results are one flat list: the month and category sections are for
+          browsing, and splitting six hits across three headings hides how few there are. */}
+      {!isLoading && searching && filtered.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 px-1">
+            Rezultati pretrage
+            <span className="ml-2 text-sm font-normal text-gray-500 dark:text-slate-400">
+              {filtered.length}
+            </span>
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {filtered.map(t => <TopicCard key={t.id} topic={t} />)}
+          </div>
+        </section>
+      )}
+
+      {!isLoading && !searching && aktuelno.length > 0 && (
         <section className="space-y-3">
           <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 px-1">
             Aktuelno u {MONTH_LOCATIVE[currentMonth - 1]}
@@ -108,7 +167,7 @@ export default function LearningPage() {
         </section>
       )}
 
-      {!isLoading && grouped.map(([cat, items]) => (
+      {!isLoading && !searching && grouped.map(([cat, items]) => (
         <section key={cat} className="space-y-3">
           <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 px-1">
             {LearningCategoryLabels[cat]}

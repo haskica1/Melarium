@@ -738,3 +738,46 @@ a fresh binding, degrade silently on a later turn).
   change — referenced only inside `EnsureFeatureAsync`'s message switch, never actually passed to that
   method (the assistant's gate was always the hand-rolled `EnsureAiCommandAsync`/now
   `EnsureAiInteractionAsync`) — so removing it deletes dead code rather than live surface.
+
+---
+
+## ADR-034: Organization Activity Is Derived from the Data, Not Stored (partially supersedes SPEC-16 §3)
+
+**Context.** The SystemAdmin organization table needed to answer "is this organization being used?".
+SPEC-16 §3 had already designed an answer: a stored `Organization.LastActivityAt`, written by an
+`ActivityTrackingWorker` off a channel, fed by a middleware that fires on every 2xx non-GET request
+plus the two auth entry points. That design was chosen partly so that *reading* the app would count,
+not only writing to it (§3.2).
+
+**Decision.** The column is computed on read instead, from the records themselves.
+`IOrganizationRepository.GetLastActivityAsync` takes `MAX(COALESCE(UpdatedAt, CreatedAt))` per
+organization across fifteen queries — the fourteen tables an organization owns, plus `RefreshToken`
+by `CreatedAt` for sign-in and session refresh — and merges them in memory. No column, no migration,
+no worker, no middleware, no config.
+
+**Why, given a spec already existed:**
+- **It is correct retroactively.** SPEC-16 §3.3 names this as its own weakness: a stored column
+  starts null everywhere and "the first 90 days after deploy the table must be read with that
+  reserve". A derived value describes the entire history that is already in the database, on the day
+  it ships. For a table whose purpose is deciding what to do about *old* organizations, that is not a
+  nice-to-have — it is the feature.
+- **It cannot silently miss a write path.** `MelariumDbContext.SaveChangesAsync` already stamps
+  `UpdatedAt` on every modified `BaseEntity`, so a new feature is counted the day it is written. The
+  middleware approach depends on every future write actually travelling through a non-GET HTTP
+  request — true today, and a silent gap the first time something writes from a worker or a job.
+- **The read-only-usage argument survives.** `RefreshToken.CreatedAt` gives sign-in and rotation
+  without a new column, so the signal SPEC-16 wanted the heartbeat for is present anyway.
+
+**Consequences accepted, not overlooked:**
+- **Fifteen queries per admin list load**, plus fifteen narrowed ones on each single-organization
+  read. This is a SystemAdmin-only page; each query is a plain indexed `GROUP BY`. Measured against
+  a schema-only translation pass, all fifteen translate to Postgres SQL — verified before merge,
+  since a LINQ shape that cannot be translated fails at runtime, not at build time.
+- **Not a UNION.** `Concat` + `GroupBy` would be one round-trip, and is exactly the shape EF is least
+  reliable at translating. Fifteen boring queries that always work beat one clever one that might not.
+- **Rounds are queried separately from their parents** (`FeedingEntry`, `TreatmentRound`): ticking a
+  feeding round off does not reliably bump the parent `Diet`, so without them an organization feeding
+  its hives every second day would read as idle.
+- **SPEC-16 is not closed by this.** Only its activity column is delivered. `IsActive`, `FirstPaidAt`,
+  the computed `OrgStatus` badge, the billing worklists and the purge fix remain unbuilt, and the
+  spec stays the record for them. Whoever picks it up must not re-add `LastActivityAt`.

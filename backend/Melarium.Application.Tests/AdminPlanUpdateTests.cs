@@ -20,6 +20,11 @@ public class AdminPlanUpdateTests
     public AdminPlanUpdateTests()
     {
         _service = new AdminService(_uow, Substitute.For<INotificationService>(), new SessionRevoker(_uow));
+
+        // The returned DTO carries the admin list's metrics, so every path that produces one reads
+        // these. Empty = "no hives, never active", which is what an unconfigured substitute means.
+        _uow.Organizations.GetBeehiveCountsAsync(Arg.Any<int?>()).Returns(new Dictionary<int, int>());
+        _uow.Organizations.GetLastActivityAsync(Arg.Any<int?>()).Returns(new Dictionary<int, DateTime>());
     }
 
     [Fact]

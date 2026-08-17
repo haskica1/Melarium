@@ -55,6 +55,14 @@ the `ai-chat` policy (SPEC-01).
 - `LearningPage` (`/learning`) — top section **"Aktuelno u {mjesecu}"** (locative month names are a
   lookup table, not string concatenation), category filter chips, topics grouped by category, cards
   with title/summary/category chip/read ✓.
+- **Search by topic title** — client-side over the list the page already loads in full; no endpoint,
+  no request per keystroke. Composes with the category chips (a chip narrows what is searched, and
+  the empty state says so when a chip is active). While a query is present the month and category
+  sections collapse into one flat **"Rezultati pretrage"** list: those sections exist for browsing,
+  and splitting six hits across three headings hides how few there are.
+  Matching is **diacritic-insensitive and word-order-free** via `shared/utils/search.ts` — "cistoca"
+  finds "Čistoća", "matica zamjena" finds "Zamjena matice". `fold()` strips combining marks after
+  NFD; **đ/đ needs its own pass** because Unicode treats it as a letter, not d + a mark.
 - `LearningTopicPage` (`/learning/:id`) — `MarkdownArticle` (shared react-markdown renderer, no
   raw-HTML plugins → `<script>` renders as inert text), **listen controls** and mark-as-read.
 - **Listen ("Poslušaj")** — `core/hooks/useSpeech.ts`, browser `speechSynthesis` (no backend, no

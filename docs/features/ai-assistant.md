@@ -169,9 +169,17 @@ without a second request.
 
 ## Frontend (`features/assistant/`)
 
-- `AssistantLauncher` — floating mic button mounted once in `Layout`, on every page. Hidden offline
-  (transcription and interpretation are server-side) and on `/assistant` itself. Passes the route's
-  apiary/hive as context, which fills gaps only.
+- `AssistantSheet` — the sheet itself, mounted once in `Layout`, on every page. Passes the route's
+  apiary/hive as context, which fills gaps only. Closes on navigation (its context would otherwise be
+  stale) and when the assistant stops being available mid-session.
+- **Opening it belongs to `Layout`, not to this component** (was `AssistantLauncher`, which owned its
+  own button and `open` state until 2026-08-17). The button shares the bottom-right corner with the QR
+  scanner, and two components each placing themselves `fixed` there is exactly how they ended up on top
+  of each other on a phone. `shared/components/FabDock` now owns that corner: both are entries in one
+  list, rendered as a single capsule with a half each, and `Layout` decides availability — hidden
+  offline (transcription and interpretation are server-side) and on `/assistant` itself, where a
+  shortcut to the page you are on is noise. On desktop the scanner half drops out (`sm:hidden` — the
+  header already carries scanning) and the capsule collapses back to an ordinary round FAB.
 - `AssistantThread` — the thread: input (textarea + mic), messages, proposal cards, confirm bar. A
   spoken command lands in the box for review and is **never** auto-sent — it can create records. An
   assistant reply renders through the shared `MarkdownMessage` (SPEC-18, moved out of the retired
