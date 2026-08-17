@@ -42,8 +42,9 @@ miss and are therefore explicit in the code:
   fully in `reply` instead of the old deflection to the (now-retired) advisor; the advisor's safety
   guardrails (AFB/EFB mandatory reporting, no dosing beyond manufacturer instructions, decline
   non-beekeeping topics) moved into this prompt verbatim.
-- `IAssistantAiClient` / `GroqAssistantAiClient` (`Features/Ai/`) — `Groq:AssistantModel`
-  (default `llama-3.3-70b-versatile`), temp 0, `response_format: json_object`.
+- `IAssistantAiClient` / `GroqAssistantAiClient` (`Features/Ai/`) — model from `GroqModels.Chat`
+  (`Groq:ChatModel`), temp 0, `response_format: json_object`. **A replacement model must support
+  JSON mode**; without it the envelope never parses and every command dies as "AI nije dostupan".
 - `AiEnvelopeParser` — **pure and total**. Never throws on model output: an unusable envelope returns
   null, a single bad action is dropped so the rest of the turn survives. Strips a stray ```json fence,
   rejects out-of-range enums and non-`yyyy-MM-dd` dates.

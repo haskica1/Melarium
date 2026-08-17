@@ -18,6 +18,7 @@ public class VoiceParsingService : IVoiceParsingService
     private readonly ITranscriptionService _transcription;
     private readonly ICurrentUser _currentUser;
     private readonly IPlanGuard _plan;
+    private readonly string _model;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -80,6 +81,7 @@ public class VoiceParsingService : IVoiceParsingService
         _transcription = transcription;
         _currentUser = currentUser;
         _plan = plan;
+        _model = Ai.GroqModels.Chat(config);
         var apiKey = config["Groq:ApiKey"] ?? throw new InvalidOperationException("Groq:ApiKey is not configured.");
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
     }
@@ -139,7 +141,7 @@ public class VoiceParsingService : IVoiceParsingService
 
         var requestBody = new
         {
-            model           = "llama-3.3-70b-versatile",
+            model           = _model,
             temperature     = 0.0,
             max_tokens      = 512,
             messages,

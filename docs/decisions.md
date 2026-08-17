@@ -781,3 +781,39 @@ no worker, no middleware, no config.
 - **SPEC-16 is not closed by this.** Only its activity column is delivered. `IsActive`, `FirstPaidAt`,
   the computed `OrgStatus` badge, the billing worklists and the purge fix remain unbuilt, and the
   spec stays the record for them. Whoever picks it up must not re-add `LastActivityAt`.
+
+---
+
+## ADR-035: One Groq Model Id, Read From Configuration (2026-08-17 outage)
+
+**Context.** Groq announced the deprecation of `llama-3.3-70b-versatile` on 2026-06-17 and stopped
+serving it to free/developer-tier keys on 2026-08-17, answering `404 model_not_found`. That id was
+pasted into four separate request bodies, so one upstream retirement took down four features at once —
+the AI assistant, voice-note inspection parsing, the weekly AI summary and learning-article drafts —
+with no code change on our side and no way to fix it without a redeploy. The vision id
+(`meta-llama/llama-4-scout-17b-16e-instruct`, retired 2026-07-17) sat in two more.
+
+**Decision.** `Features/Ai/GroqModels.cs` holds both ids. Every call site reads
+`GroqModels.Chat(config)` / `GroqModels.Vision(config)`, backed by `Groq:ChatModel` /
+`Groq:VisionModel`. The next retirement is one line in `.env` plus a restart.
+
+- `Groq:AssistantModel` is **gone**, folded into `Groq:ChatModel`. It only ever existed as a
+  commented-out line in `.env.example`; a deployment that had actually set it must rename it, or it
+  silently falls back to the default.
+- A blank config value means "not set", never "use the empty model id" — otherwise a stray blank line
+  in `.env` becomes a 404 from Groq.
+- The vision default is **`qwen/qwen3.6-27b`**, settled the same day after checking what Groq still
+  serves: it is the only model in their catalogue that takes image input at all, and it covers what
+  both image callers actually need — `json_object` **in the same request as the image**, a system
+  message, and up to 5 images (we send one). It is not on the deprecation list, and its free-tier
+  limits are identical to the chat model's (30 rpm / 1k rpd / 8k tpm / 200k tpd).
+
+**Consequence that must not be lost:** the chat model is required to support
+`response_format: json_object` — the assistant and `VoiceParsingService` both depend on JSON mode. A
+model without it fails in a way that looks identical to an outage.
+
+**Related, and why this was hard to see:** `AiAssistantService.CallAiAsync` catches every exception and
+throws `BusinessRuleException("AI servis trenutno nije dostupan…")` **without an inner exception**, so
+the real `404 model_not_found` never reached the logs — the cause had to be read off Groq's own
+dashboard. The frontend then swallowed even that message (see `features/ai-assistant.md`). Two layers
+of well-intentioned error handling turned a one-line upstream change into an invisible failure.

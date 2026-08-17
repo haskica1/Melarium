@@ -361,7 +361,7 @@ spoken name always wins. Text length 1–4000; 40 turns/session cap → `422`. A
 **nothing persisted**. Plan-gated (Standard+, **one combined** monthly quota covering questions and
 commands alike — `Plans:{Plan}:AiInteractionsPerMonth`, checked before the Groq call since a turn's kind
 is only known after it returns) → `402` with `code: "plan-limit"`. Reuses `Groq:ApiKey`; model from
-`Groq:AssistantModel`.
+`Groq:ChatModel` (see `GroqModels`) — the same id every Groq text feature uses.
 
 **Clarification.** Each turn in `AssistantSessionDetail.turns[]` carries a `candidates: [{
 label, text }][]` array — non-empty only on the **latest** assistant turn, and only when the resolver

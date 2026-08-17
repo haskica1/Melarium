@@ -29,9 +29,12 @@ frame photo in Bosnian. Implemented 2026-07-05.
 ## AI analysis (Phase 2)
 
 - `POST /inspections/photos/{photoId}/analyze` → `GroqPhotoAnalysisAiClient` (`Features/Ai`) —
-  Groq vision model from config **`Groq:VisionModel`** (default `meta-llama/llama-4-scout-17b-16e-instruct`,
-  verified current on Groq 2026-07-05), image base64 in the OpenAI-compatible payload, JSON output
+  Groq vision model from config **`Groq:VisionModel`** (via `GroqModels.Vision`; default
+  `qwen/qwen3.6-27b` since 2026-08-17 — `meta-llama/llama-4-scout-17b-16e-instruct` was retired by
+  Groq on 2026-07-17, see ADR-035), image base64 in the OpenAI-compatible payload, JSON output
   forced, temperature 0.
+  **A replacement must do vision *and* `json_object` in the same request** — this caller forces JSON
+  while sending an image, and a vision model without JSON mode fails in a way that reads as an outage.
 - Result persisted to `InspectionPhoto.AnalysisJson` (camelCase, relaxed escaping for č/ć/š);
   re-analyze overwrites. Parsed shape: `{ isFramePhoto, broodPattern 1–5|null, queenCellsVisible?,
   anomalies[], summary? }` — out-of-range scores dropped, non-frame photos empty the assessment.

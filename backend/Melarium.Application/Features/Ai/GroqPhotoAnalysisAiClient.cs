@@ -9,7 +9,7 @@ namespace Melarium.Application.Features.Ai;
 
 /// <summary>
 /// Groq multimodal (vision) client for frame photo analysis. Model id lives in config
-/// (<c>Groq:VisionModel</c>, default Llama 4 Scout — Groq's recommended vision model);
+/// (<c>Groq:VisionModel</c> via <see cref="GroqModels.Vision"/>);
 /// the image travels base64 in the OpenAI-compatible chat payload, JSON output forced.
 /// </summary>
 public class GroqPhotoAnalysisAiClient : IPhotoAnalysisAiClient
@@ -62,7 +62,7 @@ public class GroqPhotoAnalysisAiClient : IPhotoAnalysisAiClient
         _http = http;
         var apiKey = config["Groq:ApiKey"] ?? throw new InvalidOperationException("Groq:ApiKey is not configured.");
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        _model = config["Groq:VisionModel"] ?? "meta-llama/llama-4-scout-17b-16e-instruct";
+        _model = GroqModels.Vision(config);
     }
 
     public async Task<PhotoAnalysisResult> AnalyzeFrameAsync(byte[] imageBytes, string contentType, CancellationToken cancellationToken = default)

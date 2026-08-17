@@ -206,7 +206,7 @@ public class WeeklySummaryService : IWeeklySummaryService
 
         var requestBody = new
         {
-            model = "llama-3.3-70b-versatile",
+            model = Ai.GroqModels.Chat(_config),
             temperature = 0.3,
             max_tokens = 700,
             messages = new[]

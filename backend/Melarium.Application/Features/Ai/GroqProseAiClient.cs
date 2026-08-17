@@ -7,19 +7,21 @@ using Microsoft.Extensions.Configuration;
 namespace Melarium.Application.Features.Ai;
 
 /// <summary>
-/// Groq chat-completions client for free-form prose (`llama-3.3-70b-versatile`, plain text). Same
+/// Groq chat-completions client for free-form prose (<see cref="GroqModels.Chat"/>, plain text). Same
 /// endpoint and auth pattern as inspection voice parsing; no `response_format` — the reply is whatever
 /// prose the caller's prompt asks for (Bosnian advice, a learning-topic summary, ...).
 /// </summary>
 public class GroqProseAiClient : IProseAiClient
 {
     private readonly HttpClient _http;
+    private readonly string _model;
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
     public GroqProseAiClient(HttpClient http, IConfiguration config)
     {
         _http = http;
+        _model = GroqModels.Chat(config);
         var apiKey = config["Groq:ApiKey"] ?? throw new InvalidOperationException("Groq:ApiKey is not configured.");
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
     }
@@ -28,7 +30,7 @@ public class GroqProseAiClient : IProseAiClient
     {
         var requestBody = new
         {
-            model = "llama-3.3-70b-versatile",
+            model = _model,
             temperature = 0.4,
             max_tokens = 1024,
             messages = messages.Select(m => new { role = m.Role, content = m.Content }),

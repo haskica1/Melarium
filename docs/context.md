@@ -99,8 +99,9 @@
 - **Photos (SPEC-05)**: up to 5 per inspection (8 MB, JPEG/PNG/WebP by header bytes), stored via
   `IFileStorage` (`Storage:Provider = Local | S3`, prod → S3-compatible bucket e.g. Cloudflare R2;
   new package `AWSSDK.S3`), streamed through the API (private bucket). Optional **AI frame analysis**
-  (`Groq:VisionModel`, default Llama 4 Scout; rate limit `photo-analyze` 5/min/IP; images ≤ ~3 MB —
-  Groq 4 MB base64 cap). See `features/inspection-photos.md` + ADR-027.
+  (`Groq:VisionModel`, default `qwen/qwen3.6-27b` since 2026-08-17 — Llama 4 Scout was retired;
+  rate limit `photo-analyze` 5/min/IP; images ≤ ~3 MB — Groq 4 MB base64 cap).
+  See `features/inspection-photos.md` + ADR-027/035.
 
 ### Queens (Matice)
 - Per-beehive queen tracking via `/api/beehives/{id}/queens` + `/api/queens/{id}` — active queen + full history

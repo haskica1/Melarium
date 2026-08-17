@@ -51,7 +51,7 @@ public class GroqHiveNumberOcrClient : IHiveNumberOcrClient
         _apiKey = config["Groq:ApiKey"];
         if (!string.IsNullOrWhiteSpace(_apiKey))
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-        _model = config["Groq:VisionModel"] ?? "meta-llama/llama-4-scout-17b-16e-instruct";
+        _model = GroqModels.Vision(config);
     }
 
     public async Task<HiveNumberOcrResult> RecognizeNumberAsync(byte[] imageBytes, string contentType, CancellationToken cancellationToken = default)

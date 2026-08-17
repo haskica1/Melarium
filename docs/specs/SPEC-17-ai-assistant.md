@@ -98,6 +98,10 @@ One JSON envelope per turn, `response_format: { type: "json_object" }`, `tempera
 `Groq:AssistantModel` (default `llama-3.3-70b-versatile` — the model every other Groq text feature in
 this app already uses).
 
+> **2026-08-17:** Groq retired `llama-3.3-70b-versatile` and `Groq:AssistantModel` was folded into a
+> single `Groq:ChatModel` shared by all four Groq text features (ADR-035). The `response_format`
+> requirement above is unchanged and now constrains what may replace it.
+
 ```json
 {
   "reply": "Unosim pregled za Košnicu 2 na pčelinjaku Zlatna dolina i zadatak za 18.08.",

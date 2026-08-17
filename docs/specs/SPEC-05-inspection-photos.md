@@ -80,6 +80,10 @@ Rate limit uploads with the default pipeline (no special policy; size limit is t
 
 - `POST /api/inspections/photos/{photoId}/analyze` → runs vision model → persists `AnalysisJson` →
   returns DTO. Re-analyze overwrites. Rate limit: new policy `photo-analyze` **5/min per IP**.
+> **2026-08-17:** Groq retired Llama 4 Scout on 2026-07-17; the vision default is now
+> `qwen/qwen3.6-27b`, read through `GroqModels.Vision` (ADR-035). The "verify the current id"
+> instruction below turned out to be the important part of this section.
+
 - Model: Groq multimodal Llama 4 (e.g. `meta-llama/llama-4-scout-17b-16e-instruct` — **verify the
   current recommended vision model id on Groq at implementation time**; keep the model id in config
   `Groq:VisionModel`). Image sent base64 in the chat payload (Groq OpenAI-compatible format).

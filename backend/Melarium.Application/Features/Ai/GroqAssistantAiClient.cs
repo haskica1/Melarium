@@ -10,7 +10,7 @@ namespace Melarium.Application.Features.Ai;
 /// Groq chat-completions client for the AI assistant (SPEC-17). Same endpoint and auth as the advisor
 /// and voice parsing; differs in asking for <c>response_format: json_object</c> at temperature 0,
 /// because the reply is a machine-read envelope rather than prose. Model from
-/// <c>Groq:AssistantModel</c>, defaulting to the same Llama the rest of the app's text features use.
+/// <see cref="GroqModels.Chat"/> — the one model id shared by every Groq text feature.
 /// </summary>
 public class GroqAssistantAiClient : IAssistantAiClient
 {
@@ -24,7 +24,7 @@ public class GroqAssistantAiClient : IAssistantAiClient
         _http = http;
         var apiKey = config["Groq:ApiKey"] ?? throw new InvalidOperationException("Groq:ApiKey is not configured.");
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        _model = config["Groq:AssistantModel"] ?? "llama-3.3-70b-versatile";
+        _model = GroqModels.Chat(config);
     }
 
     public async Task<string> SendAsync(IReadOnlyList<ChatMessage> messages, CancellationToken cancellationToken = default)
