@@ -63,6 +63,19 @@ export function AssistantThread({
   const thinking = start.isPending || addTurn.isPending
   const busy = thinking || transcribing || confirm.isPending
 
+  // `initialSession` arrives asynchronously: the page mounts this thread the moment a session is
+  // selected, before its query has resolved, so the initial value of `session` above is `undefined`
+  // for a thread that is not already cached. Adopting the late arrival is what stops it sitting
+  // empty — that gap is why "switch to another chat and come back" appeared to be the fix (the
+  // second visit reads from cache and has the data on mount).
+  //
+  // Same id = keep what we have: our copy came from the mutation response, so it is at least as
+  // fresh as any refetch and a background refetch must not roll the thread back mid-conversation.
+  useEffect(() => {
+    if (!initialSession) return
+    setSession(current => (current?.id === initialSession.id ? current : initialSession))
+  }, [initialSession])
+
   const pendingTurn = useMemo(() => lastPendingTurn(session), [session])
   // Only the very last turn's question is still live — answering it (or sending anything else)
   // produces a newer turn, at which point the old buttons must stop being tappable.

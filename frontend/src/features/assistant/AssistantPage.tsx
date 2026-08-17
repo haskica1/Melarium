@@ -21,15 +21,26 @@ export default function AssistantPage() {
   const initialBeehiveId = searchParams.get('beehiveId')
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  // Remounting the thread resets its drafts and input, which is right when the *user* switches
+  // threads and wrong when the open thread simply acquires an id. Keying on `selectedId` did both:
+  // sending the first command produced a session, which changed the key, which unmounted the thread
+  // and threw away the reply that had just arrived with it. So the key is bumped deliberately, here,
+  // and never as a side effect of the conversation.
+  const [threadKey, setThreadKey] = useState(0)
   const { data: sessions = [], isLoading } = useAssistantSessions()
   const { data: session } = useAssistantSession(selectedId ?? 0)
+
+  function openThread(id: number | null) {
+    setSelectedId(id)
+    setThreadKey(key => key + 1)
+  }
   // Only resolved before a session exists yet, to show the hive's name in the chip early (SPEC-18).
   const { data: deepLinkHive } = useBeehive(selectedId == null && initialBeehiveId ? Number(initialBeehiveId) : 0)
   const remove = useDeleteAssistantSession()
 
   async function handleDelete(id: number) {
     await remove.mutateAsync(id)
-    if (selectedId === id) setSelectedId(null)
+    if (selectedId === id) openThread(null)
   }
 
   // Before a session exists, the chip shows the hive named in the deep link; once one exists, its
@@ -45,7 +56,7 @@ export default function AssistantPage() {
         <div className="p-3 border-b border-honey-100 dark:border-slate-800">
           <button
             type="button"
-            onClick={() => setSelectedId(null)}
+            onClick={() => openThread(null)}
             className="btn-primary w-full text-sm flex items-center justify-center gap-2"
           >
             <MessageSquarePlus className="w-4 h-4" />
@@ -74,7 +85,7 @@ export default function AssistantPage() {
                   ? 'bg-honey-50 dark:bg-slate-800'
                   : 'hover:bg-gray-50 dark:hover:bg-slate-800/60'
               }`}
-              onClick={() => setSelectedId(item.id)}
+              onClick={() => openThread(item.id)}
             >
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-800 dark:text-slate-100 truncate">{item.title}</p>
@@ -117,9 +128,9 @@ export default function AssistantPage() {
         </header>
 
         <div className="flex-1 min-h-0">
-          {/* Keyed on the session so switching threads resets the drafts and the input. */}
+          {/* Keyed on a deliberate switch, not on the session id — see `threadKey` above. */}
           <AssistantThread
-            key={selectedId ?? 'new'}
+            key={threadKey}
             contextBeehiveId={selectedId == null && initialBeehiveId ? Number(initialBeehiveId) : undefined}
             initialSession={session as AssistantSessionDetail | undefined}
             onSessionChanged={updated => {

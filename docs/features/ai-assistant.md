@@ -205,6 +205,18 @@ without a second request.
   advisor's `ChatThread`) so a Q&A answer's headings/lists/bold render properly; user turns stay plain
   text. A persistent footer disclaims that advice is informational and points AFB/EFB-type suspicions to
   a vet — ported from the advisor, since the merged assistant now sometimes gives that class of answer.
+- **`AssistantPage` must not key the thread on the session id** (fixed 2026-08-17). `AssistantThread`
+  owns its session in state; the page passes `initialSession` and gets `onSessionChanged` back. Two
+  bugs met on that seam and together produced "the answer only appears if I switch to another chat
+  and come back":
+  - Keying on `selectedId` meant that sending the **first** command remounted the thread — the reply
+    had just arrived in the mutation response, `onSessionChanged` set the id, the key changed, and
+    React threw the whole thing away. The key is now a counter bumped only when the *user* switches
+    threads (`openThread`), never as a side effect of the conversation.
+  - `useState(initialSession)` reads its argument **only on mount**, so a thread opened before its
+    query resolved ignored the data when it landed. An effect now adopts a late `initialSession`,
+    keeping the local copy when the id matches (ours came from the mutation response and is at least
+    as fresh — a background refetch must not roll the thread back mid-conversation).
 - **Every failure must be reported to the user here.** Until 2026-08-17 `send`, `confirmSelected` and
   `rejectAll` each swallowed the rejection under a comment claiming apiClient displayed it. It does
   not — `apiClient` only *rejects with* the message; nothing in it renders anything except the
