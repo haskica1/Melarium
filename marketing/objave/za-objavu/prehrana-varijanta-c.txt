@@ -1,0 +1,92 @@
+========================================================================
+MELARIUM — OBJAVA: PREHRANA I SPREMANJE ZA ZIMU (varijanta C)
+Za Facebook i Instagram. Kopiraj dio koji ti treba između crta.
+========================================================================
+
+
+------------------------- INSTAGRAM — TEKST -------------------------
+
+Počinješ prihranu ovog vikenda? Upiši program jednom — runde se sračunaju same. 🐝
+
+Upišeš:
+🍯 vrstu hrane — sirup, fondan, polen, kolači
+⚖️ koliko ide po košnici
+📅 trajanje i razmak
+
+Dobiješ:
+✅ spisak rundi s datumima
+🔔 podsjetnik ako zakasniš
+❄️ upozorenje kad se najavi mraz
+📊 trošak po košnici, ako povežeš račun
+
+I u martu tačno znaš koja je košnica šta dobila.
+
+Besplatno. Bez instalacije — otvoriš u pregledniku.
+
+👉 www.melarium.app
+
+---------------------- INSTAGRAM — HASHTAGOVI ----------------------
+(preporuka: stavi ih u prvi komentar, ne u sam tekst objave)
+
+#pčelarstvo #pčelari #pčelinjak #prihrana #zimskaprihrana #pripremazazimu #med #pčelarstvobih #pčelaribih #pčelarenje #apikultura #melarium
+
+
+========================================================================
+
+
+------------------------- FACEBOOK — TEKST -------------------------
+
+Počinješ prihranu ovog vikenda? Upiši program jednom — runde se sračunaju same.
+
+Melarium je pčelarski dnevnik na bosanskom. Za prihranu radi ovo:
+
+• razlog biraš iz spiska — „Zimsko hranjenje" je već unutra
+• hrana: šećerni sirup, fondan, polen, proteinski kolači ili vlastito
+• upišeš količinu po košnici i napomenu (npr. 1:1)
+• upišeš trajanje i na koliko dana ponavljaš — runde se generišu same
+• čekiraš svaku rundu kad je obaviš
+• podsjeti te ako runda kasni
+• javi ti kad se najavi mraz, da provjeriš prehranu i utopljenost
+• javi ti kad nekoj košnici padne nivo meda
+• povežeš račun za šećer i vidiš trošak po košnici
+
+Ne treba instalacija iz prodavnice. Otvoriš u pregledniku telefona i radi, a možeš ga dodati na početni ekran.
+
+Radi na besplatnom paketu.
+
+Ako ovog vikenda kreneš s prihranom — upiši program prije nego počneš.
+
+👉 www.melarium.app
+
+---------------------- FACEBOOK — HASHTAGOVI ----------------------
+(na FB idu na kraj samog teksta objave)
+
+#pčelarstvo #pčelaribih #prihrana #melarium
+
+
+========================================================================
+
+
+--------------------------- ALT TEKST ZA SLIKU ---------------------------
+(Instagram: Napredne postavke → Napiši alt tekst)
+(Facebook: klikni sliku → Uredi → Alternativni tekst)
+
+Detaljni prikaz programa prehrane „Zimska prihrana 2026" u aplikaciji
+Melarium. Vidljiv je status „U toku" i spisak rundi hranjenja, gdje su
+tri označene kao obavljene, a sljedeća je zakazana za 20.09.2026.
+
+
+--------------------------- KOJI SCREENSHOT ---------------------------
+
+Ekran:  detalj programa prehrane s rundama
+Ruta:   /feedings/:id   (otvoriš program iz liste Prehrana)
+
+U kadru treba da se vidi:
+  - naziv programa
+  - status „U toku"
+  - spisak rundi: nekoliko označenih kao obavljene i jedna predstojeća
+
+Priprema: unesi program s 4-5 rundi i označi 2-3 kao obavljene.
+Prazan ekran ili program bez ijedne obavljene runde ne prenosi poentu.
+
+========================================================================
