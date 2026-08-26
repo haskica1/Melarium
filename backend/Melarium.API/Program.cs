@@ -94,52 +94,69 @@ builder.Services.AddHttpClient<IWeatherService, WeatherService>(client =>
     client.Timeout = TimeSpan.FromSeconds(30);
 });
 
+// Every Groq client below shares one retry + logging layer (see GroqRetryHandler): one retry on a
+// transient failure, and whatever Groq said about the failure written to the log either way. The
+// per-attempt budget is an argument because HttpClient.Timeout covers the *whole* pipeline, retries
+// included — without a shorter per-attempt cap, one hung attempt eats the budget and the retry
+// never happens. Keep 2 × attempt + 3 s (the Retry-After cap) inside each client's own Timeout.
+Func<IServiceProvider, DelegatingHandler> GroqRetry(int attemptSeconds) =>
+    sp => new GroqRetryHandler(
+        sp.GetRequiredService<ILogger<GroqRetryHandler>>(),
+        TimeSpan.FromSeconds(attemptSeconds));
+
 // Shared Groq Whisper transcription (reused by voice inspections and the AI assistant).
 builder.Services.AddHttpClient<ITranscriptionService, GroqTranscriptionService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);
-});
+}).AddHttpMessageHandler(GroqRetry(25));
 
 // Voice parsing service — Groq API (Whisper transcription + Llama field extraction);
-// key configured via Groq:ApiKey. Longer timeout: audio upload + two model calls.
+// key configured via Groq:ApiKey.
+//
+// This client covers only the second call (the 512-token JSON extraction), which is small and fast;
+// 45 s is generous for it. The number matters because the two calls are sequential and the whole
+// chain has to fit inside what the browser waits for: worst case here is 53 s (transcription) + 43 s
+// (extraction) ≈ 96 s, under the 120 s the frontend allows, which leaves room for the upload itself
+// on a field connection. A voice note that took slightly longer than the client's patience used to
+// come back as a red error even though the work had succeeded — see inspectionService.parseVoice.
 builder.Services.AddHttpClient<IVoiceParsingService, VoiceParsingService>(client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(60);
-});
+    client.Timeout = TimeSpan.FromSeconds(45);
+}).AddHttpMessageHandler(GroqRetry(20));
 
 // Free-form Groq prose replies — originally the AI advisor's client (SPEC-01, retired into the
 // assistant by SPEC-18); LearningTopicService also uses it to draft a topic's Bosnian summary.
 builder.Services.AddHttpClient<IProseAiClient, GroqProseAiClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);
-});
+}).AddHttpMessageHandler(GroqRetry(25));
 
 // AI assistant command interpretation (SPEC-17/18) — Groq Llama constrained to a JSON envelope.
 builder.Services.AddHttpClient<IAssistantAiClient, GroqAssistantAiClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);
-});
+}).AddHttpMessageHandler(GroqRetry(25));
 
 // Weekly AI summary — Groq chat (Llama), reuses Groq:ApiKey. Runs from the AlertScanWorker
 // on Mondays; the typed HttpClient keeps the Groq call out of the request path.
 builder.Services.AddHttpClient<IWeeklySummaryService, WeeklySummaryService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);
-});
+}).AddHttpMessageHandler(GroqRetry(25));
 
 // Frame photo AI analysis (SPEC-05 Phase 2) — Groq vision model, reuses Groq:ApiKey.
 // Longer timeout: multi-MB base64 image upload + vision inference.
 builder.Services.AddHttpClient<IPhotoAnalysisAiClient, GroqPhotoAnalysisAiClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(90);
-});
+}).AddHttpMessageHandler(GroqRetry(40));
 
 // "Scan by number" fallback — Groq vision reads the hive's painted number/label when on-device
 // OCR is not confident. Same Groq vision model + Groq:ApiKey as photo analysis.
 builder.Services.AddHttpClient<IHiveNumberOcrClient, GroqHiveNumberOcrClient>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(90);
-});
+}).AddHttpMessageHandler(GroqRetry(40));
 
 // ── JWT Authentication ────────────────────────────────────────────────────────
 var jwtSecret = builder.Configuration["Jwt:Secret"]!;

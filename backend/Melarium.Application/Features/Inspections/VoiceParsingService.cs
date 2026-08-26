@@ -1,7 +1,9 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Ai;
@@ -92,12 +94,32 @@ public class VoiceParsingService : IVoiceParsingService
         if (_currentUser.OrganizationId is int orgId)
             await _plan.EnsureFeatureAsync(orgId, PlanFeature.VoiceInput);
 
-        // Transcription is shared with the advisor (ITranscriptionService); this service only
-        // adds the inspection-field extraction step on top of the transcript.
-        var transcript = await _transcription.TranscribeAsync(audioStream, fileName);
-        var fields     = await ExtractFieldsAsync(transcript);
-        fields.Transcript = transcript;
-        return fields;
+        try
+        {
+            // Transcription is shared with the advisor (ITranscriptionService); this service only
+            // adds the inspection-field extraction step on top of the transcript.
+            var transcript = await _transcription.TranscribeAsync(audioStream, fileName);
+            var fields     = await ExtractFieldsAsync(transcript);
+            fields.Transcript = transcript;
+            return fields;
+        }
+        // GroqRetryHandler has already retried and logged the reason by now; what is left is a
+        // failure the beekeeper has to be told about in words they can act on. "Wait a minute" and
+        // "try again" are different instructions, and one generic message used to cover both.
+        catch (HttpRequestException ex)
+        {
+            throw new AiUnavailableException(
+                ex.StatusCode == HttpStatusCode.TooManyRequests
+                    ? "AI servis je trenutno preopterećen. Sačekajte minutu pa pokušajte ponovo."
+                    : "AI servis trenutno ne odgovara. Pokušajte ponovo za koji trenutak ili unesite podatke ručno.",
+                ex);
+        }
+        catch (TaskCanceledException ex)
+        {
+            throw new AiUnavailableException(
+                "Obrada snimka je trajala predugo. Pokušajte ponovo — po mogućnosti kraćim snimkom ili na boljem signalu.",
+                ex);
+        }
     }
 
     // ── Llama field extraction (few-shot guided) ──────────────────────────────

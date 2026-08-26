@@ -45,6 +45,25 @@ apiClient.interceptors.response.use(
   },
 )
 
+// A client-side timeout carries no response, so the interceptor below falls through to axios's own
+// "timeout of 120000ms exceeded" — English, and meaningless to a beekeeper who was told the voice
+// note failed. The distinction matters: this one means the work may well have succeeded on the
+// server and the browser stopped waiting, which is different advice than "it broke". Registered
+// before the 401 interceptor, which then passes the message through untouched.
+// Deliberately narrow — only timeouts. A response-less error is also how an offline submit reaches
+// the outbox (SPEC-07), and that path is left exactly as it is.
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return Promise.reject(new Error(
+        'Zahtjev je trajao predugo pa je prekinut. Provjerite signal i pokušajte ponovo.',
+      ))
+    }
+    return Promise.reject(error)
+  },
+)
+
 // Single-flight refresh: concurrent 401s share one /auth/refresh call so the
 // rotating refresh token is only spent once.
 let refreshPromise: Promise<string | null> | null = null

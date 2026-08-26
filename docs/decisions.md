@@ -817,3 +817,50 @@ throws `BusinessRuleException("AI servis trenutno nije dostupan…")` **without 
 the real `404 model_not_found` never reached the logs — the cause had to be read off Groq's own
 dashboard. The frontend then swallowed even that message (see `features/ai-assistant.md`). Two layers
 of well-intentioned error handling turned a one-line upstream change into an invisible failure.
+
+---
+
+## ADR-036: Groq Failures Are Retried Once, Logged With Their Reason, and Told to the User as 503
+
+**Context.** Beekeepers reported that adding a voice inspection "fails the first time and works if you
+wait and try again" — reproducibly, on three devices, within one afternoon. Four things in the path
+turned any upstream hiccup into a red error with no way to tell which hiccup it was:
+
+- `inspectionService.parseVoice` gave up after **30 s**, while the backend's own budget for the same
+  request was 60 s + 60 s. A voice note recorded in the field and uploaded over 3G could cross 30 s on
+  a completely healthy path, so the browser abandoned work the server then finished successfully.
+- nginx has no `proxy_read_timeout` in our site config, so it inherits the **60 s** default and would
+  504 a request the backend was still working on.
+- **Nothing retried.** Every Groq client calls `EnsureSuccessStatusCode()`, so one 429 or 503 — and the
+  free tier's limits (30 rpm / 1k rpd, shared by the whole platform on one key, see ADR-035) make
+  those ordinary — became the user's problem to retry by hand.
+- **Nothing logged.** `EnsureSuccessStatusCode()` throws before anyone reads the body, and the body is
+  where Groq puts `rate_limit_exceeded` / `model_not_found`. As in ADR-035, the cause was unreadable
+  from our own logs.
+
+**Decision.**
+
+- One `GroqRetryHandler` (`Features/Ai/`) sits in front of **every** Groq typed client. It retries once
+  on 408/429/5xx and on a pre-response failure, and logs the status, the body and `Retry-After` on
+  every non-2xx — including the ones it does not retry. Retrying these POSTs is safe: Groq inference
+  has no side effect beyond spending quota.
+- `Retry-After` is honoured **only up to 3 s**. A spent per-minute quota is worth waiting out inside
+  the request; a spent daily quota answers with hours, and waiting is then worse than the error.
+- The handler takes a **per-attempt** timeout because `HttpClient.Timeout` covers the whole pipeline —
+  without one, a single hung attempt eats the budget and the retry never happens. Each client's
+  `Timeout` must exceed `2 × attempt + 3 s`.
+- New `AiUnavailableException` → **503** (`ignore.md` permits a new mapping; this is one). It means the
+  request was fine and the provider was not, which is neither a 500 nor a `BusinessRuleException` (422,
+  "the model answered but the answer was unusable"). `VoiceParsingService` raises it with a different
+  Bosnian instruction for a spent quota, an outage, and a timeout, because those are different advice.
+- Timeout budgets now form a chain that must stay ordered: nginx 180 s > browser 120 s > backend worst
+  case ~96 s. Changing one without the others re-creates this bug.
+
+**Consequences.** A beekeeper's first voice note no longer fails for a blip they then have to work
+around. Failures that survive the retry now carry Groq's own reason in the log, which is the specific
+diagnostic gap ADR-035 closed for model ids and left open for everything else. The tail case is slower:
+a genuinely dead Groq is now answered after ~2 attempts rather than 1.
+
+**Deliberately not done.** `AiUnavailableException` is raised only on the voice path — the assistant
+still reports upstream failures the way ADR-035 describes. The nginx change is in
+`deploy/nginx.melarium.conf.example`; the live VPS config is edited by hand and must be updated there.

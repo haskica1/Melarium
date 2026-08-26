@@ -74,6 +74,14 @@ public class GlobalExceptionMiddleware
                 "Payment Required",
                 new Dictionary<string, string[]> { ["detail"] = [ple.Message] }
             ),
+            // An upstream AI provider outage is not a 500: nothing about the request was wrong and
+            // "try again shortly" is the real answer, so the message is passed through verbatim
+            // instead of being replaced by the generic English text below. See decisions.md.
+            AiUnavailableException aue => (
+                HttpStatusCode.ServiceUnavailable,
+                "AI Service Unavailable",
+                new Dictionary<string, string[]> { ["detail"] = [aue.Message] }
+            ),
             // Exception type/message/inner details are only exposed in Development —
             // in production they can leak table names, connection info, etc.
             _ when includeDetails => (

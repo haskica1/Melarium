@@ -65,6 +65,7 @@ HTTP `200 OK`, `201 Created`, `204 No Content` — response body is the DTO dire
 | `NotFoundException` | 404 |
 | `ValidationException` | 400 (includes `errors` map) |
 | `BusinessRuleException` | 422 |
+| `AiUnavailableException` | 503 — upstream AI provider rate-limited us, was down, or timed out; `detail` is a Bosnian instruction the user can act on (ADR-036) |
 | Unhandled | 500 |
 
 ---
@@ -122,8 +123,11 @@ HTTP `200 OK`, `201 Created`, `204 No Content` — response body is the DTO dire
 | POST | `/inspections` | `201 + InspectionDto` |
 | PUT | `/inspections/{id}` | `200 + InspectionDto` |
 | DELETE | `/inspections/{id}` | `204` — also deletes attached photo blobs (best-effort) |
+| POST | `/inspections/parse-voice` | `200 + ParseVoiceResult` — multipart (`audio`), 15 MB cap, `voice-parse` 10/min/IP, paid-plan feature (`402 plan-limit`); Whisper transcription + field extraction. `503` when Groq is rate-limiting, down or slow (ADR-036) |
 
 **InspectionDto:** `{ id, beehiveId, date, temperature, honeyLevel, broodStatus, notes, createdAt }`
+
+**ParseVoiceResult:** `{ date?, temperature?, honeyLevel?, broodStatus?, notes?, transcript }` — every field is null unless the recording mentioned it. Client budget is 120 s (two sequential Groq calls plus the upload).
 
 #### Inspection photos (SPEC-05)
 

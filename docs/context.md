@@ -94,8 +94,11 @@
 ### Inspections
 - Full CRUD via `/api/inspections`; temperature auto-filled from the apiary's current weather (best-effort)
 - **Voice input**: `POST /api/inspections/parse-voice` — audio → Groq Whisper large-v3 transcription (BCS)
-  → Llama 3.3 70B field extraction → `{date, honeyLevel, broodStatus, notes}` + transcript.
+  → `Groq:ChatModel` field extraction → `{date, honeyLevel, broodStatus, notes}` + transcript.
   15 MB size limit + 10/min rate limit. Frontend records via `useVoiceInput`.
+  A transient Groq failure is retried once and the reason logged (`GroqRetryHandler`, applies to every
+  Groq client); what survives that is a **503** with a Bosnian instruction, not a generic error.
+  Timeout chain — nginx 180 s > browser 120 s > backend ~96 s worst case — must stay in that order (ADR-036).
 - **Photos (SPEC-05)**: up to 5 per inspection (8 MB, JPEG/PNG/WebP by header bytes), stored via
   `IFileStorage` (`Storage:Provider = Local | S3`, prod → S3-compatible bucket e.g. Cloudflare R2;
   new package `AWSSDK.S3`), streamed through the API (private bucket). Optional **AI frame analysis**

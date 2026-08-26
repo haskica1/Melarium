@@ -209,6 +209,13 @@ certbot rewrites the nginx config to add the `listen 443 ssl;` block and the HTT
 redirect. Renewal is automatic via the `certbot.timer` systemd unit the Debian package
 installs — verify with `systemctl status certbot.timer`.
 
+> **On an existing server, `deploy.sh` does not touch `/etc/nginx/`** — the live site config was
+> copied once and then edited in place by certbot. Changes to
+> `deploy/nginx.melarium.conf.example` therefore have to be applied by hand. The `proxy_*_timeout`
+> lines in the `/api/` block are one such change (ADR-036): without them nginx keeps its 60 s default
+> and returns 504 on a long voice-note request the backend is still working on. Add them to
+> `/etc/nginx/sites-available/melarium`, then `sudo nginx -t && sudo systemctl reload nginx`.
+
 ## 8. Verify
 
 - Open `https://melarium.app` — SPA loads, PWA manifest/icons work.

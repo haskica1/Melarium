@@ -32,6 +32,7 @@ import {
   type OutboxItem,
 } from '../../core/offline/outbox'
 import { isNetworkError } from '../../core/offline/syncOutbox'
+import { errorMessage, isPlanLimit } from '../../core/services/apiClient'
 import { normalizePhotoForUpload } from '../../shared/utils/imageDownscale'
 
 const voiceChipCls =
@@ -220,9 +221,12 @@ export default function InspectionFormPage() {
       if (result.broodStatus)         setValue('broodStatus', result.broodStatus)
       if (result.notes)               setValue('notes', result.notes)
       setParsedResult(result)
-    } catch {
+    } catch (err) {
       if (runId !== parseRunIdRef.current) return
-      setParseError('Greška pri obradi snimka. Pokušajte ponovo ili unesite podatke ručno.')
+      // The API now distinguishes a spent AI quota, an outage and a timeout, each with its own
+      // Bosnian instruction — flattening all three back into "greška" would throw away the only
+      // part the beekeeper can act on. A plan limit already has the upsell modal; stay quiet there.
+      if (!isPlanLimit(err)) setParseError(errorMessage(err))
     } finally {
       if (runId === parseRunIdRef.current) setIsParsing(false)
     }

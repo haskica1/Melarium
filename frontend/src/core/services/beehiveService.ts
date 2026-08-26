@@ -134,7 +134,13 @@ export const inspectionService = {
     formData.append('audio', audioBlob, `recording.${ext}`)
     const res = await apiClient.post<ParseVoiceResult>('/inspections/parse-voice', formData, {
       headers: { 'Content-Type': undefined },
-      timeout: 30_000,
+      // This one request is an upload plus *two* sequential Groq calls (Whisper, then the field
+      // extraction), so it is the longest in the app. At the old 30 s the client was giving up on
+      // work that was about to succeed — a recording made in the field, uploaded over 3G, would
+      // report "greška" while the server happily finished the job. The budget must dominate the
+      // backend's worst case (~96 s, see the HttpClient timeouts in Program.cs) with room left for
+      // the upload; nginx must in turn outlast this (proxy_read_timeout, see nginx.melarium.conf).
+      timeout: 120_000,
     })
     return res.data
   },
