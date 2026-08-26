@@ -864,3 +864,67 @@ a genuinely dead Groq is now answered after ~2 attempts rather than 1.
 **Deliberately not done.** `AiUnavailableException` is raised only on the voice path — the assistant
 still reports upstream failures the way ADR-035 describes. The nginx change is in
 `deploy/nginx.melarium.conf.example`; the live VPS config is edited by hand and must be updated there.
+
+---
+
+## ADR-037: UTC Is Enforced by a Model-Wide Value Converter, Not a Change-Tracker Sweep
+
+**Context.** Confirming an AI-assistant proposal returned 500. The trace named the cause exactly:
+
+```
+System.ArgumentException: Cannot write DateTime with Kind=Unspecified to PostgreSQL type
+'timestamp with time zone', only UTC is supported.
+   at Melarium.Entity.UnitOfWork.SaveChangesAsync … UnitOfWork.cs:119
+   at AiAssistantService.ConfirmAsync … AiAssistantService.cs:218
+```
+
+Npgsql accepts only `Kind=Utc` on a `timestamptz` column. The defence against that was a sweep in
+`MelariumDbContext.SaveChangesAsync` that normalised every `DateTime` on entries which were `Added`
+or `Modified` **at the moment it ran**. That qualifier is the bug: an entry that only reaches those
+states later — discovered through a navigation during EF's own change detection inside
+`base.SaveChangesAsync`, for instance — is written without ever being normalised. A guard that has to
+be standing in the right place at the right time is not a guarantee.
+
+Searching the Application layer for producers of an unspecified `DateTime` returned exactly three,
+all of them `DateOnly.ToDateTime(TimeOnly.MinValue)` in `AiActionExecutor` (the inspection date and
+both todo due-dates). That is why the AI assistant was the only surface that ever hit this: every
+other flow builds its dates from values already read back from Postgres as UTC.
+
+**Decision.** Two layers, because they answer different questions.
+
+- **The guarantee moves to the model.** `OnModelCreating` attaches a `ValueConverter` to every
+  `DateTime` and `DateTime?` property in the model. It runs at the persistence boundary, so no code
+  path, no tracker state and no change-detection timing can route around it. The Kind loop is deleted
+  from `SaveChangesAsync`; the `UpdatedAt` stamping stays. **Do not re-add a sweep** — two mechanisms
+  for one invariant is how this stayed invisible.
+- **The three producers are fixed at source** (`AiActionExecutor.UtcMidnight`). The converter already
+  covers them, but a value that is honest before it reaches a DTO, a validator or a comparison is
+  cheaper to reason about than one corrected on the way out.
+
+`Unspecified` is **reinterpreted** as UTC, which is what the sweep did and therefore what every
+existing row already means — converting instead would silently move every stored timestamp.
+`Local` is genuinely converted with `ToUniversalTime()`: reinterpreting it would record the wrong
+instant. Nothing in the backend produces `Local` today (no `DateTime.Now`), so this only closes a
+door; previously such a value would have thrown.
+
+**No migration.** Verified with `dotnet ef migrations has-pending-model-changes`: *"No changes have
+been made to the model since the last migration."* The CLR and provider types are identical, and
+every seeded `DateTime` in `DataSeeder` is already constructed with `DateTimeKind.Utc`, so the
+snapshot is unaffected. Nothing to run at deploy time.
+
+**Consequences.** The whole class of "Kind=Unspecified reached Postgres" is closed rather than the
+one instance of it. Value converters also apply on read, normalising anything stored in a
+`timestamp without time zone` column to UTC on the way out. The trade is that a converted property
+is slightly more constrained in LINQ translation — comparisons and ordering still translate, because
+the converter is applied to parameters, but a future provider-specific date function on one of these
+columns should be checked rather than assumed.
+
+**Related.** Two other 500s on the same endpoint were closed while investigating, both real and
+neither the cause: `AiAssistantAction.ErrorMessage` was written unbounded into a 500-char column
+(`TargetSummary` beside it was already truncated), and `ConfirmActionsValidator` accepted duplicate
+action ids, which threw out of the `ToDictionary` that keys the confirm request.
+
+**Not fixed here:** `AiActionExecutor` catches an action's failure and reports it per-action, so when
+the executor's own save fails the offending entity stays in the change tracker and the *next*
+`SaveChangesAsync` fails again — this time unhandled. With the converter in place there is no known
+value that triggers it, but the pattern is still there.

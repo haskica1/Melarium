@@ -55,6 +55,42 @@ public class AiActionExecutorTests
         BroodStatus = "staro stanje", Notes = "stara napomena", BeehiveId = 11,
     };
 
+    private static AiActionPayload CreatePayload(AiActionFields fields) =>
+        new(1, "Zlatna dolina", 11, "Košnica 2", AiResolutionIssue.None, [], fields);
+
+    /// <summary>
+    /// Regression for ADR-037: <c>DateOnly.ToDateTime</c> yields <c>Kind=Unspecified</c>, which
+    /// Npgsql refuses to write to a timestamptz column. These three call sites were the only
+    /// producers of such a value in the application, and they took assistant confirmation down with
+    /// a 500 after the record had already been written.
+    /// </summary>
+    [Fact]
+    public async Task Every_date_the_assistant_writes_is_marked_Utc()
+    {
+        CreateInspectionDto? created = null;
+        _inspections.CreateAsync(Arg.Do<CreateInspectionDto>(d => created = d))
+            .Returns(new InspectionDto { Id = 1 });
+
+        CreateTodoDto? newTodo = null;
+        _todos.CreateAsync(Arg.Do<CreateTodoDto>(d => newTodo = d)).Returns(ExistingTodo);
+
+        _todos.GetByIdAsync(501).Returns(ExistingTodo);
+        UpdateTodoDto? updatedTodo = null;
+        _todos.UpdateAsync(501, Arg.Do<UpdateTodoDto>(d => updatedTodo = d)).Returns(ExistingTodo);
+
+        var executor = Executor();
+        await executor.ExecuteAsync(AiActionKind.CreateInspection,
+            CreatePayload(new AiActionFields(Date: new DateOnly(2026, 8, 5))));
+        await executor.ExecuteAsync(AiActionKind.CreateTodo,
+            CreatePayload(new AiActionFields(Title: "Dodaj postolje", DueDate: new DateOnly(2026, 8, 25))));
+        await executor.ExecuteAsync(AiActionKind.UpdateTodo,
+            ExistingTodoPayload(501, new AiActionFields(DueDate: new DateOnly(2026, 8, 25))));
+
+        Assert.Equal(DateTimeKind.Utc, created!.Date.Kind);
+        Assert.Equal(DateTimeKind.Utc, newTodo!.DueDate!.Value.Kind);
+        Assert.Equal(DateTimeKind.Utc, updatedTodo!.DueDate!.Value.Kind);
+    }
+
     // ── UpdateTodo: only what the AI mentioned changes ──────────────────────
 
     [Fact]

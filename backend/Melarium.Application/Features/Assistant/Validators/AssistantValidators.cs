@@ -43,6 +43,15 @@ public class ConfirmActionsValidator : AbstractValidator<ConfirmActionsDto>
 {
     public ConfirmActionsValidator()
     {
+        // ConfirmAsync keys the request by action id (`dto.Actions.ToDictionary(a => a.Id)`), so a
+        // repeated id throws an ArgumentException the middleware can only render as a 500. A
+        // duplicate is a malformed request, which belongs here as a 400 with a readable reason.
+        RuleFor(x => x.Actions)
+            .Cascade(CascadeMode.Stop)
+            .NotNull().WithMessage("Nedostaje lista radnji.")
+            .Must(actions => actions.Select(a => a.Id).Distinct().Count() == actions.Count)
+                .WithMessage("Ista radnja je poslana više puta.");
+
         // An empty list is legitimate — it means "reject everything" — so only the shape is checked here.
         RuleForEach(x => x.Actions).ChildRules(action =>
         {

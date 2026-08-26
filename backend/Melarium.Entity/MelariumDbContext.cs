@@ -2,6 +2,7 @@ using Melarium.Domain.Entities;
 using Melarium.Entity.Configurations;
 using Melarium.Entity.Seed;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Melarium.Entity;
 
@@ -56,33 +57,58 @@ public class MelariumDbContext : DbContext
         // Apply all IEntityTypeConfiguration<T> classes in this assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(MelariumDbContext).Assembly);
 
+        // Every DateTime in the model is written as UTC, enforced here rather than by a caller
+        // (ADR-037). Npgsql rejects any Kind other than Utc on a timestamptz column, and the
+        // previous defence — a ChangeTracker sweep in SaveChangesAsync — only reached entries that
+        // were already Added or Modified at the moment it ran, so a value that arrived later was
+        // written unfixed. A converter runs at the persistence boundary, which nothing can bypass.
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTime))
+                    property.SetValueConverter(UtcDateTime);
+                else if (property.ClrType == typeof(DateTime?))
+                    property.SetValueConverter(NullableUtcDateTime);
+            }
+        }
+
         // Seed initial data
         DataSeeder.Seed(modelBuilder);
     }
 
     /// <summary>
-    /// Automatically sets UpdatedAt on modified entities before saving, and normalises
-    /// any DateTime.Unspecified values to UTC so Npgsql accepts them as timestamptz.
+    /// Unspecified is *reinterpreted* as UTC — it is how a naive calendar date has always been
+    /// stored here, and changing it would move every existing timestamp. Local is genuinely
+    /// converted, because reinterpreting it would record the wrong instant.
+    /// </summary>
+    private static DateTime ToUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc   => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _                  => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+    };
+
+    private static readonly ValueConverter<DateTime, DateTime> UtcDateTime =
+        new(v => ToUtc(v), v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+    private static readonly ValueConverter<DateTime?, DateTime?> NullableUtcDateTime =
+        new(v => v.HasValue ? ToUtc(v.Value) : v,
+            v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v);
+
+    /// <summary>
+    /// Automatically sets UpdatedAt on modified entities before saving. UTC normalisation used to
+    /// live here too; it is now a model-wide value converter in <see cref="OnModelCreating"/>, which
+    /// cannot be outrun by an entity that enters the change tracker after this method has looked
+    /// (ADR-037). Do not re-add a sweep here — one mechanism, at the persistence boundary.
     /// </summary>
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         foreach (var entry in ChangeTracker.Entries()
-            .Where(e => e.State is EntityState.Added or EntityState.Modified))
+            .Where(e => e.State == EntityState.Modified))
         {
-            if (entry.State == EntityState.Modified &&
-                entry.Entity is Melarium.Domain.Common.BaseEntity entity)
-            {
+            if (entry.Entity is Melarium.Domain.Common.BaseEntity entity)
                 entity.UpdatedAt = DateTime.UtcNow;
-            }
-
-            // Npgsql 6+ requires DateTimeKind.Utc for timestamptz columns.
-            // User-supplied dates arrive as Kind=Unspecified; convert them here
-            // so callers don't need to remember to do it everywhere.
-            foreach (var prop in entry.Properties)
-            {
-                if (prop.CurrentValue is DateTime dt && dt.Kind == DateTimeKind.Unspecified)
-                    prop.CurrentValue = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
-            }
         }
 
         return base.SaveChangesAsync(cancellationToken);

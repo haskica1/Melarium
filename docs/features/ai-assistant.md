@@ -79,6 +79,12 @@ miss and are therefore explicit in the code:
   mid-batch failure cannot cleanly undo the earlier writes. The result names what landed and what did not.
 - **Double-confirm guard:** confirmation claims the rows (`Pending → Confirmed`) and saves *before*
   executing, so a phone double-tap finds nothing pending and is refused rather than duplicating records.
+  The cost of claiming first: a confirm that dies mid-flight leaves the turn permanently unusable —
+  the proposal cannot be retried, only re-issued as a new command.
+- **Confirm must not be able to 500.** It is the one endpoint where a crash strands a claimed turn,
+  so the three ways it could are closed: dates are written as UTC (ADR-037), `ErrorMessage` is
+  truncated to its 500-char column, and duplicate action ids are rejected by the validator instead of
+  throwing out of the `ToDictionary` that keys the request.
 - **Ceiling:** `Ai:MaxActionsPerCommand` (default 50). Over it nothing is offered; the reply states the
   real count and asks the user to narrow the command.
 - Session cap **40 turns**, history window **8 turns**, message length 1–4000 (FluentValidation).

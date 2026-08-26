@@ -117,7 +117,7 @@ public class AiActionExecutor : IAiActionExecutor
             Title     = payload.Fields.Title!.Trim(),
             Notes     = payload.Fields.Notes,
             Priority  = payload.Fields.Priority ?? TodoPriority.Medium,
-            DueDate   = payload.Fields.DueDate?.ToDateTime(TimeOnly.MinValue),
+            DueDate   = UtcMidnight(payload.Fields.DueDate),
             // The validator requires exactly one target, so a hive-scoped todo must not also carry
             // its apiary — the resolver knows both, and the hive is the more specific of the two.
             BeehiveId = payload.BeehiveId,
@@ -150,7 +150,7 @@ public class AiActionExecutor : IAiActionExecutor
         {
             Title        = Trimmed(payload.Fields.Title) ?? current.Title,
             Notes        = payload.Fields.Notes ?? current.Notes,
-            DueDate      = payload.Fields.DueDate?.ToDateTime(TimeOnly.MinValue) ?? current.DueDate,
+            DueDate      = UtcMidnight(payload.Fields.DueDate) ?? current.DueDate,
             Priority     = payload.Fields.Priority ?? current.Priority,
             IsCompleted  = current.IsCompleted, // a status change goes through CompleteTodo, not this
             AssignedToId = current.AssignedToId,
@@ -237,8 +237,8 @@ public class AiActionExecutor : IAiActionExecutor
     }
 
     /// <summary>
-    /// Turns the resolved local calendar date into the value the form would have posted: naive
-    /// midnight, which <c>MelariumDbContext.SaveChangesAsync</c> stores verbatim as UTC.
+    /// Turns the resolved local calendar date into the value the form would have posted: midnight,
+    /// stored verbatim as UTC.
     ///
     /// The clamp matters between local midnight and 01:00/02:00, when today's local midnight is still
     /// in the future by UTC and <c>CreateInspectionValidator</c>'s "date cannot be in the future" rule
@@ -247,11 +247,24 @@ public class AiActionExecutor : IAiActionExecutor
     /// </summary>
     private DateTime ToInspectionDate(DateOnly? date)
     {
-        var localDate = date ?? AppTimeZone.Today(_tz);
-        var midnight = localDate.ToDateTime(TimeOnly.MinValue);
+        var midnight = UtcMidnight(date ?? AppTimeZone.Today(_tz));
         var now = DateTime.UtcNow;
         return midnight > now ? now : midnight;
     }
+
+    /// <summary>
+    /// Midnight on a calendar date, as UTC. <c>DateOnly.ToDateTime</c> yields
+    /// <see cref="DateTimeKind.Unspecified"/>, which Npgsql refuses to write to a <c>timestamptz</c>
+    /// column — and these were the only three places in the application that produced such a value,
+    /// which is why AI assistant confirmation was the one flow that hit it (ADR-037). The model-wide
+    /// converter now catches this too; marking the Kind here keeps the value honest before it ever
+    /// reaches a DTO, a validator, or a comparison.
+    /// </summary>
+    private static DateTime UtcMidnight(DateOnly date) =>
+        DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+
+    private static DateTime? UtcMidnight(DateOnly? date) =>
+        date is { } d ? UtcMidnight(d) : null;
 
     private static string UserMessage(Exception ex) => ex switch
     {

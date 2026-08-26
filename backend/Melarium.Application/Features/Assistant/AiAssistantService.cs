@@ -206,7 +206,14 @@ public class AiAssistantService : IAiAssistantService
                 else
                 {
                     action.Status = AiActionStatus.Failed;
-                    action.ErrorMessage = outcome.ErrorMessage;
+                    // The column is capped at 500 and this text is not ours to bound — a
+                    // ValidationException joins every failed rule into one string. TargetSummary
+                    // above is truncated for the same reason; without it here a long message makes
+                    // SaveChangesAsync throw, and a batch that already ran comes back as a 500 with
+                    // every per-action result lost.
+                    action.ErrorMessage = outcome.ErrorMessage is null
+                        ? null
+                        : Truncate(outcome.ErrorMessage, 500);
                 }
             }
 

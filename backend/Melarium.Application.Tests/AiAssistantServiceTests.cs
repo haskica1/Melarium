@@ -455,6 +455,27 @@ public class AiAssistantServiceTests
     }
 
     [Fact]
+    public async Task A_failure_message_longer_than_its_column_is_truncated_instead_of_breaking_the_save()
+    {
+        var turn = PendingTurn(actions: [PendingAction(1)]);
+
+        // A ValidationException joins every failed rule into one string, so this length is reachable.
+        _executor.ExecuteAsync(Arg.Any<AiActionKind>(), Arg.Any<AiActionPayload>())
+            .Returns(new AiActionOutcome(false, null, null, new string('x', 900)));
+
+        var response = await Service().ConfirmAsync(9, new ConfirmActionsDto
+        {
+            Actions = [new ConfirmActionItemDto { Id = 1 }],
+        });
+
+        // AiAssistantActionConfiguration caps ErrorMessage at 500. Over that, Postgres rejects the
+        // whole batch and the caller gets a 500 instead of the per-action results it already earned.
+        Assert.Equal(AiActionStatus.Failed, turn.Actions[0].Status);
+        Assert.Equal(500, turn.Actions[0].ErrorMessage!.Length);
+        Assert.Single(response.Results);
+    }
+
+    [Fact]
     public async Task An_edited_hive_id_is_re_checked_against_what_the_caller_can_actually_reach()
     {
         PendingTurn(actions: [PendingAction(1)]);

@@ -27,6 +27,12 @@
 
 **Allowed:** Adding new `DbSet<T>` properties and new `IEntityTypeConfiguration<T>` files for new tables.
 
+**Also frozen — the UTC value converter (ADR-037):** `OnModelCreating` attaches a UTC `ValueConverter`
+to every `DateTime` property in the model. That is the single mechanism guaranteeing Npgsql never sees
+a non-UTC Kind on a `timestamptz` column. Do not remove it, and do not re-add a `ChangeTracker` sweep
+in `SaveChangesAsync` alongside it — the sweep is what this replaced, precisely because it could only
+reach entries already tracked as Added/Modified when it ran.
+
 ---
 
 ## GlobalExceptionMiddleware
