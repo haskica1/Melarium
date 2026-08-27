@@ -928,3 +928,81 @@ action ids, which threw out of the `ToDictionary` that keys the confirm request.
 the executor's own save fails the offending entity stays in the change tracker and the *next*
 `SaveChangesAsync` fails again — this time unhandled. With the converter in place there is no known
 value that triggers it, but the pattern is still there.
+
+---
+
+## ADR-038: A Merged Hive Is Filtered Out at Thirteen Named Read Sites, Not by a Global Query Filter (SPEC-19)
+
+**Date.** 2026-08-21 · **Status.** Accepted · **Context.** SPEC-19 §5
+
+**Problem.** Sastavljanje društava needs one hive to stop appearing in the apiary while remaining
+fully readable. EF Core offers exactly the tool for that: `builder.HasQueryFilter(b =>
+b.MergedIntoBeehiveId == null)` on `Beehive`. One line, applied to every query ever written, and
+impossible for a future contributor to forget.
+
+**Decision.** It was rejected. The filter is applied explicitly at thirteen read sites, enumerated in
+SPEC-19 §5.
+
+**Why.** `TreatmentEntry.Beehive`, `HarvestEntry.Beehive` and `Inspection.Beehive` are **required**
+navigations onto `Beehive`. A global filter applies to navigations too, so EF would return them as
+`null` for a merged hive — silently, with no exception. The visible result would be the treatment
+register printing without hive names: the legally retained, 5-year-duty record that is the entire
+reason this feature archives instead of deleting. EF warns about this pattern at model-build time
+("required end of a relationship with a query filter"), and the warning is right.
+
+The explicit list is longer and can be forgotten by the next feature. That is a real cost, accepted
+knowingly: a forgotten filter shows a hive that should be hidden — visible, reportable, harmless. The
+global filter's failure mode is a legal document quietly losing data.
+
+**Consequences.**
+
+- `IBeehiveRepository` gained `GetAllActiveAsync()` and `GetMergedByApiaryIdAsync()`. Every *list*
+  method on it excludes merged hives; that contract is stated on the interface itself so the next
+  method added to it inherits the rule by reading.
+- **Single-hive lookups deliberately do not filter** — `GetByIdAsync`, `GetWithInspectionsAsync`,
+  `GetByUniqueIdAsync`. A merged hive must stay reachable by direct link, from the archive, from the
+  treatment register, and by scanning the sticker still on the emptied box.
+- `AccessGuard.GetAccessibleBeehivesAsync` is the choke point that carries most of the value: the hive
+  list and the AI assistant both read it (ADR-033), so those two cannot drift apart.
+- Counting is part of it. `CountByOrganizationAsync` (the plan limit), `Apiary.BeehiveCount` and the
+  admin table's per-org count all exclude merged hives — a colony that no longer exists must not
+  occupy a paid slot. The org **activity** query is deliberately *not* filtered: a merge is a sign the
+  organization is being used (ADR-034).
+
+---
+
+## ADR-039: The Merge Writes Through the Unit of Work, Not Through DietService and TodoService (SPEC-19)
+
+**Date.** 2026-08-21 · **Status.** Accepted · **Context.** SPEC-19 §3, and ADR-033's rule for the AI
+
+**Problem.** ADR-033 states the rule that makes AI-authored writes safe: the executor builds DTOs and
+calls the **existing** application services, never repositories. SPEC-19 §3.2 was written in that
+spirit and named `DietService.RemoveBeehiveAsync` as the way a merge takes a hive off its feeding
+programme. But that method — like `TodoService.DeleteAsync` and `CompleteEarlyAsync` — calls
+`SaveChangesAsync()` itself. A merge that called all of them would commit four or five times, and
+SPEC-19 §3 requires exactly one.
+
+**Decision.** `BeehiveMergeService` performs the queen, todo, diet and treatment changes through
+`_uow` directly, in a single `SaveChangesAsync()`. The AI executor still goes through
+`IBeehiveMergeService` — ADR-033 is untouched for the path it governs.
+
+**Why atomicity won.** A half-applied merge is the one state the undo journal cannot repair: a hive
+flagged as merged whose queen is still Active, or whose todos are gone but whose journal was never
+written. Every other ordering leaves a recoverable mess; this one leaves a hive that is out of the
+apiary and internally inconsistent, with no operation that puts it back.
+
+**Why little is lost.** ADR-033's rule earns its keep because the services it protects carry things
+that are invisible at the call site — `IAccessGuard`, plan limits, the automatic weather temperature,
+the todo notification cascade. Nothing comparable hides behind the calls skipped here:
+`RemoveBeehiveAsync` sets one column, and the merge service performs a **stricter** access check than
+it would (both apiaries, plus the same-organization rule no single-apiary check would catch). The
+semantics are copied exactly, `RemovedOn = today` included.
+
+**The rule this does not relax.** The merge service is still a *service*: it calls repositories, and
+nothing calls repositories from a controller or from the AI executor. The line ADR-033 draws is
+between the assistant and the domain, not between two services.
+
+**Consequence.** The one place that still commits separately is the notification, sent **after** the
+merge is committed and with its failure logged rather than thrown — the same ordering
+`BeehiveService.CreateAsync` uses, and for the same reason: a notification must never undo the write
+that produced it.

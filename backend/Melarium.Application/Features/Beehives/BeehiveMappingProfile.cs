@@ -15,14 +15,18 @@ public class BeehiveMappingProfile : AutoMapper.Profile
             .ForMember(d => d.MaterialName, o => o.MapFrom(s => BsLabels.Label(s.Material)))
             .ForMember(d => d.InspectionCount, o => o.MapFrom(s => s.Inspections.Count))
             .ForMember(d => d.CreatedByName, o => o.MapFrom(s =>
-                s.CreatedBy != null ? $"{s.CreatedBy.FirstName} {s.CreatedBy.LastName}" : null));
+                s.CreatedBy != null ? $"{s.CreatedBy.FirstName} {s.CreatedBy.LastName}" : null))
+            .ForMember(d => d.MergedIntoBeehiveName, o => o.MapFrom(s =>
+                s.MergedIntoBeehive != null ? s.MergedIntoBeehive.Name : null));
 
         CreateMap<Beehive, BeehiveDetailDto>()
             .ForMember(d => d.TypeName, o => o.MapFrom(s => BsLabels.Label(s.Type)))
             .ForMember(d => d.MaterialName, o => o.MapFrom(s => BsLabels.Label(s.Material)))
             .ForMember(d => d.InspectionCount, o => o.MapFrom(s => s.Inspections.Count()))
             .ForMember(d => d.CreatedByName, o => o.MapFrom(s =>
-                s.CreatedBy != null ? $"{s.CreatedBy.FirstName} {s.CreatedBy.LastName}" : null));
+                s.CreatedBy != null ? $"{s.CreatedBy.FirstName} {s.CreatedBy.LastName}" : null))
+            .ForMember(d => d.MergedIntoBeehiveName, o => o.MapFrom(s =>
+                s.MergedIntoBeehive != null ? s.MergedIntoBeehive.Name : null));
 
         CreateMap<CreateBeehiveDto, Beehive>();
         CreateMap<UpdateBeehiveDto, Beehive>();

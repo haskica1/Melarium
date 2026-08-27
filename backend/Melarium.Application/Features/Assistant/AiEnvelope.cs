@@ -53,4 +53,17 @@ public sealed record AiActionFields(
     string? Notes = null,
     string? Title = null,
     TodoPriority? Priority = null,
-    DateOnly? DueDate = null);
+    DateOnly? DueDate = null,
+
+    // ── MergeBeehive (SPEC-19 §8) ──
+    /// <summary>The receiving hive as the beekeeper said it ("3", "01") — resolved like any other hive.</summary>
+    string? TargetHive = null,
+    int? TargetBeehiveId = null,
+    string? TargetBeehiveName = null,
+    /// <summary>
+    /// Never guessed. When the beekeeper did not say which queen stays, the model leaves this null
+    /// and the assistant asks — it is the one irreversible choice in the whole action (SPEC-19 §8).
+    /// </summary>
+    MergeQueenOutcome? QueenOutcome = null,
+    /// <summary>Optional; the executor falls back to <c>Other</c>.</summary>
+    MergeReason? MergeReason = null);

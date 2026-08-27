@@ -36,7 +36,7 @@ public class StatsService : IStatsService
 
         var beehives = organizationId.HasValue
             ? (await _uow.Beehives.GetByOrganizationAsync(organizationId.Value)).ToList()
-            : (await _uow.Beehives.GetAllAsync()).ToList();
+            : (await _uow.Beehives.GetAllActiveAsync()).ToList();
 
         var beehiveIds = beehives.Select(b => b.Id).ToHashSet();
         var beehiveNamesById = beehives.ToDictionary(b => b.Id, b => b.Name);

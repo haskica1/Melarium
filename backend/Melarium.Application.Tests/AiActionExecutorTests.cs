@@ -6,6 +6,9 @@ using Melarium.Application.Features.Todos;
 using Melarium.Application.Features.Todos.DTOs;
 using Melarium.Application.Features.Todos.Validators;
 using Melarium.Application.Features.Assistant;
+using Melarium.Application.Features.BeehiveMerges;
+using Melarium.Application.Features.BeehiveMerges.DTOs;
+using Melarium.Application.Features.BeehiveMerges.Validators;
 using Melarium.Domain.Enums;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -27,12 +30,92 @@ public class AiActionExecutorTests
 {
     private readonly ITodoService _todos = Substitute.For<ITodoService>();
     private readonly IInspectionService _inspections = Substitute.For<IInspectionService>();
+    private readonly IBeehiveMergeService _merges = Substitute.For<IBeehiveMergeService>();
 
     private AiActionExecutor Executor() => new(
-        _inspections, _todos,
+        _inspections, _todos, _merges,
         new CreateInspectionValidator(), new CreateTodoValidator(),
         new UpdateTodoValidator(), new UpdateInspectionValidator(),
+        new CreateBeehiveMergeValidator(),
         Substitute.For<IConfiguration>(), Substitute.For<ILogger<AiActionExecutor>>());
+
+    // ── MergeBeehive (SPEC-19 §8) ──────────────────────────────────────────
+
+    private static AiActionPayload MergePayload(AiActionFields fields) =>
+        new(1, "Zlatna dolina", 11, "Košnica 5", AiResolutionIssue.None, [], fields);
+
+    [Fact]
+    public async Task MergeBeehive_calls_the_merge_service_with_both_hives_and_the_chosen_queen()
+    {
+        CreateBeehiveMergeDto? captured = null;
+        _merges.MergeAsync(Arg.Do<CreateBeehiveMergeDto>(d => captured = d))
+            .Returns(new BeehiveMergeDto { Id = 77 });
+
+        var result = await Executor().ExecuteAsync(AiActionKind.MergeBeehive, MergePayload(
+            new AiActionFields(
+                TargetBeehiveId: 12,
+                TargetBeehiveName: "Košnica 3",
+                QueenOutcome: MergeQueenOutcome.KeptSource,
+                MergeReason: MergeReason.Queenless)));
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(77, result.EntityId);
+        Assert.Equal(11, captured!.SourceBeehiveId);
+        Assert.Equal(12, captured.TargetBeehiveId);
+        Assert.Equal(MergeQueenOutcome.KeptSource, captured.QueenOutcome);
+        Assert.Equal(MergeReason.Queenless, captured.Reason);
+    }
+
+    [Fact]
+    public async Task MergeBeehive_without_a_queen_outcome_fails_instead_of_defaulting()
+    {
+        var result = await Executor().ExecuteAsync(AiActionKind.MergeBeehive, MergePayload(
+            new AiActionFields(TargetBeehiveId: 12, TargetBeehiveName: "Košnica 3")));
+
+        // Defaulting here would silently pick which queen dies (SPEC-19 §8).
+        Assert.False(result.Succeeded);
+        await _merges.DidNotReceive().MergeAsync(Arg.Any<CreateBeehiveMergeDto>());
+    }
+
+    [Fact]
+    public async Task MergeBeehive_without_a_receiving_hive_fails()
+    {
+        var result = await Executor().ExecuteAsync(AiActionKind.MergeBeehive, MergePayload(
+            new AiActionFields(QueenOutcome: MergeQueenOutcome.KeptTarget)));
+
+        Assert.False(result.Succeeded);
+        await _merges.DidNotReceive().MergeAsync(Arg.Any<CreateBeehiveMergeDto>());
+    }
+
+    [Fact]
+    public async Task MergeBeehive_runs_the_validator_the_controller_runs()
+    {
+        // Same hive twice — the validator's rule, not the service's (SPEC-17 §5.2).
+        var result = await Executor().ExecuteAsync(AiActionKind.MergeBeehive, MergePayload(
+            new AiActionFields(
+                TargetBeehiveId: 11,
+                TargetBeehiveName: "Košnica 5",
+                QueenOutcome: MergeQueenOutcome.KeptTarget)));
+
+        Assert.False(result.Succeeded);
+        await _merges.DidNotReceive().MergeAsync(Arg.Any<CreateBeehiveMergeDto>());
+    }
+
+    [Fact]
+    public async Task MergeBeehive_surfaces_the_services_own_message()
+    {
+        _merges.MergeAsync(Arg.Any<CreateBeehiveMergeDto>())
+            .Throws(new BusinessRuleException("Košnica 'Košnica 5' je već sastavljena s drugom košnicom."));
+
+        var result = await Executor().ExecuteAsync(AiActionKind.MergeBeehive, MergePayload(
+            new AiActionFields(
+                TargetBeehiveId: 12,
+                TargetBeehiveName: "Košnica 3",
+                QueenOutcome: MergeQueenOutcome.KeptTarget)));
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("već sastavljena", result.ErrorMessage!);
+    }
 
     private static AiActionPayload ExistingTodoPayload(int? existingId, AiActionFields fields) =>
         new(1, "Zlatna dolina", 11, "Košnica 2", AiResolutionIssue.None, [], fields,
@@ -60,9 +143,10 @@ public class AiActionExecutorTests
 
     /// <summary>
     /// Regression for ADR-037: <c>DateOnly.ToDateTime</c> yields <c>Kind=Unspecified</c>, which
-    /// Npgsql refuses to write to a timestamptz column. These three call sites were the only
+    /// Npgsql refuses to write to a timestamptz column. These four call sites are the only
     /// producers of such a value in the application, and they took assistant confirmation down with
-    /// a 500 after the record had already been written.
+    /// a 500 after the record had already been written. The merge date joined them with SPEC-19 —
+    /// it lands on <c>BeehiveMerge.MergedAt</c> and <c>Beehive.MergedAt</c>, both persisted.
     /// </summary>
     [Fact]
     public async Task Every_date_the_assistant_writes_is_marked_Utc()
@@ -78,6 +162,10 @@ public class AiActionExecutorTests
         UpdateTodoDto? updatedTodo = null;
         _todos.UpdateAsync(501, Arg.Do<UpdateTodoDto>(d => updatedTodo = d)).Returns(ExistingTodo);
 
+        CreateBeehiveMergeDto? merge = null;
+        _merges.MergeAsync(Arg.Do<CreateBeehiveMergeDto>(d => merge = d))
+            .Returns(new BeehiveMergeDto { Id = 77 });
+
         var executor = Executor();
         await executor.ExecuteAsync(AiActionKind.CreateInspection,
             CreatePayload(new AiActionFields(Date: new DateOnly(2026, 8, 5))));
@@ -85,10 +173,17 @@ public class AiActionExecutorTests
             CreatePayload(new AiActionFields(Title: "Dodaj postolje", DueDate: new DateOnly(2026, 8, 25))));
         await executor.ExecuteAsync(AiActionKind.UpdateTodo,
             ExistingTodoPayload(501, new AiActionFields(DueDate: new DateOnly(2026, 8, 25))));
+        await executor.ExecuteAsync(AiActionKind.MergeBeehive, MergePayload(
+            new AiActionFields(
+                Date: new DateOnly(2026, 8, 5),
+                TargetBeehiveId: 12,
+                TargetBeehiveName: "Košnica 3",
+                QueenOutcome: MergeQueenOutcome.KeptSource)));
 
         Assert.Equal(DateTimeKind.Utc, created!.Date.Kind);
         Assert.Equal(DateTimeKind.Utc, newTodo!.DueDate!.Value.Kind);
         Assert.Equal(DateTimeKind.Utc, updatedTodo!.DueDate!.Value.Kind);
+        Assert.Equal(DateTimeKind.Utc, merge!.MergedAt.Kind);
     }
 
     // ── UpdateTodo: only what the AI mentioned changes ──────────────────────

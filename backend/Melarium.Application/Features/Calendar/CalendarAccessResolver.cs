@@ -19,7 +19,7 @@ public class CalendarAccessResolver : ICalendarAccessResolver
     {
         if (ctx.Role == UserRole.SystemAdmin)
         {
-            var allBeehives = (await _uow.Beehives.GetAllAsync()).ToList();
+            var allBeehives = (await _uow.Beehives.GetAllActiveAsync()).ToList();
             var allApiaries = (await _uow.Apiaries.GetAllAsync()).ToList();
             return new CalendarScope
             {
@@ -62,7 +62,8 @@ public class CalendarAccessResolver : ICalendarAccessResolver
         {
             var assignedIds = await _uow.Users.GetAssignedBeehiveIdsAsync(ctx.UserId);
             var beehives = assignedIds.Count > 0
-                ? (await _uow.Beehives.FindAsync(b => assignedIds.Contains(b.Id))).ToList()
+                ? (await _uow.Beehives.FindAsync(b =>
+                    assignedIds.Contains(b.Id) && b.MergedIntoBeehiveId == null)).ToList()
                 : new List<Melarium.Domain.Entities.Beehive>();
 
             var apiaryIds = beehives.Select(b => b.ApiaryId).ToHashSet();

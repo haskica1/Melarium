@@ -126,11 +126,115 @@ export interface Beehive {
   createdByName?: string
   createdAt: string
   uniqueId?: string
+  /** Set when this hive's colony was merged into another one — it is out of the apiary (SPEC-19). */
+  mergedIntoBeehiveId?: number
+  mergedIntoBeehiveName?: string
+  mergedAt?: string
 }
 
 export interface BeehiveDetail extends Beehive {
   qrCodeBase64?: string
   inspections: Inspection[]
+  /** The merge that took this hive out of its apiary — the row `/undo` takes. */
+  mergeId?: number
+  /** Server-computed end of the 24h undo window; absent once it closed. Never derived client-side. */
+  canUndoUntil?: string
+}
+
+// ── Colony merge — sastavljanje društava (SPEC-19) ────────────────────────────
+
+// Numeric, like every other enum crossing this API: the backend registers no
+// JsonStringEnumConverter, so `"reason": "WeakColony"` is rejected with a 400 before it ever
+// reaches the service. The values must stay in step with Melarium.Domain.Enums.
+export enum MergeReason {
+  Queenless     = 1,
+  LayingWorkers = 2,
+  WeakColony    = 3,
+  PoorQueen     = 4,
+  Consolidation = 5,
+  Robbing       = 6,
+  Other         = 7,
+}
+
+export const MergeReasonLabels: Record<MergeReason, string> = {
+  [MergeReason.Queenless]:     'Bezmatak',
+  [MergeReason.LayingWorkers]: 'Lažne matice',
+  [MergeReason.WeakColony]:    'Slabo društvo',
+  [MergeReason.PoorQueen]:     'Loša matica',
+  [MergeReason.Consolidation]: 'Jačanje društva',
+  [MergeReason.Robbing]:       'Grabež',
+  [MergeReason.Other]:         'Ostalo',
+}
+
+export enum MergeMethod {
+  Newspaper = 1,
+  Direct    = 2,
+  Other     = 3,
+}
+
+export const MergeMethodLabels: Record<MergeMethod, string> = {
+  [MergeMethod.Newspaper]: 'Preko novinskog papira',
+  [MergeMethod.Direct]:    'Direktno',
+  [MergeMethod.Other]:     'Ostalo',
+}
+
+export enum MergeQueenOutcome {
+  KeptTarget = 1,
+  KeptSource = 2,
+  None       = 3,
+}
+
+/** Generic wording — the merge dialog names the two hives instead (SPEC-19 §7.2). */
+export const MergeQueenOutcomeLabels: Record<MergeQueenOutcome, string> = {
+  [MergeQueenOutcome.KeptTarget]: 'Ostaje matica prijemne košnice',
+  [MergeQueenOutcome.KeptSource]: 'Ostaje matica pripojene košnice',
+  [MergeQueenOutcome.None]:       'Nijedna — društvo bez matice',
+}
+
+export interface BeehiveMerge {
+  id: number
+  sourceBeehiveId: number
+  sourceBeehiveName: string
+  sourceApiaryId: number
+  targetBeehiveId: number
+  targetBeehiveName: string
+  targetApiaryId: number
+  mergedAt: string
+  reason: MergeReason
+  reasonName: string
+  method: MergeMethod
+  methodName: string
+  queenOutcome: MergeQueenOutcome
+  queenOutcomeName: string
+  notes?: string
+  createdByName?: string
+  createdAt: string
+  canUndoUntil?: string
+  undoneAt?: string
+}
+
+export interface CreateBeehiveMergePayload {
+  sourceBeehiveId: number
+  targetBeehiveId: number
+  mergedAt: string
+  reason: MergeReason
+  method: MergeMethod
+  queenOutcome: MergeQueenOutcome
+  notes?: string
+}
+
+/** What merging this hive away would actually do — drives the confirm dialog's consequence list. */
+export interface MergePreview {
+  beehiveId: number
+  beehiveName: string
+  apiaryName: string
+  openTodoCount: number
+  activeDietNames: string[]
+  ongoingTreatmentNames: string[]
+  sourceQueenSummary?: string
+  targetQueenSummary?: string
+  karencaUntil?: string
+  karencaProductName?: string
 }
 
 /** QR payload for label printing — fetched on demand via /beehives/by-apiary/{id}/qr-codes. */
@@ -263,6 +367,8 @@ export enum QueenStatus {
   Replaced = 2,
   Died     = 3,
   Missing  = 4,
+  /** Physically removed by the beekeeper — today only via a colony merge (SPEC-19). */
+  Removed  = 5,
 }
 
 export const QueenStatusLabels: Record<QueenStatus, string> = {
@@ -270,6 +376,7 @@ export const QueenStatusLabels: Record<QueenStatus, string> = {
   [QueenStatus.Replaced]: 'Zamijenjena',
   [QueenStatus.Died]:     'Uginula',
   [QueenStatus.Missing]:  'Nestala',
+  [QueenStatus.Removed]:  'Uklonjena',
 }
 
 export interface Queen {
@@ -1477,6 +1584,10 @@ export type AssistantIssue =
   | 'TodoAmbiguous'
   | 'InspectionNotFound'
   | 'InspectionAmbiguous'
+  // ── Colony merge (SPEC-19) ──
+  | 'MergeTargetNotFound'
+  | 'MergeSourceAmbiguous'
+  | 'MissingQueenOutcome'
 
 export type AssistantActionStatus = 'Pending' | 'Confirmed' | 'Rejected' | 'Failed'
 
@@ -1489,11 +1600,17 @@ export interface AssistantFields {
   title?: string | null
   priority?: TodoPriority | null
   dueDate?: string | null
+  // ── MergeBeehive (SPEC-19) — the receiving hive and which queen survives. ──
+  targetBeehiveId?: number | null
+  targetBeehiveName?: string | null
+  queenOutcome?: MergeQueenOutcome | null
+  mergeReason?: MergeReason | null
 }
 
 export type AssistantActionKind =
   | 'CreateInspection' | 'CreateTodo'
   | 'UpdateTodo' | 'CompleteTodo' | 'UpdateInspection' | 'DeleteTodo' | 'DeleteInspection'
+  | 'MergeBeehive'
 
 export interface AssistantAction {
   id: number

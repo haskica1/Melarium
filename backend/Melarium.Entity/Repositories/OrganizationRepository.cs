@@ -27,7 +27,11 @@ public class OrganizationRepository : Repository<Organization>, IOrganizationRep
     public async Task<Dictionary<int, int>> GetBeehiveCountsAsync(int? organizationId = null) =>
         await _context.Beehives
             .AsNoTracking()
-            .Where(b => organizationId == null || b.Apiary.OrganizationId == organizationId)
+            // Merged-away hives are out of the apiary and out of this count (SPEC-19 §5 #11).
+            // The "last activity" query below deliberately does not filter: a merge is a sign the
+            // organization is being used (ADR-034).
+            .Where(b => (organizationId == null || b.Apiary.OrganizationId == organizationId)
+                        && b.MergedIntoBeehiveId == null)
             .GroupBy(b => b.Apiary.OrganizationId)
             .Select(g => new { OrganizationId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.OrganizationId, x => x.Count);

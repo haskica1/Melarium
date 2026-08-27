@@ -26,6 +26,7 @@ import { ApiaryFeedingsSection } from '../diets/ApiaryFeedingsSection'
 import { ActiveFeedingChip, groupActiveByHive } from '../diets/ActiveFeedingBadge'
 import { useActiveDiets } from '../../core/services/dietQueries'
 import { ApiaryMovesSection } from '../pastures/ApiaryMovesSection'
+import { MergedHivesSection } from './MergedHivesSection'
 import { useApiaryMoves } from '../../core/services/pastureQueries'
 import type { Beehive, DailyWeather } from '../../core/models'
 import { usePermissions } from '../../core/hooks/usePermissions'
@@ -397,6 +398,9 @@ export default function ApiaryDetailPage() {
               </>
             )}
           </CollapsibleSection>
+
+          {/* Merged-away hives (SPEC-19) — hidden entirely when the apiary has none */}
+          <MergedHivesSection apiaryId={apiaryId} />
 
           {/* Weather forecast */}
           <CollapsibleSection

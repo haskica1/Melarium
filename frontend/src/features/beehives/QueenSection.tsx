@@ -25,6 +25,7 @@ const statusBadgeClass: Record<QueenStatus, string> = {
   [QueenStatus.Replaced]: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300',
   [QueenStatus.Died]:     'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
   [QueenStatus.Missing]:  'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  [QueenStatus.Removed]:  'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-300',
 }
 
 interface QueenFormState {

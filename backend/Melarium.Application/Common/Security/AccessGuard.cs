@@ -123,13 +123,14 @@ public sealed class AccessGuard : IAccessGuard
         switch (_user.Role)
         {
             case UserRole.SystemAdmin:
-                return (await _uow.Beehives.GetAllAsync()).ToList();
+                return (await _uow.Beehives.GetAllActiveAsync()).ToList();
 
             case UserRole.Beekeeper:
             {
                 var assignedIds = await GetAssignedBeehiveIdsAsync();
                 return assignedIds.Count > 0
-                    ? (await _uow.Beehives.FindAsync(b => assignedIds.Contains(b.Id))).ToList()
+                    ? (await _uow.Beehives.FindAsync(b =>
+                        assignedIds.Contains(b.Id) && b.MergedIntoBeehiveId == null)).ToList()
                     : [];
             }
 

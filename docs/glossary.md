@@ -37,6 +37,12 @@ Domain terms used in Melarium. Use these names exactly — in code, docs, and UI
 | Apiary Move | `ApiaryMove` | One relocation event (*selidba*): apiary → pasture on a date. Updates the apiary's current pasture and snapshots the pasture's coordinates onto the apiary. |
 | Svjedodžba | `CertificateNumber` | The veterinary certificate number legally expected when relocating hives; recorded per move. |
 | Matična lokacija | `CurrentPastureId == null` | The apiary's original home location, before any recorded move; also the stats bucket for pre-first-move harvests. |
+| Sastavljanje društava | `BeehiveMerge` | Uniting two colonies into one (SPEC-19). Called *spajanje* in most literature; Melarium says **sastavljanje** because *spajanje* is already SPEC-18's title. |
+| Pripojena košnica | `SourceBeehiveId` | The hive whose colony is merged away. It leaves the apiary permanently but is never deleted — its history, including treatment entries, stays readable. |
+| Prijemna košnica | `TargetBeehiveId` | The hive that receives the colony and stays in the apiary. May receive several colonies over the years. |
+| Bezmatak | `MergeReason.Queenless` | A colony with no queen — the commonest reason to merge. |
+| Lažne matice | `MergeReason.LayingWorkers` | Laying workers; such a colony cannot be saved by adding a queen and will kill an introduced one. |
+| Undo journal | `UndoJournalJson` | Snapshot of everything a merge changed outside its own table, so the 24-hour undo can restore it exactly — including the todos it deleted, which no other row remembers. |
 
 ---
 
@@ -64,6 +70,10 @@ Domain terms used in Melarium. Use these names exactly — in code, docs, and UI
 | | `WeeklySummary` | Monday AI-written weekly digest per organization. |
 | `QueenStatus` | `Active` | The hive's current queen (at most one per hive). |
 | | `Replaced / Died / Missing` | Historical states; `EndDate` records when the queen stopped being active. |
+| | `Removed` | Physically removed by the beekeeper — today only when a colony merge does not keep her (SPEC-19). |
+| `MergeReason` | `Queenless / LayingWorkers / WeakColony / PoorQueen / Consolidation / Robbing / Other` | Why two colonies were united. |
+| `MergeMethod` | `Newspaper / Direct / Other` | How they were physically united — over a sheet of newspaper (the usual way) or directly with the scents masked. |
+| `MergeQueenOutcome` | `KeptTarget / KeptSource / None` | Which queen survives. Always chosen, never assumed: a queenless receiving colony keeps the queen that arrives with the merged-in one. |
 | `TodoPriority` | `Low / Medium / High` | Urgency of a task. |
 
 ---

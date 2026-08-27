@@ -9,12 +9,14 @@ public class ApiaryMappingProfile : AutoMapper.Profile
     public ApiaryMappingProfile()
     {
         CreateMap<Apiary, ApiaryDto>()
-            .ForMember(d => d.BeehiveCount, o => o.MapFrom(s => s.Beehives.Count))
+            .ForMember(d => d.BeehiveCount, o => o.MapFrom(s =>
+                s.Beehives.Count(b => b.MergedIntoBeehiveId == null)))
             .ForMember(d => d.CreatedByName, o => o.MapFrom(s =>
                 s.CreatedBy != null ? $"{s.CreatedBy.FirstName} {s.CreatedBy.LastName}" : null));
 
         CreateMap<Apiary, ApiaryDetailDto>()
-            .ForMember(d => d.BeehiveCount, o => o.MapFrom(s => s.Beehives.Count))
+            .ForMember(d => d.BeehiveCount, o => o.MapFrom(s =>
+                s.Beehives.Count(b => b.MergedIntoBeehiveId == null)))
             .ForMember(d => d.CreatedByName, o => o.MapFrom(s =>
                 s.CreatedBy != null ? $"{s.CreatedBy.FirstName} {s.CreatedBy.LastName}" : null));
 

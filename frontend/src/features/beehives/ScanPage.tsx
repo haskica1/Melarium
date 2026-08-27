@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Loader2, Lock, QrCode, AlertTriangle } from 'lucide-react'
+import { Combine, Loader2, Lock, QrCode, AlertTriangle } from 'lucide-react'
+import { format } from 'date-fns'
 import { useAuth } from '../../core/context/AuthContext'
 import { beehiveService, type BeehiveScanInfo } from '../../core/services/beehiveService'
 
-type ScanState = 'loading' | 'not-found' | 'no-access' | 'error'
+type ScanState = 'loading' | 'not-found' | 'no-access' | 'merged' | 'error'
 
 export default function ScanPage() {
   const { uniqueId } = useParams<{ uniqueId: string }>()
@@ -12,6 +13,9 @@ export default function ScanPage() {
   const navigate = useNavigate()
   const [state, setState] = useState<ScanState>('loading')
   const [beehiveName, setBeehiveName] = useState<string>('')
+  // Set only when the scanned hive's colony was merged away (SPEC-19). The sticker stays on the
+  // emptied box until the beekeeper replaces it, so this is a normal outcome, not an error.
+  const [merged, setMerged] = useState<BeehiveScanInfo | null>(null)
 
   useEffect(() => {
     if (!uniqueId) {
@@ -57,11 +61,20 @@ export default function ScanPage() {
 
       if (cancelled) return
 
-      if (hasAccess) {
-        navigate(`/beehives/${info.id}`, { replace: true })
-      } else {
+      if (!hasAccess) {
         setState('no-access')
+        return
       }
+
+      // A merged-away hive resolves, but jumping straight into the archived record would look like
+      // a mistake — say where the colony went and offer both hives instead.
+      if (info.mergedIntoBeehiveId) {
+        setMerged(info)
+        setState('merged')
+        return
+      }
+
+      navigate(`/beehives/${info.id}`, { replace: true })
     }
 
     run()
@@ -118,6 +131,38 @@ export default function ScanPage() {
             className="mt-6 w-full py-2.5 px-4 rounded-xl bg-honey-500 hover:bg-honey-600 text-white font-semibold text-sm transition-colors"
           >
             Idi na kontrolnu ploču
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (state === 'merged' && merged) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-honey-50 dark:bg-slate-950 px-6">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-honey-100 dark:border-slate-800 px-8 py-10 max-w-sm w-full text-center">
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 mx-auto mb-4">
+            <Combine className="w-8 h-8 text-slate-400" />
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-2">Društvo je sastavljeno</h1>
+          <p className="text-gray-500 dark:text-slate-400 text-sm">
+            Društvo iz košnice <span className="font-medium text-gray-700 dark:text-slate-200">{merged.name}</span>{' '}
+            {merged.mergedAt ? `je ${format(new Date(merged.mergedAt), 'dd.MM.yyyy.')} ` : 'je '}
+            pripojeno košnici{' '}
+            <span className="font-medium text-gray-700 dark:text-slate-200">{merged.mergedIntoBeehiveName}</span>.
+            Ovaj sanduk više nije u pčelinjaku.
+          </p>
+          <button
+            onClick={() => navigate(`/beehives/${merged.mergedIntoBeehiveId}`, { replace: true })}
+            className="mt-6 w-full py-2.5 px-4 rounded-xl bg-honey-500 hover:bg-honey-600 text-white font-semibold text-sm transition-colors"
+          >
+            Otvori košnicu {merged.mergedIntoBeehiveName}
+          </button>
+          <button
+            onClick={() => navigate(`/beehives/${merged.id}`, { replace: true })}
+            className="mt-2 w-full py-2.5 px-4 rounded-xl text-honey-700 dark:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 font-semibold text-sm transition-colors"
+          >
+            Pogledaj historiju košnice {merged.name}
           </button>
         </div>
       </div>

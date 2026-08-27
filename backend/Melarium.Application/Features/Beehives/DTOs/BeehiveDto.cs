@@ -19,4 +19,10 @@ public class BeehiveDto
     public string? CreatedByName { get; set; }
     public DateTime CreatedAt { get; set; }
     public Guid? UniqueId { get; set; }
+
+    // ── Colony merge (SPEC-19). Null on every hive that is still in service, which is every hive
+    // a normal list returns — these are populated only in the archive and on the detail DTO. ──
+    public int? MergedIntoBeehiveId { get; set; }
+    public string? MergedIntoBeehiveName { get; set; }
+    public DateTime? MergedAt { get; set; }
 }

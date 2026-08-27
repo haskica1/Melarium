@@ -103,14 +103,41 @@ HTTP `200 OK`, `201 Created`, `204 No Content` — response body is the DTO dire
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/beehives/by-apiary/{apiaryId}` | `BeehiveDto[]` |
-| GET | `/beehives/{id}` | `BeehiveDetailDto` (includes inspections) |
+| GET | `/beehives/by-apiary/{apiaryId}` | `BeehiveDto[]` — **excludes merged-away hives** (SPEC-19) |
+| GET | `/beehives/merged?apiaryId=` | `BeehiveDto[]` — the archive; the only list that returns them |
+| GET | `/beehives/{id}` | `BeehiveDetailDto` (includes inspections; finds merged hives too) |
 | POST | `/beehives` | `201 + BeehiveDto` |
 | PUT | `/beehives/{id}` | `200 + BeehiveDto` |
 | DELETE | `/beehives/{id}` | `204` |
 
-**BeehiveDto:** `{ id, name, type, material, apiaryId, qrCode (Base64 PNG), uniqueId (Guid), createdAt }`
-**BeehiveDetailDto:** extends BeehiveDto + `inspections: InspectionDto[]`
+**BeehiveDto:** `{ id, name, type, material, apiaryId, qrCode (Base64 PNG), uniqueId (Guid), createdAt,
+mergedIntoBeehiveId?, mergedIntoBeehiveName?, mergedAt? }`
+**BeehiveDetailDto:** extends BeehiveDto + `inspections: InspectionDto[]`, `mergeId?`, `canUndoUntil?`
+
+---
+
+### Colony merges — sastavljanje društava (SPEC-19)
+
+| Method | Path | Returns |
+|---|---|---|
+| POST | `/beehive-merges` | `201 + BeehiveMergeDto` |
+| POST | `/beehive-merges/{id}/undo` | `200 + BeehiveMergeDto` — 400 after 24 h or if already undone |
+| GET | `/beehive-merges/by-beehive/{beehiveId}` | `BeehiveMergeDto[]` — merges this hive **received** |
+| GET | `/beehive-merges/preview?sourceBeehiveId=&targetBeehiveId=` | `MergePreviewDto` |
+
+**POST body:** `{ sourceBeehiveId, targetBeehiveId, mergedAt, reason, method, queenOutcome, notes? }`
+`reason`, `method` and `queenOutcome` are the **numeric** enum values (see Enum Reference).
+The **source** hive is the one that leaves the apiary. 400 on: same hive twice, either hive already
+merged, hives in different organizations, a future date, or `queenOutcome = KeptSource` on a queenless
+source. 403 unless the caller can manage **both** apiaries.
+
+**BeehiveMergeDto:** `{ id, sourceBeehiveId, sourceBeehiveName, sourceApiaryId, targetBeehiveId,
+targetBeehiveName, targetApiaryId, mergedAt, reason, reasonName, method, methodName, queenOutcome,
+queenOutcomeName, notes?, createdByName?, createdAt, canUndoUntil?, undoneAt? }`
+`canUndoUntil` is computed server-side from `createdAt + 24 h`; the client never derives it.
+
+**MergePreviewDto:** `{ beehiveId, beehiveName, apiaryName, openTodoCount, activeDietNames[],
+ongoingTreatmentNames[], sourceQueenSummary?, targetQueenSummary?, karencaUntil?, karencaProductName? }`
 
 ---
 
@@ -450,6 +477,11 @@ depends on either succeeding. Unset `Feedback:NotifyEmail` → e-mail silently s
 
 ## Enum Reference
 
+Enums travel as their **numeric** values in both directions — the API registers no
+`JsonStringEnumConverter`, so `"reason": "WeakColony"` is rejected with a 400 (`The JSON value could
+not be converted…`) before the request reaches the service. The exceptions are DTOs that expose the
+name on purpose: `UserRole`, and the assistant's `kind` / `kindLabel` / `status`.
+
 ```
 BeehiveType:     Langstroth | DadantBlatt | Warré | TopBar | Other
 BeehiveMaterial: Wood | Plastic | Polystyrene
@@ -464,5 +496,8 @@ TodoPriority:    Low | Medium | High
 DietStatus:      NotStarted | InProgress | Completed | StoppedEarly
 DietReason:      LackOfFood | WinterFeeding | SpringStimulation | (+ 6 more)
 FoodType:        SugarSyrup | Fondant | Pollen | ProteinPatties | Custom
-UserRole:        Admin | SystemAdmin
+UserRole:        Admin | SystemAdmin  (string, not numeric)
+MergeReason:     Queenless=1 | LayingWorkers=2 | WeakColony=3 | PoorQueen=4 | Consolidation=5 | Robbing=6 | Other=7
+MergeMethod:     Newspaper=1 | Direct=2 | Other=3
+MergeQueenOutcome: KeptTarget=1 | KeptSource=2 | None=3
 ```

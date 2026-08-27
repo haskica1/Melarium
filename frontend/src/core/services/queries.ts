@@ -89,8 +89,18 @@ export const useDeleteApiary = () => {
 
 // ── Beehive Hooks ─────────────────────────────────────────────────────────────
 
-export const useAllBeehives = () =>
-  useQuery({ queryKey: queryKeys.allBeehives, queryFn: beehiveService.getAll, staleTime: 1000 * 60 * 2 })
+/**
+ * Every hive in the organization — the list behind the hive pickers (command palette, assistant,
+ * sastavljanje društava). Kept fresh for two minutes; a caller that must not act on a stale list
+ * passes `refetchOnMount: 'always'` so opening it always revalidates.
+ */
+export const useAllBeehives = (options: { refetchOnMount?: boolean | 'always' } = {}) =>
+  useQuery({
+    queryKey: queryKeys.allBeehives,
+    queryFn: beehiveService.getAll,
+    staleTime: 1000 * 60 * 2,
+    refetchOnMount: options.refetchOnMount,
+  })
 
 export const useBeehivesByApiary = (apiaryId: number) =>
   useQuery({
@@ -112,6 +122,10 @@ export const useCreateBeehive = (apiaryId: number) => {
       // The apiaries list carries each apiary's beehiveCount — without this the Pčelinjaci
       // dashboard kept showing the old count until a manual refresh.
       qc.invalidateQueries({ queryKey: queryKeys.apiaries })
+      // The org-wide list feeds every hive picker (command palette, assistant, sastavljanje
+      // društava). It is nobody's page, so nothing else ever refetches it: without this a hive
+      // created here stayed missing from all of them until a full page reload.
+      qc.invalidateQueries({ queryKey: queryKeys.allBeehives })
     },
   })
 }
@@ -123,6 +137,8 @@ export const useUpdateBeehive = (id: number, apiaryId: number) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.beehive(id) })
       qc.invalidateQueries({ queryKey: queryKeys.apiary(apiaryId) })
+      // A renamed hive has to read the same in the pickers as on its own page.
+      qc.invalidateQueries({ queryKey: queryKeys.allBeehives })
     },
   })
 }
@@ -134,6 +150,9 @@ export const useDeleteBeehive = (apiaryId: number) => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.apiary(apiaryId) })
       qc.invalidateQueries({ queryKey: queryKeys.apiaries })
+      // A deleted hive must disappear from the pickers too — offering it as a merge target would
+      // fail only at the server.
+      qc.invalidateQueries({ queryKey: queryKeys.allBeehives })
     },
   })
 }

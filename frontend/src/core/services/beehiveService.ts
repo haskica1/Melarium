@@ -17,6 +17,10 @@ export interface BeehiveScanInfo {
   id: number
   name: string
   apiaryId: number
+  /** A merged hive still resolves — its sticker stays on the emptied box (SPEC-19). */
+  mergedIntoBeehiveId?: number
+  mergedIntoBeehiveName?: string
+  mergedAt?: string
 }
 
 // Raw axios instance for unauthenticated calls (no auth redirect interceptor)
@@ -36,6 +40,12 @@ export const beehiveService = {
 
   getByApiary: async (apiaryId: number): Promise<Beehive[]> => {
     const res = await apiClient.get<Beehive[]>(`/beehives/by-apiary/${apiaryId}`)
+    return res.data
+  },
+
+  /** The apiary's archive of merged-away hives — the only list that returns them (SPEC-19). */
+  getMergedByApiary: async (apiaryId: number): Promise<Beehive[]> => {
+    const res = await apiClient.get<Beehive[]>('/beehives/merged', { params: { apiaryId } })
     return res.data
   },
 

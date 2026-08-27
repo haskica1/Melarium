@@ -225,4 +225,51 @@ public class AiEnvelopeParserTests
 
         Assert.Null(envelope!.Actions[0].TargetTitle);
     }
+
+    // ── Colony merge (SPEC-19 §8) ────────────────────────────────────────────
+
+    [Fact]
+    public void Parses_a_merge_action()
+    {
+        var envelope = AiEnvelopeParser.Parse(
+            """
+            { "actions": [ { "kind": "merge_beehive", "hives": ["5"],
+              "fields": { "targetHive": "3", "queenOutcome": 1, "mergeReason": 1 } } ] }
+            """);
+
+        var action = envelope!.Actions[0];
+        Assert.Equal(AiActionKind.MergeBeehive, action.Kind);
+        Assert.Equal(["5"], action.Hives.Numbers);
+        Assert.Equal("3", action.Fields.TargetHive);
+        Assert.Equal(MergeQueenOutcome.KeptTarget, action.Fields.QueenOutcome);
+        Assert.Equal(MergeReason.Queenless, action.Fields.MergeReason);
+    }
+
+    [Fact]
+    public void A_bare_number_targetHive_is_accepted()
+    {
+        var envelope = AiEnvelopeParser.Parse(
+            """{ "actions": [ { "kind": "merge_beehive", "hives": ["5"], "fields": { "targetHive": 3 } } ] }""");
+
+        Assert.Equal("3", envelope!.Actions[0].Fields.TargetHive);
+    }
+
+    [Fact]
+    public void An_omitted_queenOutcome_stays_null_rather_than_defaulting()
+    {
+        var envelope = AiEnvelopeParser.Parse(
+            """{ "actions": [ { "kind": "merge_beehive", "hives": ["5"], "fields": { "targetHive": "3" } } ] }""");
+
+        // The one field the resolver turns into a question instead of guessing (SPEC-19 §8).
+        Assert.Null(envelope!.Actions[0].Fields.QueenOutcome);
+    }
+
+    [Fact]
+    public void An_out_of_range_queenOutcome_is_dropped_not_coerced()
+    {
+        var envelope = AiEnvelopeParser.Parse(
+            """{ "actions": [ { "kind": "merge_beehive", "hives": ["5"], "fields": { "targetHive": "3", "queenOutcome": 9 } } ] }""");
+
+        Assert.Null(envelope!.Actions[0].Fields.QueenOutcome);
+    }
 }

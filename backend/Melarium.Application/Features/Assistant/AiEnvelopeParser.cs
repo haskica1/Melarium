@@ -91,6 +91,7 @@ public static class AiEnvelopeParser
         "update_inspection" => AiActionKind.UpdateInspection,
         "delete_todo"       => AiActionKind.DeleteTodo,
         "delete_inspection" => AiActionKind.DeleteInspection,
+        "merge_beehive"     => AiActionKind.MergeBeehive,
         _                   => null,
     };
 
@@ -137,7 +138,25 @@ public static class AiEnvelopeParser
             Notes:       Trimmed(ReadString(f, "notes")),
             Title:       Trimmed(ReadString(f, "title")),
             Priority:    ReadEnumInRange<TodoPriority>(f, "priority", 1, 3),
-            DueDate:     ReadDate(f, "dueDate"));
+            DueDate:     ReadDate(f, "dueDate"),
+
+            // MergeBeehive (SPEC-19 §8). QueenOutcome stays null when the model did not emit it —
+            // the resolver turns that into a question rather than picking one.
+            TargetHive:   ReadHiveToken(f, "targetHive"),
+            QueenOutcome: ReadEnumInRange<MergeQueenOutcome>(f, "queenOutcome", 1, 3),
+            MergeReason:  ReadEnumInRange<MergeReason>(f, "mergeReason", 1, 7));
+    }
+
+    /// <summary>A hive number the model may emit either as a string or as a bare number.</summary>
+    private static string? ReadHiveToken(JsonElement parent, string name)
+    {
+        if (!parent.TryGetProperty(name, out var value)) return null;
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => Trimmed(value.GetString()),
+            JsonValueKind.Number => value.TryGetInt32(out var n) ? n.ToString(CultureInfo.InvariantCulture) : null,
+            _                    => null,
+        };
     }
 
     // ── Primitives ────────────────────────────────────────────────────────────

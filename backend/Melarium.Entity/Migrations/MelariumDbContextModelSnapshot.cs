@@ -365,6 +365,12 @@ namespace Melarium.Entity.Migrations
                     b.Property<int>("Material")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime?>("MergedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("MergedIntoBeehiveId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -391,6 +397,8 @@ namespace Melarium.Entity.Migrations
                     b.HasIndex("ApiaryId");
 
                     b.HasIndex("CreatedById");
+
+                    b.HasIndex("MergedIntoBeehiveId");
 
                     b.HasIndex("UniqueId")
                         .IsUnique()
@@ -443,6 +451,71 @@ namespace Melarium.Entity.Migrations
                             Notes = "Warré hive added for natural beekeeping trial.",
                             Type = 3
                         });
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.BeehiveMerge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedById")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("MergedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("QueenOutcome")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Reason")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SourceBeehiveId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TargetBeehiveId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UndoJournalJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UndoneAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("UndoneById")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedById");
+
+                    b.HasIndex("MergedAt");
+
+                    b.HasIndex("SourceBeehiveId")
+                        .IsUnique()
+                        .HasFilter("\"UndoneAt\" IS NULL");
+
+                    b.HasIndex("TargetBeehiveId");
+
+                    b.HasIndex("UndoneById");
+
+                    b.ToTable("BeehiveMerges", (string)null);
                 });
 
             modelBuilder.Entity("Melarium.Domain.Entities.CalendarSettings", b =>
@@ -1983,9 +2056,49 @@ namespace Melarium.Entity.Migrations
                         .HasForeignKey("CreatedById")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Melarium.Domain.Entities.Beehive", "MergedIntoBeehive")
+                        .WithMany()
+                        .HasForeignKey("MergedIntoBeehiveId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Apiary");
 
                     b.Navigation("CreatedBy");
+
+                    b.Navigation("MergedIntoBeehive");
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.BeehiveMerge", b =>
+                {
+                    b.HasOne("Melarium.Domain.Entities.User", "CreatedBy")
+                        .WithMany()
+                        .HasForeignKey("CreatedById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Melarium.Domain.Entities.Beehive", "SourceBeehive")
+                        .WithMany()
+                        .HasForeignKey("SourceBeehiveId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Melarium.Domain.Entities.Beehive", "TargetBeehive")
+                        .WithMany()
+                        .HasForeignKey("TargetBeehiveId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Melarium.Domain.Entities.User", "UndoneBy")
+                        .WithMany()
+                        .HasForeignKey("UndoneById")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("CreatedBy");
+
+                    b.Navigation("SourceBeehive");
+
+                    b.Navigation("TargetBeehive");
+
+                    b.Navigation("UndoneBy");
                 });
 
             modelBuilder.Entity("Melarium.Domain.Entities.CalendarSettings", b =>

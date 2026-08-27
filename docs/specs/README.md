@@ -36,6 +36,7 @@
 | 16 | [Org Activity & Status](SPEC-16-org-activity-retention.md) | Da li se organizacija *koristi*: heartbeat aktivnosti + izračunat status (Aktivna / Uspavana / Za brisanje) i radne liste za naplatu u admin tabeli, ručni prekidač "Neaktivna" koji blokira prijavu, i popravljeno ručno brisanje organizacije. **Ništa se ne briše automatski** | M | — (extends 09, reuse ADR-021/027) | 🔨 Kolona "Zadnja aktivnost" isporučena (2026-08-17) **bez heartbeata** — izračun iz podataka, ADR-034; status badge, prekidač i brisanje i dalje planirani |
 | 17 | [AI Asistent](SPEC-17-ai-assistant.md) | Glasovna ili tekstualna naredba → AI pokaže šta je razumio → korisnik potvrdi → radnja se izvrši. Sam pronalazi pčelinjak i košnicu, radi više radnji iz jedne rečenice, razgovorom razrješava nejasnoće, i mijenja/briše postojeće zapise uz drugu potvrdu | L | — (reuse 01 Groq stack, 09 paketi) | ✅ Implemented (2026-08-09) — Q&A extended by 18 |
 | 18 | [Spajanje AI Savjetnika u AI Asistenta](SPEC-18-ai-merge.md) | Jedan AI umjesto dva: Asistent sad i odgovara na pitanja (uz kontekst košnice kad je u fokusu), ne samo izvršava naredbe. `/advisor` se gasi, stara historija se migrira, mjesečna kvota se spaja u jednu | M | 01, 17 | 🔨 U implementaciji (2026-08-09) |
+| 19 | [Sastavljanje društava](SPEC-19-colony-merge.md) | Dva društva u jedno: pripojena košnica trajno izlazi iz pčelinjaka (ne briše se), prijemna nosi zapis o primljenom društvu. Bira se koja matica ostaje, zadaci/prehrana/tretmani se uredno zatvaraju, poništavanje u roku od 24h | M | — (dodiruje 03, 08, 09, 12, 17) | ✅ Implemented (2026-08-21) — migracija još nije primijenjena, vidi §12 |
 
 **Recommended order = index order.** Rationale:
 
@@ -107,6 +108,22 @@
   counter, because the quota gate necessarily runs *before* the model call that would reveal whether a turn
   was a question or a command — a single pre-flight number is not just simpler, it is what that ordering
   requires.
+- **SPEC-19** was written 2026-08-21 from Asim's idea, with its product decisions settled one at a time
+  before drafting and listed in §1 — the document is the record, not the place they were made. It is the
+  first spec whose point is to make an existing row **stop being listed** rather than to add a new one, and
+  that is where its whole risk sits: §5 enumerates **thirteen** read sites that must learn the filter, and
+  states why the one-line alternative (an EF global query filter) was rejected — `TreatmentEntry.Beehive`
+  is a required navigation, so EF would silently null it and the legally-retained treatment register would
+  print without hive names. That register is also why this feature exists at all: the only way to remove a
+  hive today, `DELETE /api/beehives/{id}`, cascades into `TreatmentEntry` and destroys a 5-year record.
+  Two decisions must be implemented literally rather than approximately, because both are silent
+  falsifications otherwise. The queen order in §3.2 (`KeptSource` closes the *target's* queen **before**
+  moving the source's) — reversed, it trips the existing "already has an active queen" rule. And feeding is
+  removed **per hive** (`DietService.RemoveBeehiveAsync`), never by stopping the programme: since SPEC-12 a
+  diet is an apiary-level programme, so "close the feeding" for one hive would end it for every other hive
+  on it. Its Phase C (the AI action) goes last deliberately, so the only path that lets a model start an
+  irreversible change reaches production after the service has met real usage — the same ordering SPEC-17
+  used for its own update/delete phase.
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD

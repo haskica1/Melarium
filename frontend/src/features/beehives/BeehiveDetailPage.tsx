@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { CloudOff, Download, Pencil, Plus, QrCode, Sparkles, Thermometer, Trash2 } from 'lucide-react'
+import { CloudOff, Combine, Download, Pencil, Plus, QrCode, Sparkles, Thermometer, Trash2 } from 'lucide-react'
 import { differenceInDays, format, isPast, isToday, parseISO } from 'date-fns'
 import { downloadBeehiveQrPdf } from '../../shared/utils/qrPdf'
 import {
@@ -23,6 +23,8 @@ import { HiveFeedingCard } from '../diets/HiveFeedingCard'
 import { ActiveFeedingBadge } from '../diets/ActiveFeedingBadge'
 import { InspectionPhotoStrip } from '../inspections/InspectionPhotos'
 import { QueenSection } from './QueenSection'
+import { MergeSection } from './MergeSection'
+import { MergeColonyModal } from './MergeColonyModal'
 import { HiveYieldCard } from './HiveYieldCard'
 import { HiveTreatmentCard } from '../treatments/HiveTreatmentCard'
 import { useAuth } from '../../core/context/AuthContext'
@@ -60,6 +62,7 @@ export default function BeehiveDetailPage() {
   const deleteTodo = useDeleteTodo(todoKey)
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: number } | null>(null)
+  const [mergeOpen, setMergeOpen] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
   // Kept as strings so the field can be cleared / retyped freely; clamped to 10–200 mm on blur & export.
   const [qrSize, setQrSize] = useState({ w: '60', h: '60' })
@@ -76,7 +79,10 @@ export default function BeehiveDetailPage() {
   if (!beehive) return null
 
   const hasQr = !!beehive.uniqueId && !!beehive.qrCodeBase64
-  const canManageThisHive = canManageInspections || isAssignedToHive(beehiveId)
+  // A merged-away hive is read-only: its colony no longer exists, so nothing new can be recorded
+  // against it. Its history stays fully readable (SPEC-19 §7.3).
+  const isMerged = !!beehive.mergedIntoBeehiveId
+  const canManageThisHive = !isMerged && (canManageInspections || isAssignedToHive(beehiveId))
 
   // ── Derived "vitals" (computed from already-loaded data — no extra requests) ──
   const inspections = [...(beehive.inspections ?? [])].sort(
@@ -148,7 +154,12 @@ export default function BeehiveDetailPage() {
                   <QrCode className="w-4 h-4" /> <span className="hidden sm:inline">QR kod</span>
                 </button>
               )}
-              {canEditDelete && (
+              {canEditDelete && !isMerged && (
+                <button onClick={() => setMergeOpen(true)} className="btn-secondary text-sm" title="Sastavi društvo" aria-label="Sastavi društvo">
+                  <Combine className="w-4 h-4" /> <span className="hidden sm:inline">Sastavi društvo</span>
+                </button>
+              )}
+              {canEditDelete && !isMerged && (
                 <Link to={`/beehives/${beehiveId}/edit`} className="btn-secondary text-sm" title="Uredi" aria-label="Uredi">
                   <Pencil className="w-4 h-4" /> <span className="hidden sm:inline">Uredi</span>
                 </Link>
@@ -157,6 +168,26 @@ export default function BeehiveDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Merged-away banner (SPEC-19 §7.3) ─────────────────────────────────── */}
+      {isMerged && (
+        <div className="flex items-start gap-2.5 px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700
+                        bg-slate-50 dark:bg-slate-800/60 text-sm text-slate-700 dark:text-slate-300">
+          <Combine className="w-4 h-4 shrink-0 mt-0.5 text-slate-500" />
+          <p>
+            Ova košnica je{' '}
+            {beehive.mergedAt ? <>{format(new Date(beehive.mergedAt), 'dd.MM.yyyy.')} </> : null}
+            sastavljena s košnicom{' '}
+            <Link
+              to={`/beehives/${beehive.mergedIntoBeehiveId}`}
+              className="font-semibold text-honey-700 dark:text-honey-400 hover:underline"
+            >
+              {beehive.mergedIntoBeehiveName ?? 'drugom košnicom'}
+            </Link>
+            . Nije više u pčelinjaku — zapisi ispod su njena historija.
+          </p>
+        </div>
+      )}
 
       {/* ── Vitals strip ──────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 stagger">
@@ -245,8 +276,8 @@ export default function BeehiveDetailPage() {
             todos={todos}
             isLoading={todosLoading}
             beehiveId={beehiveId}
-            canCreate={canManageHiveTodos || isAssignedToHive(beehiveId)}
-            canManage={canManageHiveTodos || isAssignedToHive(beehiveId)}
+            canCreate={!isMerged && (canManageHiveTodos || isAssignedToHive(beehiveId))}
+            canManage={!isMerged && (canManageHiveTodos || isAssignedToHive(beehiveId))}
             onCreate={p => createTodo.mutateAsync(p)}
             onUpdate={(id, p) => updateTodo.mutateAsync({ id, payload: p })}
             onDelete={id => deleteTodo.mutateAsync(id)}
@@ -295,6 +326,9 @@ export default function BeehiveDetailPage() {
           {/* Queen (matica) */}
           <QueenSection beehiveId={beehiveId} canManage={canManageThisHive} />
 
+          {/* Colonies merged into this hive — renders nothing when there are none (SPEC-19) */}
+          <MergeSection beehiveId={beehiveId} />
+
           {/* Honey yield (prinos) */}
           <HiveYieldCard beehiveId={beehiveId} />
 
@@ -306,6 +340,9 @@ export default function BeehiveDetailPage() {
 
         </div>
       </div>
+
+      {/* Merge colony (sastavljanje društava) */}
+      <MergeColonyModal open={mergeOpen} onClose={() => setMergeOpen(false)} source={beehive} />
 
       {/* Delete inspection confirmation */}
       <ConfirmDialog

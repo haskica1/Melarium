@@ -150,6 +150,20 @@ public class BeehivesController : ControllerBase
         return Ok(beehives);
     }
 
+    /// <summary>
+    /// Returns the apiary's archive — hives whose colony was merged into another one (SPEC-19).
+    /// Every other list endpoint excludes these.
+    /// </summary>
+    [HttpGet("merged")]
+    [ProducesResponseType(typeof(IEnumerable<BeehiveDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetMerged([FromQuery] int apiaryId)
+    {
+        var beehives = await _service.GetMergedByApiaryIdAsync(apiaryId);
+        return Ok(beehives);
+    }
+
     /// <summary>Returns the QR codes of the apiary's beehives, for label printing/export.</summary>
     [HttpGet("by-apiary/{apiaryId:int}/qr-codes")]
     [ProducesResponseType(typeof(IEnumerable<BeehiveQrDto>), StatusCodes.Status200OK)]

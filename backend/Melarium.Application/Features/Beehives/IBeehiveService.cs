@@ -5,6 +5,13 @@ namespace Melarium.Application.Features.Beehives;
 public interface IBeehiveService
 {
     Task<IEnumerable<BeehiveDto>> GetByApiaryIdAsync(int apiaryId);
+
+    /// <summary>
+    /// The apiary's archive: hives whose colony was merged into another one (SPEC-19). The only list
+    /// that returns merged hives; everything else filters them out.
+    /// </summary>
+    Task<IEnumerable<BeehiveDto>> GetMergedByApiaryIdAsync(int apiaryId);
+
     Task<BeehiveDetailDto> GetByIdAsync(int id);
     Task<BeehiveDto> CreateAsync(CreateBeehiveDto dto);
     Task<BeehiveDto> UpdateAsync(int id, UpdateBeehiveDto dto);

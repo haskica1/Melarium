@@ -39,6 +39,9 @@ public static class AiTargetResolver
             return ResolveExistingTodo(action, ctx);
         if (action.Kind is AiActionKind.UpdateInspection or AiActionKind.DeleteInspection)
             return ResolveExistingInspection(action, ctx);
+        // SPEC-19: two hives, and the second one is not a target to create against — it is a field.
+        if (action.Kind is AiActionKind.MergeBeehive)
+            return ResolveMerge(action, ctx);
 
         var (apiary, apiaryIssue, apiaryCandidates) = ResolveApiary(action.Apiary, ctx);
 
@@ -126,6 +129,70 @@ public static class AiTargetResolver
             ApiaryCandidates: null,
             HiveCandidates: candidates.Count > 0 ? candidates : null,
             UnresolvedHiveNumbers: unresolved.Count > 0 ? unresolved : null);
+    }
+
+    // ── Colony merge (SPEC-19 §8) ─────────────────────────────────────────────
+
+    /// <summary>
+    /// A merge is the only action with two hives, and they mean opposite things: the resolved target
+    /// is the hive that <i>leaves</i> the apiary, while the receiving hive rides along in the fields.
+    ///
+    /// <para>Three things are refused outright rather than guessed, because each would be
+    /// irreversible if the command were misheard: merging "sve košnice", merging several hives at
+    /// once, and a merge that never named which queen survives.</para>
+    /// </summary>
+    private static AiResolvedAction ResolveMerge(AiProposedAction action, AiResolutionContext ctx)
+    {
+        var (apiary, apiaryIssue, apiaryCandidates) = ResolveApiary(action.Apiary, ctx);
+        if (apiaryIssue != AiResolutionIssue.None && action.Apiary is not null)
+            return new AiResolvedAction(action.Kind, action.Fields, [], apiaryIssue, apiaryCandidates);
+
+        if (action.Hives.All || action.Hives.Numbers.Count > 1)
+            return new AiResolvedAction(action.Kind, action.Fields, [], AiResolutionIssue.MergeSourceAmbiguous);
+
+        // The hive that disappears: named explicitly, or the hive whose page the user is on.
+        var source = ResolveNumberedHives(action, apiary, ctx);
+        if (source.Targets.Count == 0 && action.Hives.Numbers.Count == 0 && ctx.PageBeehiveId is int pageHiveId)
+        {
+            var pageHive = ctx.Hives.FirstOrDefault(h => h.Id == pageHiveId);
+            if (pageHive is not null)
+                source = new AiResolvedAction(action.Kind, action.Fields, [ToTarget(pageHive, ctx)]);
+        }
+
+        if (source.Targets.Count != 1)
+            return source.Targets.Count == 0 && source.Issue == AiResolutionIssue.None
+                ? new AiResolvedAction(action.Kind, action.Fields, [], AiResolutionIssue.MissingHive)
+                : source;
+
+        var sourceTarget = source.Targets[0];
+
+        var receiving = ResolveSingleHive(action.Fields.TargetHive, ctx);
+        if (receiving is null || receiving.Id == sourceTarget.BeehiveId)
+            return new AiResolvedAction(action.Kind, action.Fields, [], AiResolutionIssue.MergeTargetNotFound);
+
+        // Never guessed — SPEC-19 §8. The card comes back with the question instead.
+        if (action.Fields.QueenOutcome is null)
+            return new AiResolvedAction(
+                action.Kind,
+                action.Fields with { TargetBeehiveId = receiving.Id, TargetBeehiveName = receiving.Name },
+                [], AiResolutionIssue.MissingQueenOutcome);
+
+        return new AiResolvedAction(
+            action.Kind,
+            action.Fields with { TargetBeehiveId = receiving.Id, TargetBeehiveName = receiving.Name },
+            [sourceTarget]);
+    }
+
+    /// <summary>One hive by spoken number/name; null when it matches nothing or is ambiguous.</summary>
+    private static HiveRef? ResolveSingleHive(string? spoken, AiResolutionContext ctx)
+    {
+        if (string.IsNullOrWhiteSpace(spoken)) return null;
+
+        var canonical = HiveNumberMatcher.Normalize(spoken);
+        if (canonical is null) return null;
+
+        var matches = ctx.Hives.Where(h => HiveNumberMatcher.Matches(h.LabelNumber, h.Name, canonical)).ToList();
+        return matches.Count == 1 ? matches[0] : null;
     }
 
     // ── No hive named ─────────────────────────────────────────────────────────

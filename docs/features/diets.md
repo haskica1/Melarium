@@ -59,3 +59,17 @@ duration:    required, > 0 (days)
 frequency:   required, > 0 (days between feedings)
 foodType:    required, valid FoodType enum
 ```
+
+## A merged-away hive (SPEC-19)
+
+A colony merge takes the source hive **off the programme** — it sets `DietBeehive.RemovedOn` for that
+hive, exactly as `DietService.RemoveBeehiveAsync` does. It does **not** stop the programme, because
+since SPEC-12 a diet is an apiary-level programme covering a set of hives: stopping it would end the
+feeding for every other hive on it.
+
+The programme itself moves to `StoppedEarly`, with the comment *"Društvo sastavljeno s košnicom X"*,
+only when the merged hive was the **last** one still on it.
+
+The 24-hour merge undo clears `RemovedOn` on the **same row** rather than adding a new membership —
+a fresh row would carry a new `CreatedAt`, which is "when the hive joined the programme" and feeds
+the consumption maths.

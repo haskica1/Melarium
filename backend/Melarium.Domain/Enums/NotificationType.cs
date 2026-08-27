@@ -51,4 +51,8 @@ public enum NotificationType
 
     // ── Treatment application rounds — parity with FeedingOverdue ──
     TreatmentRoundOverdue  = 25,
+
+    // ── Colony merge (SPEC-19 D6) — same audience and reason as BeehiveCreated: the hive count
+    // of an apiary changed, and the person responsible for it did not do it themselves.
+    BeehiveMerged          = 26,
 }

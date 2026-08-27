@@ -1,6 +1,8 @@
 using FluentValidation;
 using Melarium.Application.Common;
 using Melarium.Application.Common.Exceptions;
+using Melarium.Application.Features.BeehiveMerges;
+using Melarium.Application.Features.BeehiveMerges.DTOs;
 using Melarium.Application.Features.Inspections;
 using Melarium.Application.Features.Inspections.DTOs;
 using Melarium.Application.Features.Todos;
@@ -25,29 +27,35 @@ public class AiActionExecutor : IAiActionExecutor
 {
     private readonly IInspectionService _inspections;
     private readonly ITodoService _todos;
+    private readonly IBeehiveMergeService _merges;
     private readonly IValidator<CreateInspectionDto> _inspectionValidator;
     private readonly IValidator<CreateTodoDto> _todoValidator;
     private readonly IValidator<UpdateTodoDto> _todoUpdateValidator;
     private readonly IValidator<UpdateInspectionDto> _inspectionUpdateValidator;
+    private readonly IValidator<CreateBeehiveMergeDto> _mergeValidator;
     private readonly TimeZoneInfo _tz;
     private readonly ILogger<AiActionExecutor> _logger;
 
     public AiActionExecutor(
         IInspectionService inspections,
         ITodoService todos,
+        IBeehiveMergeService merges,
         IValidator<CreateInspectionDto> inspectionValidator,
         IValidator<CreateTodoDto> todoValidator,
         IValidator<UpdateTodoDto> todoUpdateValidator,
         IValidator<UpdateInspectionDto> inspectionUpdateValidator,
+        IValidator<CreateBeehiveMergeDto> mergeValidator,
         IConfiguration config,
         ILogger<AiActionExecutor> logger)
     {
         _inspections = inspections;
         _todos = todos;
+        _merges = merges;
         _inspectionValidator = inspectionValidator;
         _todoValidator = todoValidator;
         _todoUpdateValidator = todoUpdateValidator;
         _inspectionUpdateValidator = inspectionUpdateValidator;
+        _mergeValidator = mergeValidator;
         _tz = AppTimeZone.Resolve(config);
         _logger = logger;
     }
@@ -65,6 +73,7 @@ public class AiActionExecutor : IAiActionExecutor
                 AiActionKind.UpdateInspection => await UpdateInspectionAsync(payload),
                 AiActionKind.DeleteTodo       => await DeleteTodoAsync(payload),
                 AiActionKind.DeleteInspection => await DeleteInspectionAsync(payload),
+                AiActionKind.MergeBeehive     => await MergeBeehiveAsync(payload),
                 _                             => Failed("Ova radnja još nije podržana."),
             };
         }
@@ -220,6 +229,40 @@ public class AiActionExecutor : IAiActionExecutor
         return new AiActionOutcome(true, nameof(Domain.Entities.Inspection), inspectionId, null);
     }
 
+    /// <summary>
+    /// SPEC-19 §8. Calls <see cref="IBeehiveMergeService"/> — the same service the dialog posts to — so
+    /// the access checks on both apiaries, the queen ordering, the todo/diet/treatment handling and the
+    /// undo journal all come along. The queen outcome is never defaulted: the resolver refuses to
+    /// produce a confirmable card without it.
+    /// </summary>
+    private async Task<AiActionOutcome> MergeBeehiveAsync(AiActionPayload payload)
+    {
+        if (payload.BeehiveId is not int sourceId)
+            return Failed("Nije određena košnica koja se pripaja.");
+
+        if (payload.Fields.TargetBeehiveId is not int targetId)
+            return Failed("Nije određena prijemna košnica.");
+
+        if (payload.Fields.QueenOutcome is not MergeQueenOutcome queenOutcome)
+            return Failed("Nije određeno koja matica ostaje nakon sastavljanja.");
+
+        var dto = new CreateBeehiveMergeDto
+        {
+            SourceBeehiveId = sourceId,
+            TargetBeehiveId = targetId,
+            MergedAt        = ToMergeDate(payload.Fields.Date),
+            Reason          = payload.Fields.MergeReason ?? MergeReason.Other,
+            Method          = MergeMethod.Newspaper,
+            QueenOutcome    = queenOutcome,
+            Notes           = payload.Fields.Notes,
+        };
+
+        Validate(_mergeValidator, dto);
+
+        var created = await _merges.MergeAsync(dto);
+        return new AiActionOutcome(true, nameof(Domain.Entities.BeehiveMerge), created.Id, null);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -265,6 +308,19 @@ public class AiActionExecutor : IAiActionExecutor
 
     private static DateTime? UtcMidnight(DateOnly? date) =>
         date is { } d ? UtcMidnight(d) : null;
+
+    /// <summary>
+    /// Same clamp as <see cref="ToInspectionDate"/>, for the same reason: between local midnight and
+    /// 01:00/02:00 today's local midnight is still in the future by UTC, and the merge validator
+    /// rejects future dates. The date goes on to <c>BeehiveMerge.MergedAt</c> and <c>Beehive.MergedAt</c>,
+    /// so it must carry <see cref="DateTimeKind.Utc"/> like every other date this class builds (ADR-037).
+    /// </summary>
+    private DateTime ToMergeDate(DateOnly? date)
+    {
+        var midnight = UtcMidnight(date ?? AppTimeZone.Today(_tz));
+        var now = DateTime.UtcNow;
+        return midnight > now ? now : midnight;
+    }
 
     private static string UserMessage(Exception ex) => ex switch
     {

@@ -5,6 +5,7 @@ using Melarium.Application.Common.Security;
 using Melarium.Application.Common.Services;
 using Melarium.Application.Features.Ai;
 using Melarium.Application.Features.Beehives.DTOs;
+using Melarium.Application.Features.BeehiveMerges;
 using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
@@ -76,6 +77,29 @@ public class BeehiveService : IBeehiveService
         }).ToList();
     }
 
+    /// <summary>
+    /// The archive (SPEC-19). Beekeepers are filtered to their assigned hives exactly as in
+    /// <see cref="GetByApiaryIdAsync"/> — being merged away does not widen what anyone may see.
+    /// </summary>
+    public async Task<IEnumerable<BeehiveDto>> GetMergedByApiaryIdAsync(int apiaryId)
+    {
+        if (!await _uow.Apiaries.ExistsAsync(apiaryId))
+            throw new NotFoundException(nameof(Apiary), apiaryId);
+
+        if (_currentUser.Role != UserRole.Beekeeper)
+            await _access.EnsureCanManageApiaryAsync(apiaryId);
+
+        var beehives = await _uow.Beehives.GetMergedByApiaryIdAsync(apiaryId);
+
+        if (_currentUser.Role == UserRole.Beekeeper)
+        {
+            var assignedIds = await _access.GetAssignedBeehiveIdsAsync();
+            beehives = beehives.Where(b => assignedIds.Contains(b.Id)).ToList();
+        }
+
+        return _mapper.Map<IEnumerable<BeehiveDto>>(beehives).ToList();
+    }
+
     public async Task<BeehiveDetailDto> GetByIdAsync(int id)
     {
         var beehive = await _uow.Beehives.GetWithInspectionsAsync(id)
@@ -83,7 +107,20 @@ public class BeehiveService : IBeehiveService
 
         await _access.EnsureCanAccessBeehiveAsync(id);
 
-        return _mapper.Map<BeehiveDetailDto>(beehive);
+        var dto = _mapper.Map<BeehiveDetailDto>(beehive);
+
+        // The undo window is computed server-side so the client never derives a deadline (SPEC-19 §6).
+        if (beehive.MergedIntoBeehiveId is not null)
+        {
+            var merge = await _uow.BeehiveMerges.GetActiveBySourceAsync(id);
+            if (merge is not null)
+            {
+                dto.MergeId      = merge.Id;
+                dto.CanUndoUntil = MergeUndoPolicy.DeadlineFor(merge, DateTime.UtcNow);
+            }
+        }
+
+        return dto;
     }
 
     public async Task<BeehiveDto> CreateAsync(CreateBeehiveDto dto)
@@ -154,7 +191,16 @@ public class BeehiveService : IBeehiveService
     {
         var beehive = await _uow.Beehives.GetByUniqueIdAsync(uniqueId);
         if (beehive is null) return null;
-        return new BeehiveScanDto { Id = beehive.Id, Name = beehive.Name, ApiaryId = beehive.ApiaryId };
+        return new BeehiveScanDto
+        {
+            Id                    = beehive.Id,
+            Name                  = beehive.Name,
+            ApiaryId              = beehive.ApiaryId,
+            // A merged hive still resolves: its sticker stays on the emptied box (SPEC-19 §1).
+            MergedIntoBeehiveId   = beehive.MergedIntoBeehiveId,
+            MergedIntoBeehiveName = beehive.MergedIntoBeehive?.Name,
+            MergedAt              = beehive.MergedAt,
+        };
     }
 
     public async Task<IEnumerable<BeehiveQrDto>> GetQrCodesByApiaryAsync(int apiaryId)
@@ -165,7 +211,10 @@ public class BeehiveService : IBeehiveService
         if (_currentUser.Role != UserRole.Beekeeper)
             await _access.EnsureCanManageApiaryAsync(apiaryId);
 
-        var beehives = await _uow.Beehives.FindAsync(b => b.ApiaryId == apiaryId);
+        // Merged-away hives are left out — a label for a hive that is no longer in the apiary is
+        // waste, and after SPEC-19 D1 the emptied box gets a new hive with a new code anyway.
+        var beehives = await _uow.Beehives.FindAsync(b =>
+            b.ApiaryId == apiaryId && b.MergedIntoBeehiveId == null);
 
         if (_currentUser.Role == UserRole.Beekeeper)
         {

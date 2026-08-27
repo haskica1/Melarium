@@ -291,3 +291,33 @@ voice-inspection prompt byte-for-byte across the glossary extraction. `PlanGuard
 `EnsureAiInteractionAsync` (Free blocks, quota exhausted blocks, under quota passes, absent key
 unlimited, SystemAdmin bypass) — closing a gap where the assistant's own gate previously had no direct
 test, only a mocked `IPlanGuard` in `AiAssistantServiceTests`. 552/552 backend tests green.
+
+## MergeBeehive — sastavljanje društava (SPEC-19 §8)
+
+`AiActionKind.MergeBeehive` lets a spoken command unite two colonies: *"sastavi košnicu 5 sa
+košnicom 3"*. `IsDestructive` is **true**, so it needs the second confirmation — it takes a hive out
+of the apiary for good, which is further than any delete the assistant offers, and the 24-hour undo
+is a safety net for a misclick rather than a reason to ask less.
+
+It is the only action with **two** hives, and they mean opposite things. The source (the hive that
+*leaves*) resolves as the normal target; the receiving hive rides in
+`AiActionFields.TargetBeehiveId` / `TargetBeehiveName`, resolved from the model's spoken
+`targetHive`. Both are searched only within `IAccessGuard`'s accessible set, so an out-of-scope hive
+is unresolvable rather than merely forbidden — and `BeehiveMergeService` re-checks both apiaries at
+execution time, since the card is editable (SPEC-17 §5.3).
+
+`AiTargetResolver.ResolveMerge` refuses three things outright rather than guessing, because each
+would be irreversible on a misheard command:
+
+| Refused | Issue |
+|---|---|
+| `"sve košnice"`, or more than one source hive | `MergeSourceAmbiguous` |
+| No receiving hive named, or it matched nothing / itself | `MergeTargetNotFound` |
+| Which queen survives was not stated | `MissingQueenOutcome` |
+
+The last one is the important one: **the queen is never defaulted.** Reason and method may fall back
+(`Other` / `Newspaper`), the queen may not — it is the one irreversible choice in the action, so the
+card comes back with the question and the executor refuses a payload without it.
+
+The executor calls `IBeehiveMergeService.MergeAsync` — the same service the dialog posts to — and
+runs `CreateBeehiveMergeValidator` itself (SPEC-17 §5.1/§5.2).

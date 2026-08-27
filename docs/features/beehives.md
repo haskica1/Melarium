@@ -44,3 +44,17 @@ BeehiveMaterial: Wood | Plastic | Polystyrene
 - `BeehiveDetailDto` includes `InspectionDto[]` — ordered newest first by service layer
 - `QrCodeService` uses `QRCoder` library, outputs 300×300 PNG
 - `uniqueId` is exposed in the DTO for use in QR scanning flows
+
+## Colony merge (SPEC-19)
+
+A hive can leave the apiary without being deleted: `Beehive.MergedIntoBeehiveId` + `MergedAt` mark it
+as merged away, and every hive **list** filters it out while every single-hive lookup still finds it.
+Full behaviour in [colony-merge.md](colony-merge.md).
+
+Two consequences for this feature specifically:
+
+- **`DELETE /beehives/{id}` is no longer the way to remove a hive from an apiary.** It still cascades
+  into `TreatmentEntry` and destroys a legally retained record; merging is the correct action, and
+  deletion is now only for a hive created by mistake.
+- **Merged hives do not count toward `MaxBeehives`.** `CountByOrganizationAsync`,
+  `Apiary.BeehiveCount` and the admin table's per-org count all exclude them.

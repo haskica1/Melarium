@@ -27,6 +27,17 @@ public class Beehive : BaseEntity
     /// <summary>PNG QR code image stored as a Base64 string. Generated once on creation.</summary>
     public string? QrCodeBase64 { get; set; }
 
+    /// <summary>
+    /// Set when this hive's colony was merged into another hive (SPEC-19). Non-null means the hive is
+    /// out of the apiary for good (D1) — it disappears from every hive list and stops counting toward
+    /// the plan limit, but the row and all its history stay readable by id.
+    /// </summary>
+    public int? MergedIntoBeehiveId { get; set; }
+    public Beehive? MergedIntoBeehive { get; set; }
+
+    /// <summary>The day the merge happened. Null whenever <see cref="MergedIntoBeehiveId"/> is null.</summary>
+    public DateTime? MergedAt { get; set; }
+
     public int? CreatedById { get; set; }
     public User? CreatedBy { get; set; }
 

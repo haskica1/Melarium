@@ -17,4 +17,8 @@ public enum AiActionKind
     UpdateInspection = 5,
     DeleteTodo       = 6,
     DeleteInspection = 7,
+
+    // ── SPEC-19 D5 — sastavljanje društava. Destructive: it takes a hive out of the apiary for
+    // good, so it requires the second confirmation like the kinds above. ──
+    MergeBeehive     = 8,
 }

@@ -9,6 +9,7 @@ public interface IUnitOfWork : IDisposable
     IUserRepository Users { get; }
     IApiaryRepository Apiaries { get; }
     IBeehiveRepository Beehives { get; }
+    IBeehiveMergeRepository BeehiveMerges { get; }
     IInspectionRepository Inspections { get; }
     IInspectionPhotoRepository InspectionPhotos { get; }
     IQueenRepository Queens { get; }

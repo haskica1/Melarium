@@ -50,6 +50,17 @@ public class BeehiveConfiguration : IEntityTypeConfiguration<Beehive>
         // Diets are apiary-scoped (SPEC-12) — a hive reaches them through DietBeehive, configured
         // there, so there is no direct Beehive → Diet relationship any more.
 
+        // Colony merge (SPEC-19). Restrict, not cascade: deleting the receiving hive must not take
+        // the merged-away hive's rows with it — that hive is the one carrying the retained history.
+        builder.HasOne(b => b.MergedIntoBeehive)
+            .WithMany()
+            .HasForeignKey(b => b.MergedIntoBeehiveId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        // Every hive list filters on this column (SPEC-19 §5), so it is worth an index.
+        builder.HasIndex(b => b.MergedIntoBeehiveId);
+
         builder.ToTable("Beehives");
     }
 }

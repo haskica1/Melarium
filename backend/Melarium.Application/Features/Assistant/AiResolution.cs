@@ -84,6 +84,15 @@ public enum AiResolutionIssue
 
     /// <summary>Phase C: more than one inspection matches (same hive, same date).</summary>
     InspectionAmbiguous,
+
+    /// <summary>SPEC-19: the receiving hive of a merge was not named, or matched nothing reachable.</summary>
+    MergeTargetNotFound,
+
+    /// <summary>SPEC-19: the merge names more than one hive to merge away, or "sve košnice".</summary>
+    MergeSourceAmbiguous,
+
+    /// <summary>SPEC-19: which queen survives was not stated, and it is never guessed.</summary>
+    MissingQueenOutcome,
 }
 
 /// <summary>

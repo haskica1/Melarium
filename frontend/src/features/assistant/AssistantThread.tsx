@@ -15,7 +15,7 @@ import { useApiaries, useAllBeehives } from '../../core/services/queries'
 import { plural } from '../../shared/utils/plural'
 import { MarkdownMessage, Modal } from '../../shared/components'
 import type { AssistantAction, AssistantSessionDetail, AssistantTurn } from '../../core/models'
-import { DeletePreview, ProposalCard, UpdateSummary, isDeleteKind, isDraftComplete, type ProposalDraft } from './ProposalCard'
+import { DeletePreview, MergePreview, ProposalCard, UpdateSummary, isDeleteKind, isDraftComplete, type ProposalDraft } from './ProposalCard'
 
 interface AssistantThreadProps {
   /** Page the user is on — fills gaps in the command, never overrides a spoken name. */
@@ -368,7 +368,9 @@ export function AssistantThread({
         <div className="space-y-2">
           {destructiveSelected.map(a => (
             <div key={a.id}>
-              {isDeleteKind(a.kind) ? <DeletePreview action={a} /> : <UpdateSummary action={a} />}
+              {a.kind === 'MergeBeehive' ? <MergePreview action={a} />
+                : isDeleteKind(a.kind) ? <DeletePreview action={a} />
+                : <UpdateSummary action={a} />}
             </div>
           ))}
         </div>

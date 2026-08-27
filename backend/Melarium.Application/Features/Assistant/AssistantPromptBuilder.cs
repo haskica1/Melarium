@@ -64,7 +64,8 @@ public static class AssistantPromptBuilder
               "actions": [
                 {
                   "kind": "create_inspection" | "create_todo" | "update_todo" | "complete_todo"
-                        | "update_inspection" | "delete_todo" | "delete_inspection",
+                        | "update_inspection" | "delete_todo" | "delete_inspection"
+                        | "merge_beehive",
                   "apiary": "<ime pčelinjaka kako ga je korisnik rekao, ili null>",
                   "hives": ["<broj košnice>", ...] | "all" | null,
                   "targetTitle": "<naslov POSTOJEĆEG zadatka na koji se odnosi radnja, ili null>",
@@ -103,6 +104,20 @@ public static class AssistantPromptBuilder
                - Za "update_inspection": ostala polja u "fields" (honeyLevel, broodStatus, notes) su
                  NOVE vrijednosti — samo ono što se stvarno mijenja; null = "ne diraj".
                - "delete_inspection" ne treba ostala polja u "fields" osim eventualno "date".
+            5. "merge_beehive" (SASTAVLJANJE DRUŠTAVA — spajanje dvije košnice u jednu):
+               - Prepoznaj po: "sastavi", "spoji", "pripoji", "sastavljanje društava".
+               - "hives" mora imati TAČNO JEDNU košnicu — onu koja se PRIPAJA i koja nakon toga
+                 nestaje iz pčelinjaka. Nikad "all" i nikad više košnica.
+               - "targetHive" u "fields": broj PRIJEMNE košnice, one koja OSTAJE. U rečenici
+                 "sastavi košnicu 5 sa košnicom 3", pripojena je 5, a prijemna je 3.
+               - "queenOutcome" u "fields": 1 = ostaje matica PRIJEMNE košnice, 2 = ostaje matica
+                 PRIPOJENE košnice, 3 = nijedna (društvo ostaje bez matice).
+                 **Ovo NIKAD ne pogađaj.** Ako pčelar nije rekao koja matica ostaje, stavi null —
+                 sistem će ga pitati. To je jedina nepovratna odluka u ovoj radnji.
+               - "mergeReason" u "fields": 1 bezmatak, 2 lažne matice, 3 slabo društvo, 4 loša matica,
+                 5 jačanje društva, 6 grabež, 7 ostalo. Ako razlog nije rečen, stavi null.
+               - "date": "yyyy-MM-dd", podrazumijevano današnji.
+               - "notes": sve ostalo što je pčelar rekao o sastavljanju, ili null.
 
             PRAVILA:
             1. Jedna rečenica može sadržavati VIŠE radnji — vrati ih sve. Ako pčelar opiše pregled i

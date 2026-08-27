@@ -128,7 +128,36 @@ public static class BsLabels
         QueenStatus.Replaced => "Zamijenjena",
         QueenStatus.Died     => "Uginula",
         QueenStatus.Missing  => "Nestala",
+        QueenStatus.Removed  => "Uklonjena",
         _                    => s.ToString(),
+    };
+
+    public static string Label(MergeReason r) => r switch
+    {
+        MergeReason.Queenless     => "Bezmatak",
+        MergeReason.LayingWorkers => "Lažne matice",
+        MergeReason.WeakColony    => "Slabo društvo",
+        MergeReason.PoorQueen     => "Loša matica",
+        MergeReason.Consolidation => "Jačanje društva",
+        MergeReason.Robbing       => "Grabež",
+        MergeReason.Other         => "Ostalo",
+        _                         => r.ToString(),
+    };
+
+    public static string Label(MergeMethod m) => m switch
+    {
+        MergeMethod.Newspaper => "Preko novinskog papira",
+        MergeMethod.Direct    => "Direktno",
+        MergeMethod.Other     => "Ostalo",
+        _                     => m.ToString(),
+    };
+
+    public static string Label(MergeQueenOutcome o) => o switch
+    {
+        MergeQueenOutcome.KeptTarget => "Ostala matica prijemne košnice",
+        MergeQueenOutcome.KeptSource => "Ostala matica pripojene košnice",
+        MergeQueenOutcome.None       => "Nijedna — društvo bez matice",
+        _                            => o.ToString(),
     };
 
     public static string Label(BeehiveMaterial m) => m switch
@@ -256,6 +285,7 @@ public static class BsLabels
         AiActionKind.UpdateInspection => "Izmjena pregleda",
         AiActionKind.DeleteTodo       => "Brisanje zadatka",
         AiActionKind.DeleteInspection => "Brisanje pregleda",
+        AiActionKind.MergeBeehive     => "Sastavljanje društava",
         _                             => k.ToString(),
     };
 

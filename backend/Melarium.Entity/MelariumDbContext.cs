@@ -18,6 +18,7 @@ public class MelariumDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Apiary> Apiaries => Set<Apiary>();
     public DbSet<Beehive> Beehives => Set<Beehive>();
+    public DbSet<BeehiveMerge> BeehiveMerges => Set<BeehiveMerge>();
     public DbSet<UserBeehive> UserBeehives => Set<UserBeehive>();
     public DbSet<Inspection> Inspections => Set<Inspection>();
     public DbSet<InspectionPhoto> InspectionPhotos => Set<InspectionPhoto>();

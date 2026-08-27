@@ -10,7 +10,9 @@ public class ApiaryRepository : Repository<Apiary>, IApiaryRepository
 
     public async Task<Apiary?> GetWithBeehivesAsync(int id) =>
         await _context.Apiaries
-            .Include(a => a.Beehives)
+            // Filtered include: merged-away hives are out of the apiary (SPEC-19 §5). This feeds
+            // ApiaryDetailDto.Beehives — the hive list on the apiary page — and its BeehiveCount.
+            .Include(a => a.Beehives.Where(b => b.MergedIntoBeehiveId == null))
             .Include(a => a.CreatedBy)
             .FirstOrDefaultAsync(a => a.Id == id);
 
@@ -27,7 +29,13 @@ public class ApiaryRepository : Repository<Apiary>, IApiaryRepository
             .AsNoTracking()
             .Where(a => a.OrganizationId == organizationId)
             .OrderBy(a => a.Name)
-            .Select(a => new { Apiary = a, a.CreatedBy, BeehiveCount = a.Beehives.Count })
+            .Select(a => new
+            {
+                Apiary = a,
+                a.CreatedBy,
+                // Merged-away hives are out of the apiary (SPEC-19 §5 #10).
+                BeehiveCount = a.Beehives.Count(b => b.MergedIntoBeehiveId == null),
+            })
             .ToListAsync();
 
         return rows.Select(r =>

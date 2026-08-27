@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
@@ -192,5 +193,38 @@ public class AccessGuardTests
         var ids = await guard.GetAssignedBeehiveIdsAsync();
 
         Assert.Equal(new HashSet<int> { 10, 11 }, ids);
+    }
+
+    // ── Merged hives are invisible (SPEC-19 §5) ────────────────────────────────
+
+    [Fact]
+    public async Task GetAccessibleBeehives_SystemAdmin_AsksForActiveHivesOnly()
+    {
+        var guard = CreateGuard(UserRole.SystemAdmin);
+        _uow.Beehives.GetAllActiveAsync().Returns([new Beehive { Id = 10 }]);
+
+        var hives = await guard.GetAccessibleBeehivesAsync();
+
+        // GetAllAsync would include hives that left their apiary; the active-only method must be used.
+        Assert.Single(hives);
+        await _uow.Beehives.DidNotReceive().GetAllAsync();
+        await _uow.Beehives.Received(1).GetAllActiveAsync();
+    }
+
+    [Fact]
+    public async Task GetAccessibleBeehives_Beekeeper_FiltersOutMergedHives()
+    {
+        var guard = CreateGuard(UserRole.Beekeeper, organizationId: 7);
+        _uow.Users.GetAssignedBeehiveIdsAsync(1).Returns([10, 11]);
+
+        Expression<Func<Beehive, bool>>? captured = null;
+        _uow.Beehives.FindAsync(Arg.Do<Expression<Func<Beehive, bool>>>(p => captured = p)).Returns([]);
+
+        await guard.GetAccessibleBeehivesAsync();
+
+        var predicate = Assert.IsAssignableFrom<Expression<Func<Beehive, bool>>>(captured).Compile();
+        Assert.True(predicate(new Beehive { Id = 10 }));
+        Assert.False(predicate(new Beehive { Id = 11, MergedIntoBeehiveId = 20 }));
+        Assert.False(predicate(new Beehive { Id = 12 })); // not assigned
     }
 }

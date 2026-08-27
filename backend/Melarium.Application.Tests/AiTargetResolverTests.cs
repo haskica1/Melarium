@@ -579,4 +579,97 @@ public class AiTargetResolverTests
         Assert.Equal("Matica uočena", target.PreviousFields?.BroodStatus);
         Assert.Equal("napomena", target.PreviousFields?.Notes);
     }
+
+    // ── Colony merge (SPEC-19 §8) ────────────────────────────────────────────
+
+    private static AiProposedAction MergeAction(
+        AiHiveSelector hives,
+        string? targetHive = "2",
+        MergeQueenOutcome? queen = MergeQueenOutcome.KeptTarget) =>
+        new(AiActionKind.MergeBeehive, null, hives,
+            new AiActionFields(TargetHive: targetHive, QueenOutcome: queen));
+
+    [Fact]
+    public void Merge_resolves_the_source_hive_as_the_target_and_the_receiving_hive_into_fields()
+    {
+        var result = AiTargetResolver.Resolve(Envelope(MergeAction(Numbers("1"), targetHive: "2")), Context());
+
+        var action = result.Actions[0];
+        var target = Assert.Single(action.Targets);
+
+        // The resolved target is the hive that LEAVES; the receiving hive rides along in the fields.
+        Assert.Equal(10, target.BeehiveId);
+        Assert.Equal(11, action.Fields.TargetBeehiveId);
+        Assert.Equal("Košnica 2", action.Fields.TargetBeehiveName);
+        Assert.Equal(AiResolutionIssue.None, action.Issue);
+    }
+
+    [Fact]
+    public void Merge_refuses_all_hives()
+    {
+        var result = AiTargetResolver.Resolve(Envelope(MergeAction(All)), Context());
+
+        // Merging every hive into one on a misheard command would be unrecoverable.
+        Assert.Equal(AiResolutionIssue.MergeSourceAmbiguous, result.Actions[0].Issue);
+        Assert.Empty(result.Actions[0].Targets);
+    }
+
+    [Fact]
+    public void Merge_refuses_more_than_one_source_hive()
+    {
+        var result = AiTargetResolver.Resolve(Envelope(MergeAction(Numbers("1", "2"))), Context());
+
+        Assert.Equal(AiResolutionIssue.MergeSourceAmbiguous, result.Actions[0].Issue);
+    }
+
+    [Fact]
+    public void Merge_without_a_receiving_hive_reports_it()
+    {
+        var result = AiTargetResolver.Resolve(Envelope(MergeAction(Numbers("1"), targetHive: null)), Context());
+
+        Assert.Equal(AiResolutionIssue.MergeTargetNotFound, result.Actions[0].Issue);
+        Assert.Empty(result.Actions[0].Targets);
+    }
+
+    [Fact]
+    public void Merge_into_the_same_hive_reports_it()
+    {
+        var result = AiTargetResolver.Resolve(Envelope(MergeAction(Numbers("1"), targetHive: "1")), Context());
+
+        Assert.Equal(AiResolutionIssue.MergeTargetNotFound, result.Actions[0].Issue);
+    }
+
+    [Fact]
+    public void Merge_never_guesses_the_queen()
+    {
+        var result = AiTargetResolver.Resolve(Envelope(MergeAction(Numbers("1"), queen: null)), Context());
+
+        var action = result.Actions[0];
+        Assert.Equal(AiResolutionIssue.MissingQueenOutcome, action.Issue);
+        Assert.Empty(action.Targets);
+        // The receiving hive is still carried, so answering the question does not re-do the work.
+        Assert.Equal(11, action.Fields.TargetBeehiveId);
+    }
+
+    [Fact]
+    public void Merge_falls_back_to_the_hive_page_for_the_source()
+    {
+        var result = AiTargetResolver.Resolve(
+            Envelope(MergeAction(NoHives, targetHive: "2")),
+            Context(pageBeehiveId: 10));
+
+        var target = Assert.Single(result.Actions[0].Targets);
+        Assert.Equal(10, target.BeehiveId);
+    }
+
+    [Fact]
+    public void Merge_cannot_reach_a_hive_outside_the_callers_scope()
+    {
+        // Only hive 10 is accessible; "2" is not in the context at all.
+        var result = AiTargetResolver.Resolve(
+            Envelope(MergeAction(Numbers("1"), targetHive: "2")),
+            Context(hives: [new HiveRef(10, "Košnica 1", "1", 1)]));
+
+        Assert.Equal(AiResolutionIssue.MergeTargetNotFound, result.Actions[0].Issue);
+    }
 }

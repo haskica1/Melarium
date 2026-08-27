@@ -84,3 +84,17 @@ notes:           optional, max 500 chars
 (first queen active + derived color, atomic replace in one save, double-active rejection,
 end-date defaulting, access-guard enforcement, not-found paths, edit-log rows written on change
 and skipped when nothing changed).
+
+## Removed queens (SPEC-19)
+
+`QueenStatus.Removed` ("Uklonjena") is set when a colony merge does not keep a queen — she was
+physically removed by the beekeeper, which is neither "Uginula" nor "Nestala", and "Zamijenjena"
+would lie when *both* queens of a merge are removed and the united colony is left queenless.
+
+A merge writes it directly (via `_uow`, see ADR-039), appending a line to the queen's `Notes`
+recording which two hives were involved. `MergeQueenOutcome.KeptSource` additionally **moves** the
+surviving queen's `BeehiveId` to the receiving hive — the only place in the app where a queen changes
+hive. The target's queen is closed *first*, because `QueenService.UpdateAsync` refuses a hive that
+already holds an Active queen.
+
+The 24-hour merge undo restores `Status`, `EndDate`, `BeehiveId` and `Notes` from the undo journal.

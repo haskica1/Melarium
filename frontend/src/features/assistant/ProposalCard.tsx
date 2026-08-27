@@ -1,8 +1,11 @@
-import { AlertTriangle, CheckCircle2, ClipboardList, Leaf, Pencil, Trash2, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ClipboardList, Combine, Leaf, Pencil, Trash2, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import {
   HoneyLevel,
   HoneyLevelLabels,
+  MergeQueenOutcomeLabels,
+  MergeReason,
+  MergeReasonLabels,
   TodoPriority,
   TodoPriorityLabels,
   type Apiary,
@@ -11,6 +14,7 @@ import {
   type AssistantFields,
   type AssistantIssue,
   type Beehive,
+  type MergeQueenOutcome,
 } from '../../core/models'
 
 /** What the card holds while the user edits it, before confirmation. */
@@ -62,6 +66,9 @@ export function issueMessage(issue: AssistantIssue, unresolved: string[]): strin
     case 'TodoAmbiguous':         return 'Više zadataka odgovara tom naslovu — recite preciznije (npr. uz pčelinjak).'
     case 'InspectionNotFound':    return 'Nisam pronašao taj pregled.'
     case 'InspectionAmbiguous':   return 'Više pregleda odgovara tom datumu.'
+    case 'MergeTargetNotFound':   return 'Nisam prepoznao prijemnu košnicu — odaberite je ispod.'
+    case 'MergeSourceAmbiguous':  return 'Sastavlja se jedna po jedna košnica — recite koju pripajate.'
+    case 'MissingQueenOutcome':   return 'Nije rečeno koja matica ostaje — odaberite ispod.'
     default:                      return null
   }
 }
@@ -74,6 +81,13 @@ export function issueMessage(issue: AssistantIssue, unresolved: string[]): strin
 export function isDraftComplete(action: AssistantAction, draft: ProposalDraft): boolean {
   if (isExistingRecordKind(action.kind)) return action.issue === 'None'
   if (action.kind === 'CreateInspection') return draft.beehiveId != null
+  // A merge needs both hives and, above all, the queen — which the server refuses to default.
+  if (action.kind === 'MergeBeehive') {
+    return draft.beehiveId != null
+      && draft.fields.targetBeehiveId != null
+      && draft.fields.targetBeehiveId !== draft.beehiveId
+      && draft.fields.queenOutcome != null
+  }
   return (draft.beehiveId != null || draft.apiaryId != null) && !!draft.fields.title?.trim()
 }
 
@@ -81,6 +95,7 @@ export function ProposalCard({
   action, draft, checked, disabled, apiaries, beehives, onToggle, onChange,
 }: ProposalCardProps) {
   const isInspection = action.kind === 'CreateInspection' || action.kind === 'UpdateInspection'
+  const isMerge = action.kind === 'MergeBeehive'
   const isExisting = isExistingRecordKind(action.kind)
   const settled = action.status !== 'Pending'
   const complete = isDraftComplete(action, draft)
@@ -207,7 +222,8 @@ export function ProposalCard({
 
                 <label className="text-xs">
                   <span className="block text-gray-500 dark:text-slate-400 mb-1">
-                    Košnica {isInspection && <span className="text-red-500">*</span>}
+                    {isMerge ? 'Pripojena košnica' : 'Košnica'}{' '}
+                    {(isInspection || isMerge) && <span className="text-red-500">*</span>}
                   </span>
                   <select
                     className="form-input py-1.5 text-sm"
@@ -215,13 +231,20 @@ export function ProposalCard({
                     disabled={disabled}
                     onChange={e => selectHive(e.target.value)}
                   >
-                    <option value="">{isInspection ? '— odaberite —' : '— cijeli pčelinjak —'}</option>
+                    <option value="">{isInspection || isMerge ? '— odaberite —' : '— cijeli pčelinjak —'}</option>
                     {hiveOptions.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </label>
               </div>
 
-              {isInspection ? (
+              {isMerge ? (
+                <MergeFields
+                  draft={draft}
+                  beehives={beehives}
+                  disabled={disabled}
+                  setField={setField}
+                />
+              ) : isInspection ? (
                 <>
                   <div className="grid grid-cols-2 gap-2">
                     <label className="text-xs">
@@ -332,7 +355,137 @@ function ActionIcon({ kind }: { kind: AssistantActionKind }) {
   if (isDeleteKind(kind)) return <Trash2 className="w-4 h-4" />
   if (kind === 'UpdateTodo' || kind === 'UpdateInspection') return <Pencil className="w-4 h-4" />
   if (kind === 'CompleteTodo') return <CheckCircle2 className="w-4 h-4" />
+  if (kind === 'MergeBeehive') return <Combine className="w-4 h-4" />
   return kind === 'CreateInspection' ? <ClipboardList className="w-4 h-4" /> : <Leaf className="w-4 h-4" />
+}
+
+// Numeric enums on the wire (the API takes no string enums), so the option values are numbers and
+// every read back off a <select> goes through Number().
+const QUEEN_OUTCOMES = Object.entries(MergeQueenOutcomeLabels).map(([value, label]) => ({
+  value: Number(value) as MergeQueenOutcome,
+  label,
+}))
+
+const MERGE_REASONS = Object.entries(MergeReasonLabels).map(([value, label]) => ({
+  value: Number(value) as MergeReason,
+  label,
+}))
+
+/**
+ * The merge-specific half of the card (SPEC-19 §8). The receiving hive and the queen are separate
+ * from the standard target selects above, which pick the hive that <i>leaves</i> the apiary.
+ *
+ * The queen select has no pre-selected value on purpose: leaving it blank is what keeps the card
+ * unconfirmable until a human states the one irreversible choice.
+ */
+function MergeFields({
+  draft, beehives, disabled, setField,
+}: {
+  draft: ProposalDraft
+  beehives: { id: number; name: string; apiaryId: number }[]
+  disabled?: boolean
+  setField: (patch: Partial<AssistantFields>) => void
+}) {
+  const targetOptions = beehives.filter(b => b.id !== draft.beehiveId)
+  const known = draft.fields.targetBeehiveId != null
+    && !targetOptions.some(b => b.id === draft.fields.targetBeehiveId)
+  const options = known
+    ? [{
+        id: draft.fields.targetBeehiveId!,
+        name: draft.fields.targetBeehiveName ?? `Košnica #${draft.fields.targetBeehiveId}`,
+        apiaryId: 0,
+      }, ...targetOptions]
+    : targetOptions
+
+  return (
+    <>
+      <label className="block text-xs">
+        <span className="block text-gray-500 dark:text-slate-400 mb-1">
+          Prijemna košnica <span className="text-red-500">*</span>
+        </span>
+        <select
+          className="form-input py-1.5 text-sm"
+          value={draft.fields.targetBeehiveId ?? ''}
+          disabled={disabled}
+          onChange={e => {
+            const id = e.target.value ? Number(e.target.value) : null
+            setField({
+              targetBeehiveId: id,
+              targetBeehiveName: options.find(b => b.id === id)?.name ?? null,
+            })
+          }}
+        >
+          <option value="">— odaberite —</option>
+          {options.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+      </label>
+
+      <label className="block text-xs">
+        <span className="block text-gray-500 dark:text-slate-400 mb-1">
+          Matica <span className="text-red-500">*</span>
+        </span>
+        <select
+          className="form-input py-1.5 text-sm"
+          value={draft.fields.queenOutcome ?? ''}
+          disabled={disabled}
+          onChange={e => setField({ queenOutcome: e.target.value ? Number(e.target.value) as MergeQueenOutcome : null })}
+        >
+          <option value="">— odaberite —</option>
+          {QUEEN_OUTCOMES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+      </label>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="text-xs">
+          <span className="block text-gray-500 dark:text-slate-400 mb-1">Datum</span>
+          <input
+            type="date"
+            className="form-input py-1.5 text-sm"
+            max={format(new Date(), 'yyyy-MM-dd')}
+            value={draft.fields.date ?? ''}
+            disabled={disabled}
+            onChange={e => setField({ date: e.target.value || null })}
+          />
+        </label>
+        <label className="text-xs">
+          <span className="block text-gray-500 dark:text-slate-400 mb-1">Razlog</span>
+          <select
+            className="form-input py-1.5 text-sm"
+            value={draft.fields.mergeReason ?? MergeReason.Other}
+            disabled={disabled}
+            onChange={e => setField({ mergeReason: Number(e.target.value) as MergeReason })}
+          >
+            {MERGE_REASONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </label>
+      </div>
+    </>
+  )
+}
+
+/**
+ * The merge's entry in the second-confirmation modal. Read-only, and deliberately spells out that
+ * the hive leaves the apiary — that is the part a "Sastavljanje društava" label does not convey.
+ */
+export function MergePreview({ action }: { action: AssistantAction }) {
+  const f = action.fields
+  const queen = QUEEN_OUTCOMES.find(o => o.value === f.queenOutcome)?.label
+
+  return (
+    <div className="rounded-xl border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-2.5 space-y-1.5">
+      <p className="text-xs font-medium text-red-700 dark:text-red-400">
+        Košnica {action.beehiveName ?? action.targetSummary} izlazi iz pčelinjaka
+      </p>
+      <p className="text-xs text-gray-700 dark:text-slate-300">
+        Društvo prelazi u košnicu <strong>{f.targetBeehiveName ?? '—'}</strong>.
+        {queen ? ` ${queen}.` : ''}
+      </p>
+      <p className="text-xs text-gray-500 dark:text-slate-400">
+        Otvoreni zadaci se brišu, košnica se skida s prehrane, a učešće u tretmanima u toku se prekida.
+        Poništiti se može unutar 24 sata.
+      </p>
+    </div>
+  )
 }
 
 /**

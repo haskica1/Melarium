@@ -93,3 +93,19 @@ and boundary days. `TreatmentServiceTests` — foreign-hive create → `Validati
 saved); duplicate hive → 400 (validator); Beekeeper list filtered to treatments containing assigned
 hives, read-only; Beekeeper with no assignments → empty. `HiveContextBuilderTests` (renamed from
 `AdvisorContextBuilderTests` by SPEC-18) — treatment line rendering (U toku + Karenca do …).
+
+## A merged-away hive (SPEC-19)
+
+When a hive's colony is merged into another one, its `TreatmentEntry` rows on **in-progress**
+treatments (`endDate == null`) get a line appended to `DoseNote`:
+*"Prekinuto 12.09.2026. — društvo sastavljeno s košnicom 3."*
+
+The row is **never deleted** — the 5-year retention duty applies to a hive that left the apiary
+exactly as it does to one that stayed. `DoseNote` is not among the PDF register's columns (it prints
+only the hive count and names), so the legal artifact is byte-for-byte what it was; the note is
+visible in the treatment detail, where a beekeeper would look for it.
+
+Finished treatments are not touched. The merge's 24-hour undo restores the previous `DoseNote`.
+
+Merged hives disappear from the hive pickers on the treatment form, but keep appearing in the
+register and in `hiveNames` — filtering them out of an existing record would falsify it.

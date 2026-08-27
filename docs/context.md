@@ -91,6 +91,24 @@
 - Public scan flow: `GET /api/beehives/scan/{uniqueId}` (anonymous) + `/scan/:uniqueId` route + in-app QR scanner (`@zxing`)
 - `POST /api/beehives/regenerate-qr-codes` (SystemAdmin) regenerates all QR codes after a frontend URL change
 
+### Colony merge — sastavljanje društava (SPEC-19)
+- `POST /api/beehive-merges` unites two colonies: the **source** hive leaves the apiary permanently
+  (`Beehive.MergedIntoBeehiveId`), the **target** keeps a `BeehiveMerge` record. Nothing is deleted —
+  `DELETE /api/beehives/{id}` would cascade into the legally retained `TreatmentEntry` rows
+- Which queen survives is **chosen** (`KeptTarget` / `KeptSource` / `None`), never assumed; `KeptSource`
+  closes the target's queen *before* moving the source's over
+- Open hive todos are deleted, the hive comes off its feeding programmes (`DietBeehive.RemovedOn` —
+  the programme itself only stops when this was its last hive), in-progress treatment entries get a
+  note appended and are never removed. One `SaveChangesAsync()` for all of it
+- **24-hour undo** (`POST /beehive-merges/{id}/undo`) restores everything from `UndoJournalJson`;
+  `canUndoUntil` is computed server-side
+- Merged hives are filtered out of 13 read sites (SPEC-19 §5) — incl. `AccessGuard.GetAccessibleBeehivesAsync`,
+  the plan-limit count and `Apiary.BeehiveCount` — but stay reachable by id, by direct link and by QR scan
+- Cross-apiary merges allowed (both apiaries must be manageable, same organization); archive at
+  `GET /api/beehives/merged?apiaryId=`
+- AI Asistent can do it by command (`AiActionKind.MergeBeehive`, `isDestructive: true`); the model
+  never guesses the queen
+
 ### Inspections
 - Full CRUD via `/api/inspections`; temperature auto-filled from the apiary's current weather (best-effort)
 - **Voice input**: `POST /api/inspections/parse-voice` — audio → Groq Whisper large-v3 transcription (BCS)

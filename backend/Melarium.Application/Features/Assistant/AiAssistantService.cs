@@ -591,6 +591,12 @@ public class AiAssistantService : IAiAssistantService
         return "Nije određeno";
     }
 
+    /// <summary>
+    /// Merges the card's edits over what was proposed. Everything here is untrusted (SPEC-17 §5.3) —
+    /// including <c>TargetBeehiveId</c>, which the merge card lets the user re-pick:
+    /// <c>BeehiveMergeService</c> re-checks both hives against <see cref="IAccessGuard"/> before it
+    /// writes, so a swapped-in id fails there rather than being trusted here.
+    /// </summary>
     private static AiActionFields ToFields(AssistantFieldsDto edited, AiActionFields? stored) => new(
         Date:        edited.Date        ?? stored?.Date,
         HoneyLevel:  edited.HoneyLevel  ?? stored?.HoneyLevel,
@@ -598,7 +604,12 @@ public class AiAssistantService : IAiAssistantService
         Notes:       Trimmed(edited.Notes)       ?? stored?.Notes,
         Title:       Trimmed(edited.Title)       ?? stored?.Title,
         Priority:    edited.Priority    ?? stored?.Priority,
-        DueDate:     edited.DueDate     ?? stored?.DueDate);
+        DueDate:     edited.DueDate     ?? stored?.DueDate,
+        TargetHive:  stored?.TargetHive,
+        TargetBeehiveId:   edited.TargetBeehiveId   ?? stored?.TargetBeehiveId,
+        TargetBeehiveName: edited.TargetBeehiveName ?? stored?.TargetBeehiveName,
+        QueenOutcome:      edited.QueenOutcome      ?? stored?.QueenOutcome,
+        MergeReason:       edited.MergeReason       ?? stored?.MergeReason);
 
     private static AssistantSessionDetailDto ToDetail(AiAssistantSession s)
     {
@@ -649,19 +660,29 @@ public class AiAssistantService : IAiAssistantService
     /// checkbox asks nothing), so holding it to the same bar as overwriting or destroying a record
     /// would be a stricter rule than the rest of the UI already applies to the identical action.
     /// </summary>
+    /// <remarks>
+    /// <see cref="AiActionKind.MergeBeehive"/> joins them (SPEC-19 §8): it takes a hive out of the
+    /// apiary for good, which is further than any delete here goes — the 24-hour undo is a safety net
+    /// for a misclick, not a reason to ask less.
+    /// </remarks>
     private static bool IsDestructive(AiActionKind kind) => kind is
         AiActionKind.UpdateTodo or AiActionKind.UpdateInspection or
-        AiActionKind.DeleteTodo or AiActionKind.DeleteInspection;
+        AiActionKind.DeleteTodo or AiActionKind.DeleteInspection or
+        AiActionKind.MergeBeehive;
 
     private static AssistantFieldsDto ToFieldsDto(AiActionFields fields) => new()
     {
-        Date        = fields.Date,
-        HoneyLevel  = fields.HoneyLevel,
-        BroodStatus = fields.BroodStatus,
-        Notes       = fields.Notes,
-        Title       = fields.Title,
-        Priority    = fields.Priority,
-        DueDate     = fields.DueDate,
+        Date              = fields.Date,
+        HoneyLevel        = fields.HoneyLevel,
+        BroodStatus       = fields.BroodStatus,
+        Notes             = fields.Notes,
+        Title             = fields.Title,
+        Priority          = fields.Priority,
+        DueDate           = fields.DueDate,
+        TargetBeehiveId   = fields.TargetBeehiveId,
+        TargetBeehiveName = fields.TargetBeehiveName,
+        QueenOutcome      = fields.QueenOutcome,
+        MergeReason       = fields.MergeReason,
     };
 
     // ── Guards & helpers ──────────────────────────────────────────────────────

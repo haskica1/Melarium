@@ -56,6 +56,12 @@ public class AssistantFieldsDto
     public string? Title { get; set; }
     public TodoPriority? Priority { get; set; }
     public DateOnly? DueDate { get; set; }
+
+    // ── MergeBeehive (SPEC-19 §8) ──
+    public int? TargetBeehiveId { get; set; }
+    public string? TargetBeehiveName { get; set; }
+    public MergeQueenOutcome? QueenOutcome { get; set; }
+    public MergeReason? MergeReason { get; set; }
 }
 
 // ── Responses ─────────────────────────────────────────────────────────────────
