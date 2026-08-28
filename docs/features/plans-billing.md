@@ -70,7 +70,8 @@ org whose effective plan ≠ Free and `PlanValidUntil` is within 7 days notifies
 
 - `core/models`: `PlanType` enum + `PlanTypeLabels`, `MyPlan`/`PlanUsage`, `UpdateOrganizationPlanPayload`.
 - `core/services/planService.ts`: `useMyPlan` (retry:false — org-less 404 is expected), `PLAN_PRICING`,
-  `isFeatureLocked`, `UPGRADE_EMAIL`.
+  `isFeatureLocked`, `UPGRADE_EMAIL` — since 2026-08-28 an alias of `CONTACT_EMAIL`
+  (`core/contact/contactInfo.ts`, SPEC-20), so upgrades and support cannot drift onto two addresses.
 - **402 upsell**: a *new* response interceptor in `apiClient.ts` (added before the frozen 401 one —
   ignore.md allows adding interceptors) recognises 402 + `code:"plan-limit"`, dispatches a
   `window` `CustomEvent('plan-limit', { detail })`, and rejects with the Bosnian message.

@@ -7,6 +7,7 @@ import { useAuth } from '../../core/context/AuthContext'
 import { useTheme } from '../../core/hooks/useTheme'
 import type { LoginResponse } from '../../core/services/authService'
 import { getServerError } from './authErrors'
+import ContactLink from '../../shared/components/ContactLink'
 
 interface LoginForm {
   /** Email address or phone number — the backend decides which by looking for an '@'. */
@@ -249,6 +250,11 @@ export default function LoginPage() {
             </p>
 
           </div>
+
+          {/* Contact (SPEC-20). A modal rather than a route: leaving this page would unmount the
+              form and discard whatever was already typed — and someone who cannot sign in is
+              exactly the person reaching for it. */}
+          <ContactLink className="mt-6" />
         </div>
       </div>
     </div>

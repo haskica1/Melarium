@@ -291,6 +291,25 @@
 - UI: `FeedbackFormModal`, "Moje povratne informacije" on `ProfilePage`, `FeedbackAdminPage`
   (`/admin/feedback`) + nav item with untriaged badge. See `features/feedback.md`
 
+### Contact & support (Kontakt i podrška, SPEC-20)
+- **Frontend only — no entity, no endpoint, no migration, no env var.** Details are a compile-time
+  constant (`core/contact/contactInfo.ts`): one number `+387603209030` for call/Viber/WhatsApp, and
+  `info@melarium.app` — deliberately **not** `noreply@melarium.app`, which stays the Resend sending
+  identity in `EmailService`
+- A **modal, not a route**: a `/kontakt` route would unmount the login form and discard the typed
+  credentials, and someone who cannot sign in is exactly who reaches for it. The cost — no shareable
+  contact URL — was accepted
+- Reachable from the footer of every page, both copies of the profile menu, and all five signed-out
+  screens (`ContactLink` on Login/Register + via `AuthCard` for forgot/reset/verify). `Layout` owns
+  one `ContactModal` for its three triggers, as it already does for `FeedbackFormModal`
+- Every row copies, with a select-the-text fallback when the Clipboard API is refused — a `viber://`
+  link on a desktop without Viber does nothing at all, and a swallowed rejection would repeat that
+  silent failure
+- WhatsApp/mailto prefill carries name, organisation, role and route **only from `AuthContext`** — no
+  extra query on a screen whose purpose is to work when network or sign-in is broken
+- Does **not** replace SPEC-13 feedback: contact is urgent and conversational and works signed out;
+  the form carries a screenshot, a DB row and triage. See `features/contact-support.md`
+
 ### In-app help & onboarding (SPEC-14)
 - **Frontend only — no entity, no endpoint, no migration.** Help content is a static typed registry
   (`core/help/helpContent.ts`), lazily imported as its own chunk; it describes the UI, so it changes in
@@ -356,7 +375,7 @@
 
 **All roadmap specs shipped** (see `docs/specs/README.md`).
 
-**Shipped (were specced):** SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
+**Shipped (were specced):** SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-20 Kontakt i podrška ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
 
 **Unspecced ideas:**
 

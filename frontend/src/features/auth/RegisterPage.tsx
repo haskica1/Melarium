@@ -8,6 +8,7 @@ import { useAuth } from '../../core/context/AuthContext'
 import { useTheme } from '../../core/hooks/useTheme'
 import { useReferralInviter } from '../../core/services/inviteQueries'
 import { getServerError } from './authErrors'
+import ContactLink from '../../shared/components/ContactLink'
 
 interface RegisterForm {
   firstName: string
@@ -387,6 +388,11 @@ export default function RegisterPage() {
               </Link>
             </p>
           </div>
+
+          {/* Contact (SPEC-20). A modal rather than a route: leaving this page would unmount the
+              form and discard whatever was already typed — and someone who cannot sign in is
+              exactly the person reaching for it. */}
+          <ContactLink className="mt-6" />
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, Moon, Sun } from 'lucide-react'
 import clsx from 'clsx'
 import { useTheme } from '../../core/hooks/useTheme'
+import ContactLink from '../../shared/components/ContactLink'
 
 /**
  * Shared shell for the utility auth pages (forgot / reset / verify). Mirrors the right-hand
@@ -59,6 +60,9 @@ export function AuthCard({
             </p>
           )}
         </div>
+
+        {/* Contact (SPEC-20) — one insertion here covers forgot / reset / verify. */}
+        <ContactLink className="mt-6" />
       </div>
     </div>
   )

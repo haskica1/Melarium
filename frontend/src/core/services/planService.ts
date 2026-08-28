@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import apiClient from './apiClient'
 import { PlanType, type MyPlan } from '../models'
+import { CONTACT_EMAIL } from '../contact/contactInfo'
 
 /**
  * Informational pricing (SPEC-09 v1 — no payment flow yet). Prices are communicated monthly
@@ -14,8 +15,12 @@ export const PLAN_PRICING: Record<PlanType, { monthly: number | null; yearly: nu
   [PlanType.Partner]:  { monthly: null, yearly: null },
 }
 
-/** Contact for manual upgrades (v1). */
-export const UPGRADE_EMAIL = 'asim.haskic.ah123@gmail.com'
+/**
+ * Contact for manual upgrades (v1). Aliased to the support address rather than spelled out, so the
+ * app cannot end up showing two different "contact us" addresses — it did, until SPEC-20. Point this
+ * at its own value only if billing ever gets a separate mailbox from support.
+ */
+export const UPGRADE_EMAIL = CONTACT_EMAIL
 
 export const planService = {
   getMyPlan: async (): Promise<MyPlan> => {

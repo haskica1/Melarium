@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ArrowLeft, CloudOff, CreditCard, LogOut, Menu, MessageSquarePlus, Moon, QrCode, Search, Settings, Sparkles, Sun, UserPlus, X } from 'lucide-react'
+import { ArrowLeft, CloudOff, CreditCard, Headset, LogOut, Menu, MessageSquarePlus, Moon, QrCode, Search, Settings, Sparkles, Sun, UserPlus, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../../core/context/AuthContext'
 import { usePermissions } from '../../core/hooks/usePermissions'
@@ -11,6 +11,7 @@ import { useOutboxSync } from '../../core/offline/useOutboxSync'
 import QrScannerModal from './QrScannerModal'
 import NotificationBell from './NotificationBell'
 import FeedbackFormModal from './FeedbackFormModal'
+import ContactModal from './ContactModal'
 import HelpButton from './HelpButton'
 import HelpPanel from './HelpPanel'
 import WelcomeModal from './WelcomeModal'
@@ -33,6 +34,7 @@ export default function Layout() {
   const [scannerOpen, setScannerOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [contactOpen, setContactOpen] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
   const { user, logout } = useAuth()
@@ -293,6 +295,15 @@ export default function Layout() {
                       <UserPlus className="w-4 h-4" />
                       Pozovi prijatelja
                     </button>
+                    {/* Contact (SPEC-20) — a direct line to a human, sitting next to the async
+                        form so the two read as the pair they are. */}
+                    <button
+                      onClick={() => { setProfileOpen(false); setContactOpen(true) }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                    >
+                      <Headset className="w-4 h-4" />
+                      Kontakt i podrška
+                    </button>
                     {/* Feedback (SPEC-13) — reachable from every page, whatever the user is doing */}
                     <button
                       onClick={() => { setProfileOpen(false); setFeedbackOpen(true) }}
@@ -418,6 +429,13 @@ export default function Layout() {
                     Pozovi prijatelja
                   </button>
                   <button
+                    onClick={() => { setMobileOpen(false); setContactOpen(true) }}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <Headset className="w-4 h-4 text-honey-600 dark:text-honey-400" />
+                    Kontakt i podrška
+                  </button>
+                  <button
                     onClick={() => { setMobileOpen(false); setFeedbackOpen(true) }}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
                   >
@@ -465,8 +483,17 @@ export default function Layout() {
         </main>
 
         {/* ── Footer ────────────────────────────────────────────────────────────── */}
-        <footer className="border-t border-honey-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-4 text-center text-xs text-gray-400 dark:text-slate-500">
-          Melarium App © {new Date().getFullYear()} — Čuvajte vaše kolonije zdravim 🍯
+        <footer className="border-t border-honey-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-4 px-4 text-center text-xs text-gray-400 dark:text-slate-500">
+          <p>Melarium App © {new Date().getFullYear()} — Čuvajte vaše kolonije zdravim 🍯</p>
+          {/* The footer was dead space, and contact has to be findable without already knowing to
+              look under the profile avatar (SPEC-20). */}
+          <button
+            onClick={() => setContactOpen(true)}
+            className="mt-1.5 inline-flex items-center gap-1.5 text-gray-500 dark:text-slate-400 hover:text-honey-600 dark:hover:text-honey-400 hover:underline transition-colors"
+          >
+            <Headset className="w-3.5 h-3.5" />
+            Kontakt i podrška
+          </button>
         </footer>
       </div>
 
@@ -486,6 +513,10 @@ export default function Layout() {
 
       {/* ── Feedback form (SPEC-13) ───────────────────────────────────────────── */}
       <FeedbackFormModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+
+      {/* ── Contact (SPEC-20) ─────────────────────────────────────────────────── */}
+      {/* One instance, opened from the footer and from both copies of the profile menu. */}
+      <ContactModal open={contactOpen} onClose={() => setContactOpen(false)} />
 
       {/* ── Per-page help + first-run welcome (SPEC-14) ────────────────────────── */}
       <HelpPanel

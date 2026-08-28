@@ -37,6 +37,7 @@
 | 17 | [AI Asistent](SPEC-17-ai-assistant.md) | Glasovna ili tekstualna naredba → AI pokaže šta je razumio → korisnik potvrdi → radnja se izvrši. Sam pronalazi pčelinjak i košnicu, radi više radnji iz jedne rečenice, razgovorom razrješava nejasnoće, i mijenja/briše postojeće zapise uz drugu potvrdu | L | — (reuse 01 Groq stack, 09 paketi) | ✅ Implemented (2026-08-09) — Q&A extended by 18 |
 | 18 | [Spajanje AI Savjetnika u AI Asistenta](SPEC-18-ai-merge.md) | Jedan AI umjesto dva: Asistent sad i odgovara na pitanja (uz kontekst košnice kad je u fokusu), ne samo izvršava naredbe. `/advisor` se gasi, stara historija se migrira, mjesečna kvota se spaja u jednu | M | 01, 17 | 🔨 U implementaciji (2026-08-09) |
 | 19 | [Sastavljanje društava](SPEC-19-colony-merge.md) | Dva društva u jedno: pripojena košnica trajno izlazi iz pčelinjaka (ne briše se), prijemna nosi zapis o primljenom društvu. Bira se koja matica ostaje, zadaci/prehrana/tretmani se uredno zatvaraju, poništavanje u roku od 24h | M | — (dodiruje 03, 08, 09, 12, 17) | ✅ Implemented (2026-08-21) — migracija još nije primijenjena, vidi §12 |
+| 20 | [Kontakt i podrška](SPEC-20-contact-support.md) | Kontakt modal (WhatsApp, Viber, telefon, email) dostupan sa svake stranice **i s login/register ekrana**, uz obećanje odgovora u 24h. Frontend-only, bez rute | S | — (soft-link 13) | ✅ Implemented (2026-08-28) |
 
 **Recommended order = index order.** Rationale:
 
@@ -124,6 +125,20 @@
   on it. Its Phase C (the AI action) goes last deliberately, so the only path that lets a model start an
   irreversible change reaches production after the service has met real usage — the same ordering SPEC-17
   used for its own update/delete phase.
+- **SPEC-20** was written 2026-08-28 from Asim's idea, its product decisions settled one at a time
+  before drafting and listed in its Domain rules — the document is the record, not the place they were
+  made. It is the smallest spec in the set and the only one that is **pure UI with no data at all**:
+  no entity, no endpoint, no migration, no env var. Its one decision worth reading before changing
+  anything is that contact is a **modal and not a route** (D1): a `/kontakt` route would unmount the
+  login form and discard the typed credentials, and the user who cannot sign in is exactly the one
+  reaching for it — so the missing shareable URL is a price that was paid knowingly, not an oversight.
+  Two smaller rules are there for the same reason and are easy to "tidy away": the contact details are
+  a **frontend constant** rather than a fetch, because the app is used offline in the field and a
+  fetched number would be missing exactly when the phone is the only channel left (D2); and every row
+  has a **copy button with a select-the-text fallback**, because a `viber://` link on a desktop
+  without Viber installed does nothing at all and swallowing a clipboard rejection would reproduce the
+  very silent failure the button exists to prevent (D4). The contact address is `info@melarium.app`;
+  `noreply@melarium.app` stays what it is, the Resend sending identity.
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD
