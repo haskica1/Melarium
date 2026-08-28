@@ -272,6 +272,33 @@ null/empty = evergreen; drafts may have an empty body.
 
 ---
 
+### Announcements (Šta je novo)
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/announcements?type=` | `AnnouncementListDto` = `{ items, unreadCount }` — **published only**, newest first by `publishedAt`, incl. per-caller `isRead` (one grouped query) |
+| GET | `/announcements/banner` | `AnnouncementBannerDto` = `{ announcement, unreadCount }` — the **newest published** announcement with its `bodyMarkdown`, or `announcement: null` when there is none or the caller has already seen it. Called on every page; feeds both the banner and the nav badge in one request |
+| GET | `/announcements/{id}` | `AnnouncementDetailDto` (published only, incl. `bodyMarkdown`) |
+| POST | `/announcements/{id}/read` | `204` — idempotent "seen" marker for the current user. Set both by dismissing the banner and by closing the modal (SPEC-21 D2) |
+
+No plan or role targeting — every authenticated user sees every published announcement (D5).
+
+**Authoring (SystemAdmin only, `/api/admin/announcements`):**
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/admin/announcements` | `AdminAnnouncementDto[]` (incl. unpublished drafts) |
+| GET | `/admin/announcements/{id}` | `AdminAnnouncementDto` |
+| POST | `/admin/announcements` | `201 + AdminAnnouncementDto` (created as draft) |
+| PUT | `/admin/announcements/{id}` | `200 + AdminAnnouncementDto` — does **not** clear seen markers, so an edit never resurrects a dismissed banner (D9) |
+| DELETE | `/admin/announcements/{id}` | `204` (cascades seen markers) |
+| PUT | `/admin/announcements/{id}/publish` | `{ isPublished }` → `200`; publish requires a non-empty body; **first** publish stamps `PublishedAt`. Sends **nothing** — no e-mail, no bell notification (D4) |
+
+**Save body:** `{ title, type, bodyMarkdown }` — `type` is `1 New | 2 Improvement | 3 Fix`; drafts
+may have an empty body.
+
+---
+
 ### Pastures & apiary moves (Pašnjaci i selidbe)
 
 | Method | Path | Returns |

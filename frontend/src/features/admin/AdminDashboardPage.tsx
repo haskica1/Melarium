@@ -90,12 +90,20 @@ export default function AdminDashboardPage() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/admin/learning-topics')}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border border-honey-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-700 transition-colors"
-          >
-            🎓 Uredi edukaciju
-          </button>
+          <div className="shrink-0 flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => navigate('/admin/learning-topics')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-honey-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              🎓 Uredi edukaciju
+            </button>
+            <button
+              onClick={() => navigate('/admin/announcements')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-honey-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              ✨ Šta je novo
+            </button>
+          </div>
         </div>
       </div>
 

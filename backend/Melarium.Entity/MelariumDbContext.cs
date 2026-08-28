@@ -37,6 +37,8 @@ public class MelariumDbContext : DbContext
     public DbSet<TreatmentRound> TreatmentRounds => Set<TreatmentRound>();
     public DbSet<LearningTopic> LearningTopics => Set<LearningTopic>();
     public DbSet<LearningTopicRead> LearningTopicReads => Set<LearningTopicRead>();
+    public DbSet<Announcement> Announcements => Set<Announcement>();
+    public DbSet<AnnouncementRead> AnnouncementReads => Set<AnnouncementRead>();
     public DbSet<Pasture> Pastures => Set<Pasture>();
     public DbSet<ApiaryMove> ApiaryMoves => Set<ApiaryMove>();
     public DbSet<Notification> Notifications => Set<Notification>();

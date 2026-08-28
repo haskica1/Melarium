@@ -38,6 +38,7 @@
 | 18 | [Spajanje AI Savjetnika u AI Asistenta](SPEC-18-ai-merge.md) | Jedan AI umjesto dva: Asistent sad i odgovara na pitanja (uz kontekst košnice kad je u fokusu), ne samo izvršava naredbe. `/advisor` se gasi, stara historija se migrira, mjesečna kvota se spaja u jednu | M | 01, 17 | 🔨 U implementaciji (2026-08-09) |
 | 19 | [Sastavljanje društava](SPEC-19-colony-merge.md) | Dva društva u jedno: pripojena košnica trajno izlazi iz pčelinjaka (ne briše se), prijemna nosi zapis o primljenom društvu. Bira se koja matica ostaje, zadaci/prehrana/tretmani se uredno zatvaraju, poništavanje u roku od 24h | M | — (dodiruje 03, 08, 09, 12, 17) | ✅ Implemented (2026-08-21) — migracija još nije primijenjena, vidi §12 |
 | 20 | [Kontakt i podrška](SPEC-20-contact-support.md) | Kontakt modal (WhatsApp, Viber, telefon, email) dostupan sa svake stranice **i s login/register ekrana**, uz obećanje odgovora u 24h. Frontend-only, bez rute | S | — (soft-link 13) | ✅ Implemented (2026-08-28) |
+| 21 | [Šta je novo](SPEC-21-announcements.md) | SystemAdmin objavi novu funkcionalnost (naslov + opis u markdownu, tip Novo/Poboljšanje/Ispravka) → banner na svakoj stranici → modal s cijelim tekstom → "x" ga trajno sklanja. Sve objave ostaju na stranici "Šta je novo". Bez stavke u zvonu, bez slike, bez ciljanja po paketu | M | — (prepisuje obrazac 06) | ✅ Implemented (2026-08-28) — migracija još nije primijenjena |
 
 **Recommended order = index order.** Rationale:
 
@@ -139,6 +140,22 @@
   without Viber installed does nothing at all and swallowing a clipboard rejection would reproduce the
   very silent failure the button exists to prevent (D4). The contact address is `info@melarium.app`;
   `noreply@melarium.app` stays what it is, the Resend sending identity.
+- **SPEC-21** was written 2026-08-28 from Asim's idea, its product decisions settled one at a time
+  before drafting and listed in its Domain rules — the document is the record, not the place they were
+  made. It copies SPEC-06's shape almost line for line (SystemAdmin authors, platform-wide content,
+  a per-user read marker instead of a notification fan-out), which is why the effort is M and not L;
+  the table is nonetheless **separate** on purpose, because Edukacija is beekeeping knowledge and this
+  is news about the app, and merging them would pollute `/learning` with release notes. Its one rule
+  worth reading before changing anything is D1: the banner shows **only the latest** announcement,
+  never a queue. The obvious "improvement" — walking backwards through everything the user has not
+  seen — was considered and rejected, because a user returning after three publishes then gets three
+  banners in a row and a newly-registered user gets a wall of them. The accepted cost is that an
+  announcement can be skipped in the banner entirely, and D8's unread badge on the menu item exists
+  precisely to catch it; removing that badge as redundant would leave the gap open. Two smaller rules
+  are deliberate and easy to "tidy" in the wrong direction: there is **one** seen-state, not a separate
+  read and dismissed pair (D2 — closing the modal dismisses, since a user who read the whole text needs
+  no further banner), and publishing writes **nothing** to `Notification` (D4), so that dismissing the
+  banner cannot leave an unread bell item behind for the same announcement.
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD

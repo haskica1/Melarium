@@ -255,6 +255,30 @@
 - Dev-only seed: 6 starter topics (`SeedLearningTopicsAsync`). Tests in `LearningTopicServiceTests`.
   See `docs/features/learning.md`.
 
+### Announcements — "Šta je novo" (SPEC-21)
+- Product news (SPEC-21): SystemAdmin writes title + markdown body + type, publishes, **every** user
+  sees a banner on **every** page. Separate table from Edukacija on purpose — that is beekeeping
+  knowledge, this is news about the app
+- `/api/announcements` (list + `unreadCount`), `/api/announcements/banner` (the one call the layout
+  makes per page — banner content **and** nav badge), `POST /{id}/read`; authoring under
+  `/api/admin/announcements`
+- **Banner shows only the *latest* announcement, never a queue.** Consequence, accepted: one
+  published between two logins can be skipped in the banner — the **unread badge** on the nav item
+  and the archive page are what catch it. Do not "fix" this into a backlog walker
+- **One** seen-state per (announcement, user): written by the banner "x" *and* by closing the modal.
+  In the database (not `localStorage`), so dismissing on the phone holds on the laptop
+- Publishing writes **nothing** to `Notification` — no bell item, no email. The bell is for what
+  happened to your hives; the banner is for what changed in the app
+- No plan/role targeting; SystemAdmin sees the banner like everyone else
+- `PublishedAt` stamped on first publish only; editing never clears seen markers, so a typo fix does
+  not resurrect a dismissed banner. Ordering by `PublishedAt`, not `CreatedAt`
+- UI: `AnnouncementBanner` in `Layout` (inside `<main>`, **outside** `ErrorBoundary`), `AnnouncementModal`
+  (`Modal` + `MarkdownMessage`), `/announcements` archive with type filter, admin list + form with
+  markdown preview
+- **Banner shows type + title + "Pročitaj više" only** — no body text, no summary field. A derived
+  teaser was built and then removed: taller banner, still not enough to skip the modal
+- Title + markdown body only: no image, no CTA link, no AI draft. See `docs/features/announcements.md`.
+
 ### Calendar & Stats
 - `GET /api/calendar` — role-scoped todos + feeding entries (Bosnian labels)
 - `GET /api/stats` — org-scoped (platform-wide for SystemAdmin): totals, distributions,
@@ -375,7 +399,7 @@
 
 **All roadmap specs shipped** (see `docs/specs/README.md`).
 
-**Shipped (were specced):** SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-20 Kontakt i podrška ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
+**Shipped (were specced):** SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-20 Kontakt i podrška ✅, SPEC-21 Šta je novo ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
 
 **Unspecced ideas:**
 

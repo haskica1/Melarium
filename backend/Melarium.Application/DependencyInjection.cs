@@ -3,6 +3,7 @@ using Melarium.Application.Features.Apiaries.Validators;
 using Melarium.Application.Common.Services;
 using Melarium.Application.Features.Admin;
 using Melarium.Application.Features.Alerts;
+using Melarium.Application.Features.Announcements;
 using Melarium.Application.Features.Apiaries;
 using Melarium.Application.Features.Assistant;
 using Melarium.Application.Features.Invitations;
@@ -82,6 +83,7 @@ public static class DependencyInjection
         services.AddScoped<IHarvestService, HarvestService>();
         services.AddScoped<ITreatmentService, TreatmentService>();
         services.AddScoped<ILearningTopicService, LearningTopicService>();
+        services.AddScoped<IAnnouncementService, AnnouncementService>();
         services.AddScoped<IPastureService, PastureService>();
         services.AddScoped<IApiaryMoveService, ApiaryMoveService>();
 

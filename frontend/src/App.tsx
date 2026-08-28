@@ -36,8 +36,11 @@ import LearningPage from './features/learning/LearningPage'
 import LearningTopicPage from './features/learning/LearningTopicPage'
 import OutboxPage from './features/offline/OutboxPage'
 import PasturesPage from './features/pastures/PasturesPage'
+import AnnouncementsPage from './features/announcements/AnnouncementsPage'
 import LearningTopicsAdminPage from './features/admin/LearningTopicsAdminPage'
 import LearningTopicFormPage from './features/admin/LearningTopicFormPage'
+import AnnouncementsAdminPage from './features/admin/AnnouncementsAdminPage'
+import AnnouncementFormPage from './features/admin/AnnouncementFormPage'
 import FeedbackAdminPage from './features/admin/FeedbackAdminPage'
 import AssistantPage from './features/assistant/AssistantPage'
 import SmartRedirect from './shared/components/SmartRedirect'
@@ -138,6 +141,9 @@ export default function App() {
               <Route path="learning"     element={<LearningPage />} />
               <Route path="learning/:id" element={<LearningTopicPage />} />
 
+              {/* Šta je novo (SPEC-21) — all authenticated users, SystemAdmin included */}
+              <Route path="announcements" element={<AnnouncementsPage />} />
+
               {/* Offline outbox (neposlani pregledi) — all authenticated users */}
               <Route path="outbox" element={<OutboxPage />} />
 
@@ -185,6 +191,9 @@ export default function App() {
                 <Route path="admin/learning-topics"             element={<LearningTopicsAdminPage />} />
                 <Route path="admin/learning-topics/new"         element={<LearningTopicFormPage />} />
                 <Route path="admin/learning-topics/:id/edit"    element={<LearningTopicFormPage />} />
+                <Route path="admin/announcements"               element={<AnnouncementsAdminPage />} />
+                <Route path="admin/announcements/new"           element={<AnnouncementFormPage />} />
+                <Route path="admin/announcements/:id/edit"      element={<AnnouncementFormPage />} />
                 <Route path="admin/feedback"                    element={<FeedbackAdminPage />} />
               </Route>
             </Route>

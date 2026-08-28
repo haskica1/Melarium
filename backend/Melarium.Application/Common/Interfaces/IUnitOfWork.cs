@@ -21,6 +21,7 @@ public interface IUnitOfWork : IDisposable
     IHarvestRepository Harvests { get; }
     ITreatmentRepository Treatments { get; }
     ILearningTopicRepository LearningTopics { get; }
+    IAnnouncementRepository Announcements { get; }
     IPastureRepository Pastures { get; }
     IApiaryMoveRepository ApiaryMoves { get; }
     INotificationRepository Notifications { get; }

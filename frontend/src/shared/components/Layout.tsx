@@ -15,6 +15,8 @@ import ContactModal from './ContactModal'
 import HelpButton from './HelpButton'
 import HelpPanel from './HelpPanel'
 import WelcomeModal from './WelcomeModal'
+import AnnouncementBanner from './AnnouncementBanner'
+import { useAnnouncementBanner } from '../../core/services/announcementQueries'
 import { useFeedbackSummary } from '../../core/services/feedbackQueries'
 import { useHelp } from '../../core/help/useHelp'
 import { HelpProvider } from '../../core/help/HelpContext'
@@ -56,6 +58,11 @@ export default function Layout() {
   // Untriaged feedback count for the nav badge (SPEC-13) — only SystemAdmin has the endpoint.
   const { data: feedbackSummary } = useFeedbackSummary({ enabled: isSystemAdmin })
 
+  // Unseen announcements for the nav badge (SPEC-21 D8). Same query key as the banner, so this is
+  // the cached result, not a second request — and it is what catches an announcement the banner
+  // never showed because a newer one had already replaced it.
+  const { data: announcementBanner } = useAnnouncementBanner()
+
   // Per-page help (SPEC-14). Resolved from the route here, once, so the icon sits in the same place
   // on every page instead of being added to thirty page components by hand.
   const help = useHelp()
@@ -66,6 +73,7 @@ export default function Layout() {
     canManageMembers,
     canSeePastures,
     feedbackNewCount: feedbackSummary?.newCount,
+    announcementUnreadCount: announcementBanner?.unreadCount,
   }
 
   // navigate(-1) mirrors real browser back — re-evaluated on every route change via useLocation().
@@ -472,6 +480,9 @@ export default function Layout() {
 
         {/* ── Main Content ──────────────────────────────────────────────────────── */}
         <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">
+          {/* Outside the boundary on purpose (SPEC-21): the banner is not part of any page, so a
+              page that crashes should not take the announcement down with it. */}
+          <AnnouncementBanner />
           {/* Keyed on the path so navigating away clears a crashed page — without the key the
               boundary would stay in its error state for the rest of the session. */}
           <ErrorBoundary key={pathname}>

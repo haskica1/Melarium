@@ -29,6 +29,7 @@ public class UnitOfWork : IUnitOfWork
     private IHarvestRepository? _harvests;
     private ITreatmentRepository? _treatments;
     private ILearningTopicRepository? _learningTopics;
+    private IAnnouncementRepository? _announcements;
     private IPastureRepository? _pastures;
     private IApiaryMoveRepository? _apiaryMoves;
     private INotificationRepository? _notifications;
@@ -91,6 +92,9 @@ public class UnitOfWork : IUnitOfWork
 
     public ILearningTopicRepository LearningTopics =>
         _learningTopics ??= new LearningTopicRepository(_context);
+
+    public IAnnouncementRepository Announcements =>
+        _announcements ??= new AnnouncementRepository(_context);
 
     public IPastureRepository Pastures =>
         _pastures ??= new PastureRepository(_context);

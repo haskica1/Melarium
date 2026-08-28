@@ -1703,3 +1703,59 @@ export interface ConfirmActionItem {
 export interface ConfirmActionsPayload {
   actions: ConfirmActionItem[]
 }
+
+// ── Announcements — "Šta je novo" (SPEC-21) ─────────────────────────────────────
+
+export enum AnnouncementType {
+  New         = 1,
+  Improvement = 2,
+  Fix         = 3,
+}
+
+export const AnnouncementTypeLabels: Record<AnnouncementType, string> = {
+  [AnnouncementType.New]:         'Novo',
+  [AnnouncementType.Improvement]: 'Poboljšanje',
+  [AnnouncementType.Fix]:         'Ispravka',
+}
+
+export interface AnnouncementSummary {
+  id: number
+  title: string
+  type: AnnouncementType
+  typeName: string
+  isRead: boolean
+  publishedAt?: string
+}
+
+export interface AnnouncementDetail extends AnnouncementSummary {
+  bodyMarkdown: string
+}
+
+export interface AnnouncementList {
+  items: AnnouncementSummary[]
+  unreadCount: number
+}
+
+/** One call per page: the banner announcement (null when there is none) + the menu badge count. */
+export interface AnnouncementBanner {
+  announcement: AnnouncementDetail | null
+  unreadCount: number
+}
+
+export interface AdminAnnouncement {
+  id: number
+  title: string
+  type: AnnouncementType
+  typeName: string
+  bodyMarkdown: string
+  isPublished: boolean
+  publishedAt?: string
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface SaveAnnouncementPayload {
+  title: string
+  type: AnnouncementType
+  bodyMarkdown: string
+}

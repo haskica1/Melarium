@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   BarChart2, CalendarDays, ChevronsLeft, ChevronsRight, Droplets, GraduationCap, Home,
-  LayoutDashboard, Leaf, MessageSquareHeart, Pill, ReceiptText, Sparkles, Tent, Users,
+  LayoutDashboard, Leaf, Megaphone, MessageSquareHeart, Pill, ReceiptText, Sparkles, Tent, Users,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -14,6 +14,8 @@ export interface NavRoleFlags {
   canSeePastures: boolean
   /** Untriaged feedback count (SPEC-13) — SystemAdmin only, 0/undefined hides the badge. */
   feedbackNewCount?: number
+  /** Unseen announcements (SPEC-21 D8) — everyone, 0/undefined hides the badge. */
+  announcementUnreadCount?: number
 }
 
 export interface NavItemDef {
@@ -39,6 +41,14 @@ export function getNavItems(flags: NavRoleFlags): NavItemDef[] {
     { to: '/treatments', icon: <Pill className="w-4 h-4" />, label: 'Tretmani', visible: !flags.isSystemAdmin },
     { to: '/assistant', icon: <Sparkles className="w-4 h-4" />, label: 'AI Asistent', visible: !flags.isSystemAdmin },
     { to: '/learning', icon: <GraduationCap className="w-4 h-4" />, label: 'Edukacija', visible: true },
+    // Visible to SystemAdmin too — it is the only way for him to check how an announcement looks (D5).
+    {
+      to: '/announcements',
+      icon: <Megaphone className="w-4 h-4" />,
+      label: 'Šta je novo',
+      badge: flags.announcementUnreadCount,
+      visible: true,
+    },
     { to: '/calendar', icon: <CalendarDays className="w-4 h-4" />, label: 'Kalendar', visible: !flags.isSystemAdmin },
     { to: '/stats', icon: <BarChart2 className="w-4 h-4" />, label: 'Statistike', visible: !flags.isSystemAdmin },
     {

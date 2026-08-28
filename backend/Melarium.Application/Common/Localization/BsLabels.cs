@@ -234,6 +234,14 @@ public static class BsLabels
         _                                  => c.ToString(),
     };
 
+    public static string Label(AnnouncementType t) => t switch
+    {
+        AnnouncementType.New         => "Novo",
+        AnnouncementType.Improvement => "Poboljšanje",
+        AnnouncementType.Fix         => "Ispravka",
+        _                            => t.ToString(),
+    };
+
     public static string Label(FeedbackType t) => t switch
     {
         FeedbackType.Bug            => "Prijava problema",
