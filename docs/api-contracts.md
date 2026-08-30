@@ -172,6 +172,37 @@ ongoingTreatmentNames[], sourceQueenSummary?, targetQueenSummary?, karencaUntil?
 
 ---
 
+### Moja organizacija (SPEC-22)
+
+The caller's **own** organization. There is no `{id}` anywhere in this group: the organization is
+resolved from `ICurrentUser.OrganizationId`, so a member cannot address another tenant's row.
+Reading is open to every member of the organization, writing is `OrganizationAdmin` only. An org-less
+SystemAdmin gets **403** (not 404) — the row exists for everyone else, they are simply not in one.
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/organizations/my` | `MyOrganizationDto` |
+| PUT | `/organizations/my` | `200 + MyOrganizationDto` — body `{ name, description? }`; OrgAdmin only |
+| POST | `/organizations/my/logo` | `200 + MyOrganizationDto` — multipart `file`, ≤ 2 MB, JPEG/PNG/WebP by header bytes; OrgAdmin only |
+| GET | `/organizations/my/logo` | image stream, `Cache-Control: private, no-cache` — auth-checked, storage never public |
+| DELETE | `/organizations/my/logo` | `200 + MyOrganizationDto` — clears both columns, deletes the blob (best-effort); OrgAdmin only |
+| GET | `/admin/organizations/{id}/logo` | image stream — SystemAdmin only, for the system table |
+
+**MyOrganizationDto:** `{ id, name, description?, hasLogo, createdAt, userCount, apiaryCount, beehiveCount }`
+— deliberately **not** `AdminOrganizationDto`: plan, payment note and activity belong to the SystemAdmin
+screens, not to a tenant looking at itself. The logo is never inlined; `hasLogo` says whether the stream
+endpoint has anything to give.
+
+The logo cache header differs from the inspection photo's `max-age=86400` on purpose: this URL never
+changes, so a replaced logo would keep serving the old image for a day. Uploading replaces any previous
+logo and deletes its blob **after** the new key is committed. A row pointing at a missing blob answers
+`404`, not `500`.
+
+Renaming does **not** revoke sessions — the organization name is not a JWT claim (`organizationId` is,
+and it does not change).
+
+---
+
 ### Plans & billing (SPEC-09)
 
 | Method | Path | Returns |
@@ -362,6 +393,7 @@ pasture or a foreign-org pasture → `400`; `movedAt` max +1 day. `GET /api/stat
 | POST | `/admin/users` | Create user — `phone` **required** |
 | PUT | `/admin/users/{id}` | Update user — `phone` optional; blank leaves it unchanged |
 | DELETE | `/admin/users/{id}` | Delete user |
+| GET | `/admin/organizations/{id}/logo` | Organization logo stream (SPEC-22); `404` when it has none |
 
 **AdminOrganizationDto** additionally carries `beehiveCount` and `lastActivityAt` (nullable). Both are
 **derived, never stored**: the hive count resolves through the owning apiary, and `lastActivityAt` is the
@@ -370,6 +402,18 @@ feeding rounds, treatment + rounds, harvest, expense, pasture, member, apiary/hi
 issue, i.e. sign-in and session refresh. `null` = no sign of life beyond the row's own creation. Every
 endpoint in the table above that returns an `AdminOrganizationDto` fills both, so the two fields never
 carry a placeholder zero. See `features/org-activity.md`.
+
+**Owner contact and logo on `AdminOrganizationDto` (SPEC-22):** `ownerName`, `ownerEmail`, `ownerPhone`,
+`orgAdminCount`, `hasLogo`. The owner is the organization's **OrganizationAdmin**, not `createdByName` —
+for an organization the SystemAdmin created, `CreatedById` is the SystemAdmin. Resolution order: the
+OrgAdmin whose id equals `CreatedById`, else the longest-standing OrgAdmin, else `null` (an organization
+with no admin at all). Derived from the already-included `Users` collection — no extra query.
+
+**Account signals on `AdminUserDto` (SPEC-22):** `emailVerifiedAt` (null = never confirmed; soft, never
+blocks sign-in) and `lastLoginAt` = `MAX(RefreshToken.CreatedAt)` for that user, null when they have
+never signed in. A token row is written on sign-in **and** on every refresh, so it reads as "last time
+this account was used"; nothing prunes the table, so the maximum covers the whole history. Same source
+as `lastActivityAt` above — see ADR-040.
 
 **Phone on user payloads.** Every endpoint that creates an account (`/auth/register`,
 `/admin/users`, org member creation) requires a `phone`; every endpoint that updates one

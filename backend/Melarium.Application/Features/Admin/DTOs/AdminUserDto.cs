@@ -15,4 +15,13 @@ public class AdminUserDto
     public string? ApiaryName { get; set; }
     public List<int> AssignedBeehiveIds { get; set; } = [];
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>When the user proved control of their address; null = still unverified (soft — never blocks sign-in).</summary>
+    public DateTime? EmailVerifiedAt { get; set; }
+
+    /// <summary>
+    /// Newest issued session — sign-in or token refresh, so it reads as "last time the account was
+    /// used". Null = never signed in (an admin-created account nobody has opened yet).
+    /// </summary>
+    public DateTime? LastLoginAt { get; set; }
 }

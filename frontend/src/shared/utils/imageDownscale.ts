@@ -124,6 +124,33 @@ async function reencodeAsJpeg(image: Blob, maxEdge: number, maxBytes: number): P
   }
 }
 
+/** A logo is shown at ~64 px and downloaded by every member — far tighter bounds than a photo. */
+const LOGO_MAX_EDGE = 512
+const LOGO_MAX_BYTES = 1024 * 1024
+
+/**
+ * Makes a picked file uploadable as an organization logo.
+ *
+ * A PNG or WebP that already fits is returned **untouched**: re-encoding it to JPEG would flatten a
+ * transparent logo onto a white square (see the white matte in `reencodeAsJpeg`), which is the one
+ * thing a logo must not lose. Everything else — an oversized JPEG, a phone shot, an iPhone HEIC —
+ * goes through the canvas and comes back as a bounded JPEG.
+ */
+export async function prepareLogoForUpload(file: File): Promise<File> {
+  const keepsAlpha = file.type === 'image/png' || file.type === 'image/webp'
+  if (keepsAlpha && file.size <= LOGO_MAX_BYTES) return file
+
+  const converted = await reencodeAsJpeg(file, LOGO_MAX_EDGE, LOGO_MAX_BYTES)
+  // reencodeAsJpeg hands back the input untouched when it cannot decode it; passing that through
+  // lets the existing validation produce its normal "unsupported format" message.
+  if (converted === file) return file
+
+  return new File([converted], file.name.replace(/\.[^.]+$/, '') + '.jpg', {
+    type: 'image/jpeg',
+    lastModified: file.lastModified,
+  })
+}
+
 /** Bounded JPEG for the hive-number scan (on-device OCR + the vision endpoint). */
 export const downscaleForScan = (image: Blob): Promise<Blob> =>
   reencodeAsJpeg(image, SCAN_MAX_EDGE, SCAN_MAX_BYTES)

@@ -384,6 +384,23 @@ export const HELP_CONTENT: Record<HelpKey, HelpEntry> = {
     learningCategory: LearningCategory.Napredno,
   },
 
+  // ── Moja organizacija (SPEC-22) ─────────────────────────────────────────────
+  '/organization': {
+    title: 'Moja organizacija',
+    summary:
+      'Naziv, opis i logotip vaše organizacije — ono što vaši članovi vide u aplikaciji. Mijenja samo administrator organizacije.',
+    steps: [
+      'Ispravite naziv ili dopišite opis i pritisnite „Spremi promjene“.',
+      'Dodajte logotip — kvadratna slika do 2 MB (JPEG, PNG ili WebP).',
+    ],
+    tips: [
+      'Naziv organizacije nije isto što i naziv pčelinjaka. Organizacija je vaše gazdinstvo ili udruženje; pčelinjaci su lokacije unutar njega.',
+      'Promjena naziva odmah važi za sve članove — niko se ne mora ponovo prijavljivati.',
+      'Prozirni PNG ostaje prozirni PNG. Fotografija s telefona se automatski smanji prije slanja.',
+      'Paket i naplata nisu ovdje — njih vidite na stranici „Paketi“.',
+    ],
+  },
+
   // ── Members ─────────────────────────────────────────────────────────────────
   '/members': {
     title: 'Članovi',

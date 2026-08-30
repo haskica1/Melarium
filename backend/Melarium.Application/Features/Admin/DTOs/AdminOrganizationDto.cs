@@ -9,6 +9,24 @@ public class AdminOrganizationDto
     public int ApiaryCount { get; set; }
     public int BeehiveCount { get; set; }
     public string? CreatedByName { get; set; }
+
+    // ── Owner contact ── who to call about this organization, without opening the users table ──
+
+    /// <summary>
+    /// The organization's OrganizationAdmin: the founder (<c>CreatedById</c>) when they are still one,
+    /// otherwise the longest-standing one. Null for an organization that currently has none — which is
+    /// itself worth seeing in the table.
+    /// </summary>
+    public string? OwnerName { get; set; }
+    public string? OwnerEmail { get; set; }
+    public string? OwnerPhone { get; set; }
+
+    /// <summary>How many OrganizationAdmins the org has — more than one means the contact above is one of several.</summary>
+    public int OrgAdminCount { get; set; }
+
+    /// <summary>Logo is streamed from <c>GET /api/admin/organizations/{id}/logo</c>, never inlined here.</summary>
+    public bool HasLogo { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     /// <summary>

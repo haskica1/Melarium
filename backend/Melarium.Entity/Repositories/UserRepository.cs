@@ -141,4 +141,16 @@ public class UserRepository : Repository<User>, IUserRepository
 
     public async Task<int> CountByOrganizationAsync(int organizationId) =>
         await _context.Users.CountAsync(u => u.OrganizationId == organizationId);
+
+    /// <summary>
+    /// One GROUP BY over the token table — no rows are ever pruned, so the max is the whole history
+    /// of the account. Never joins Users: a user with no token simply has no entry.
+    /// </summary>
+    public async Task<Dictionary<int, DateTime>> GetLastLoginAtAsync(int? userId = null) =>
+        await _context.RefreshTokens
+            .AsNoTracking()
+            .Where(t => userId == null || t.UserId == userId)
+            .GroupBy(t => t.UserId)
+            .Select(g => new { UserId = g.Key, At = g.Max(t => t.CreatedAt) })
+            .ToDictionaryAsync(x => x.UserId, x => x.At);
 }

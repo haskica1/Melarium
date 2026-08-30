@@ -20,7 +20,7 @@ public class AdminOrganizationMetricsTests
 
     public AdminOrganizationMetricsTests()
     {
-        _service = new AdminService(_uow, Substitute.For<INotificationService>(), new SessionRevoker(_uow));
+        _service = new AdminService(_uow, Substitute.For<INotificationService>(), new SessionRevoker(_uow), Substitute.For<IFileStorage>());
     }
 
     [Fact]

@@ -72,4 +72,12 @@ public interface IUserRepository : IRepository<User>
 
     /// <summary>Number of user accounts in the organization — plan member-limit checks (SPEC-09).</summary>
     Task<int> CountByOrganizationAsync(int organizationId);
+
+    /// <summary>
+    /// Newest issued session per user — <c>MAX(RefreshToken.CreatedAt)</c>, since a token row is written
+    /// on sign-in and on every refresh. Read as "last time this account was actually used", which is
+    /// what the SystemAdmin table labels "Zadnja prijava" (same source as ADR-034 org activity).
+    /// Users who have never signed in are absent from the dictionary rather than present with a date.
+    /// </summary>
+    Task<Dictionary<int, DateTime>> GetLastLoginAtAsync(int? userId = null);
 }

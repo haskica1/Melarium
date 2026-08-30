@@ -39,6 +39,7 @@
 | 19 | [Sastavljanje društava](SPEC-19-colony-merge.md) | Dva društva u jedno: pripojena košnica trajno izlazi iz pčelinjaka (ne briše se), prijemna nosi zapis o primljenom društvu. Bira se koja matica ostaje, zadaci/prehrana/tretmani se uredno zatvaraju, poništavanje u roku od 24h | M | — (dodiruje 03, 08, 09, 12, 17) | ✅ Implemented (2026-08-21) — migracija još nije primijenjena, vidi §12 |
 | 20 | [Kontakt i podrška](SPEC-20-contact-support.md) | Kontakt modal (WhatsApp, Viber, telefon, email) dostupan sa svake stranice **i s login/register ekrana**, uz obećanje odgovora u 24h. Frontend-only, bez rute | S | — (soft-link 13) | ✅ Implemented (2026-08-28) |
 | 21 | [Šta je novo](SPEC-21-announcements.md) | SystemAdmin objavi novu funkcionalnost (naslov + opis u markdownu, tip Novo/Poboljšanje/Ispravka) → banner na svakoj stranici → modal s cijelim tekstom → "x" ga trajno sklanja. Sve objave ostaju na stranici "Šta je novo". Bez stavke u zvonu, bez slike, bez ciljanja po paketu | M | — (prepisuje obrazac 06) | ✅ Implemented (2026-08-28) — migracija još nije primijenjena |
+| 22 | [Moja organizacija](SPEC-22-org-profile.md) | Administrator organizacije napokon može urediti organizaciju koju je sam napravio pri registraciji: naziv, opis i logotip, na stranici "Moja organizacija". Uz to, sistemske tabele dobijaju kontakt vlasnika, potvrdu e-pošte, zadnju prijavu, filtere i sortiranje | M | — (dodiruje 05, 09, 16) | ✅ Implemented (2026-08-30) — migracija još nije primijenjena |
 
 **Recommended order = index order.** Rationale:
 
@@ -156,6 +157,19 @@
   read and dismissed pair (D2 — closing the modal dismisses, since a user who read the whole text needs
   no further banner), and publishing writes **nothing** to `Notification` (D4), so that dismissing the
   banner cannot leave an unread bell item behind for the same announcement.
+- **SPEC-22** was written 2026-08-30 **after** the feature was built, from four decisions Asim made
+  up front (§ Decisions) — the same working order as 20 and 21: his idea, the choices settled one at a
+  time, the document written last. The decision that shapes everything else is D1: contact and official
+  fields (e-pošta, telefon, adresa, JIB, broj registra pčelara) were offered, argued for, and
+  **declined** for v1 — "samo osnovna polja, za sad". So the migration adds two nullable columns for
+  the logo and nothing else; anyone re-reading this and thinking the org model looks thin should add
+  those fields when they are actually needed, not because they were once proposed. D4 is the one that
+  must not be "simplified": every endpoint in the slice resolves the organization from
+  `ICurrentUser.OrganizationId` and there is **no id in any route** — adding `/organizations/{id}`
+  "for symmetry with /admin" would turn a structurally tenant-safe slice into one that depends on
+  remembering an access check. D6/ADR-040 explains why "zadnja prijava" is a query over refresh tokens
+  and not a `User.LastLoginAt` column, and D7 why the "Vlasnik" column is the org's OrganizationAdmin
+  rather than `CreatedBy` (for an org the SystemAdmin created, `CreatedById` is Asim).
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD

@@ -62,7 +62,29 @@
   freshness (≤30 d / ≤90 d / older or never). **ADR-034** — replaces SPEC-16 §3's heartbeat design;
   the rest of SPEC-16 (IsActive lock, OrgStatus badge, billing lists, purge) is still unbuilt.
   See `docs/features/org-activity.md`.
+- Org table also shows the **owner contact** (the org's OrganizationAdmin — name, e-pošta, telefon,
+  `+N` when there are several, "bez admina" when there is none) and its **logo**; both tables have
+  **filters** (paket incl. "istekao", aktivnost, uloga, status računa) and **click-to-sort** columns.
+  A fifth vitals tile counts expired plans — v1 billing is manual with no dunning job (SPEC-22)
+- User table shows **Kontakt** (e-pošta + whether it was ever confirmed, telefon), **Zadnja prijava**
+  and **Registrovan**. "Zadnja prijava" is `MAX(RefreshToken.CreatedAt)` — derived, not stored, the
+  same source and reasoning as org activity (**ADR-040**)
 - Demo data (2 orgs, apiaries, hives) seeded via EF `HasData` migrations
+
+### Moja organizacija (SPEC-22)
+- `/organization` — an **OrganizationAdmin edits the organization they created at sign-up**: name,
+  description, and a logo. Until this shipped the org was unreachable to its own owner
+- `GET|PUT /api/organizations/my` + `POST|GET|DELETE /api/organizations/my/logo`
+  (`OrgProfileService`). **No id anywhere** — the org is resolved from `ICurrentUser.OrganizationId`,
+  so there is no id to tamper with; read = any member, write = OrgAdmin (controller attributes).
+  The org-less SystemAdmin gets **403**, and the nav item is hidden for him
+- Logo: two nullable columns + the existing `IFileStorage` (ADR-027), streamed through the API, no
+  public URL, format sniffed from header bytes (`Common/Validation/ImageRules`), ≤ 2 MB.
+  `Cache-Control: private, no-cache` — unlike inspection photos, because the URL never changes
+- Renaming revokes no session (the name is not a JWT claim) but does refresh the cached
+  `organizationName`, so the label under the profile avatar updates without re-login
+- **Contact/official org fields (e-pošta, telefon, adresa, JIB) were declined for v1** — basic fields
+  only. See `docs/features/organization-profile.md`
 
 ### Organization Members (`/api/org/*`)
 - OrganizationAdmin/ApiaryAdmin manage members: create ApiaryAdmin/Beekeeper accounts,
@@ -399,7 +421,7 @@
 
 **All roadmap specs shipped** (see `docs/specs/README.md`).
 
-**Shipped (were specced):** SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-20 Kontakt i podrška ✅, SPEC-21 Šta je novo ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
+**Shipped (were specced):** SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-20 Kontakt i podrška ✅, SPEC-21 Šta je novo ✅, SPEC-22 Moja organizacija ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
 
 **Unspecced ideas:**
 

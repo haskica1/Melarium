@@ -14,12 +14,14 @@ public class AdminService : IAdminService
     private readonly IUnitOfWork _uow;
     private readonly INotificationService _notifications;
     private readonly ISessionRevoker _sessions;
+    private readonly IFileStorage _storage;
 
-    public AdminService(IUnitOfWork uow, INotificationService notifications, ISessionRevoker sessions)
+    public AdminService(IUnitOfWork uow, INotificationService notifications, ISessionRevoker sessions, IFileStorage storage)
     {
         _uow           = uow;
         _notifications = notifications;
         _sessions      = sessions;
+        _storage       = storage;
     }
 
     // ── Organizations ──────────────────────────────────────────────────────────
@@ -106,6 +108,30 @@ public class AdminService : IAdminService
         await _uow.SaveChangesAsync();
     }
 
+    /// <summary>
+    /// Streams an organization's logo for the system tables. The blob has no public URL, so the only
+    /// way to show it outside the owning organization is through an endpoint that re-checks the role.
+    /// </summary>
+    public async Task<(Stream Content, string ContentType)> OpenOrganizationLogoAsync(int id)
+    {
+        var org = await _uow.Organizations.GetByIdAsync(id)
+            ?? throw new NotFoundException(nameof(Organization), id);
+
+        if (org.LogoStoragePath is null || org.LogoContentType is null)
+            throw new NotFoundException(nameof(Organization), id);
+
+        try
+        {
+            var stream = await _storage.OpenReadAsync(org.LogoStoragePath);
+            return (stream, org.LogoContentType);
+        }
+        catch (FileNotFoundException)
+        {
+            // Row points at a blob that is gone — a clean 404 beats a 500.
+            throw new NotFoundException(nameof(Organization), id);
+        }
+    }
+
     // ── Apiaries ───────────────────────────────────────────────────────────────
 
     public async Task<IEnumerable<AdminApiaryListItemDto>> GetApiariesByOrganizationAsync(int organizationId)
@@ -132,14 +158,17 @@ public class AdminService : IAdminService
         // AssignedBeehives is included by the repository — one query for all users
         // instead of an extra round-trip per Beekeeper.
         var users = await _uow.Users.GetAllWithOrganizationAsync();
-        return users.Select(MapUser).ToList();
+        var lastLogin = await _uow.Users.GetLastLoginAtAsync();
+        return users.Select(u => MapUser(u, lastLogin)).ToList();
     }
 
     public async Task<AdminUserDto> GetUserByIdAsync(int id)
     {
         var user = await _uow.Users.GetByIdWithAssignedBeehivesAsync(id)
             ?? throw new NotFoundException(nameof(User), id);
-        return MapUser(user);
+
+        var lastLogin = await _uow.Users.GetLastLoginAtAsync(id);
+        return MapUser(user, lastLogin);
     }
 
     public async Task<AdminUserDto> CreateUserAsync(CreateAdminUserDto dto)
@@ -248,7 +277,7 @@ public class AdminService : IAdminService
             }
         }
 
-        return MapUser(created!);
+        return MapUser(created!, await _uow.Users.GetLastLoginAtAsync(user.Id));
     }
 
     public async Task<AdminUserDto> UpdateUserAsync(int id, UpdateAdminUserDto dto)
@@ -434,7 +463,7 @@ public class AdminService : IAdminService
             }
         }
 
-        return MapUser(updated!);
+        return MapUser(updated!, await _uow.Users.GetLastLoginAtAsync(id));
     }
 
     public async Task DeleteUserAsync(int id)
@@ -485,24 +514,47 @@ public class AdminService : IAdminService
     private static AdminOrganizationDto MapOrganization(
         Organization o,
         Dictionary<int, int> beehiveCounts,
-        Dictionary<int, DateTime> lastActivity) => new()
+        Dictionary<int, DateTime> lastActivity)
     {
-        Id = o.Id,
-        Name = o.Name,
-        Description = o.Description,
-        UserCount = o.Users.Count,
-        ApiaryCount = o.Apiaries.Count,
-        BeehiveCount = beehiveCounts.GetValueOrDefault(o.Id),
-        LastActivityAt = lastActivity.TryGetValue(o.Id, out var at) ? at : null,
-        CreatedByName = o.CreatedBy != null ? $"{o.CreatedBy.FirstName} {o.CreatedBy.LastName}" : null,
-        CreatedAt = o.CreatedAt,
-        Plan = o.Plan,
-        PlanName = Common.Localization.BsLabels.Label(o.Plan),
-        PlanValidUntil = o.PlanValidUntil,
-        PlanNotes = o.PlanNotes,
-    };
+        // Who to contact about this organization. The founder is preferred, but only while they are
+        // still an OrgAdmin — an org created by the SystemAdmin, or one whose founder was demoted,
+        // falls through to the longest-standing OrgAdmin. Both come out of the Users collection the
+        // repository already includes, so this costs no extra query.
+        var orgAdmins = o.Users
+            .Where(u => u.Role == UserRole.OrganizationAdmin)
+            .OrderBy(u => u.CreatedAt)
+            .ThenBy(u => u.Id)
+            .ToList();
+        var owner = orgAdmins.FirstOrDefault(u => u.Id == o.CreatedById) ?? orgAdmins.FirstOrDefault();
 
-    private static AdminUserDto MapUser(User u) => new()
+        return new AdminOrganizationDto
+        {
+            Id = o.Id,
+            Name = o.Name,
+            Description = o.Description,
+            UserCount = o.Users.Count,
+            ApiaryCount = o.Apiaries.Count,
+            BeehiveCount = beehiveCounts.GetValueOrDefault(o.Id),
+            LastActivityAt = lastActivity.TryGetValue(o.Id, out var at) ? at : null,
+            CreatedByName = o.CreatedBy != null ? $"{o.CreatedBy.FirstName} {o.CreatedBy.LastName}" : null,
+            OwnerName = owner != null ? $"{owner.FirstName} {owner.LastName}" : null,
+            OwnerEmail = owner?.Email,
+            OwnerPhone = owner?.Phone,
+            OrgAdminCount = orgAdmins.Count,
+            HasLogo = o.LogoStoragePath is not null,
+            CreatedAt = o.CreatedAt,
+            Plan = o.Plan,
+            PlanName = Common.Localization.BsLabels.Label(o.Plan),
+            PlanValidUntil = o.PlanValidUntil,
+            PlanNotes = o.PlanNotes,
+        };
+    }
+
+    /// <summary>
+    /// <paramref name="lastLogin"/> is passed in rather than queried per user: the users table is
+    /// read as a whole list, and a per-row lookup would be one query per account.
+    /// </summary>
+    private static AdminUserDto MapUser(User u, Dictionary<int, DateTime> lastLogin) => new()
     {
         Id = u.Id,
         FirstName = u.FirstName,
@@ -515,6 +567,8 @@ public class AdminService : IAdminService
         ApiaryId = u.ApiaryId,
         ApiaryName = u.Apiary?.Name,
         AssignedBeehiveIds = u.AssignedBeehives.Select(ub => ub.BeehiveId).ToList(),
-        CreatedAt = u.CreatedAt
+        CreatedAt = u.CreatedAt,
+        EmailVerifiedAt = u.EmailVerifiedAt,
+        LastLoginAt = lastLogin.TryGetValue(u.Id, out var at) ? at : null,
     };
 }

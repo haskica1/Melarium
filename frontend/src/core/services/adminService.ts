@@ -42,6 +42,15 @@ export const adminService = {
     await apiClient.delete(`/admin/organizations/${id}`)
   },
 
+  /**
+   * Logo bytes for the system table — an <img src> cannot carry the Bearer header and the storage
+   * bucket has no public URL. Callers turn the blob into an object URL and must revoke it.
+   */
+  async fetchOrganizationLogoBlob(id: number): Promise<Blob> {
+    const { data } = await apiClient.get<Blob>(`/admin/organizations/${id}/logo`, { responseType: 'blob' })
+    return data
+  },
+
   async getApiariesByOrganization(orgId: number): Promise<AdminApiaryListItem[]> {
     const { data } = await apiClient.get<AdminApiaryListItem[]>(`/admin/organizations/${orgId}/apiaries`)
     return data

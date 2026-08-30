@@ -9,7 +9,7 @@ interface AuthContextValue {
   login: (identifier: string, password: string) => Promise<LoginResponse>
   register: (payload: RegisterPayload) => Promise<LoginResponse>
   logout: () => void
-  updateUser: (partial: Pick<AuthUser, 'firstName' | 'lastName' | 'email'>) => void
+  updateUser: (partial: Partial<Pick<AuthUser, 'firstName' | 'lastName' | 'email' | 'organizationName'>>) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }, [queryClient])
 
-  const updateUser = useCallback((partial: Pick<AuthUser, 'firstName' | 'lastName' | 'email'>) => {
+  const updateUser = useCallback((partial: Partial<Pick<AuthUser, 'firstName' | 'lastName' | 'email' | 'organizationName'>>) => {
     authService.updateStoredUser(partial)
     setUser(prev => prev ? { ...prev, ...partial } : prev)
   }, [])

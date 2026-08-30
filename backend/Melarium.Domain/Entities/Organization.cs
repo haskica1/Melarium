@@ -17,6 +17,17 @@ public class Organization : BaseEntity
     /// <summary>Manual bookkeeping: broj uplatnice, ko je platio, "Probni period"…</summary>
     public string? PlanNotes { get; set; }
 
+    // ── Logo (SPEC-22) ──
+
+    /// <summary>
+    /// Opaque <c>IFileStorage</c> key for the organization logo; null when none was uploaded.
+    /// The blob is never public — it is streamed through the API like inspection photos (ADR-027).
+    /// </summary>
+    public string? LogoStoragePath { get; set; }
+
+    /// <summary>Content type of the stored logo, sniffed from the file header bytes on upload.</summary>
+    public string? LogoContentType { get; set; }
+
     public int? CreatedById { get; set; }
     public User? CreatedBy { get; set; }
 

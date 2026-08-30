@@ -23,6 +23,7 @@ import AdminDashboardPage from './features/admin/AdminDashboardPage'
 import OrganizationFormPage from './features/admin/OrganizationFormPage'
 import UserFormPage from './features/admin/UserFormPage'
 import MembersPage from './features/members/MembersPage'
+import MyOrganizationPage from './features/organization/MyOrganizationPage'
 import MemberAssignmentPage from './features/members/MemberAssignmentPage'
 import ExpensesPage from './features/expenses/ExpensesPage'
 import ExpenseFormPage from './features/expenses/ExpenseFormPage'
@@ -58,6 +59,9 @@ import HistoryTracker from './shared/components/HistoryTracker'
 const APIARY_MANAGERS   = ['OrganizationAdmin', 'SystemAdmin']
 const HIVE_MANAGERS     = ['ApiaryAdmin', 'OrganizationAdmin', 'SystemAdmin']
 const MEMBER_MANAGERS   = ['OrganizationAdmin', 'ApiaryAdmin']
+// Deliberately not SystemAdmin: he has no organization of his own, and administers every other
+// one through /admin (SPEC-22).
+const ORG_OWNERS        = ['OrganizationAdmin']
 const EXPENSE_MANAGERS  = ['ApiaryAdmin', 'OrganizationAdmin', 'SystemAdmin']
 
 export default function App() {
@@ -149,6 +153,11 @@ export default function App() {
 
               {/* Pastures (pašnjaci) — registry readable by all; write actions gated in-page + API */}
               <Route path="pastures" element={<PasturesPage />} />
+
+              {/* Moja organizacija (SPEC-22) — only the OrgAdmin can edit the org they own */}
+              <Route element={<RoleRoute allowedRoles={ORG_OWNERS} />}>
+                <Route path="organization" element={<MyOrganizationPage />} />
+              </Route>
 
               {/* Members routes — OrgAdmin and Admin */}
               <Route element={<RoleRoute allowedRoles={MEMBER_MANAGERS} />}>

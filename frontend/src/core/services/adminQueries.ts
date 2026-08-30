@@ -11,6 +11,7 @@ import type {
 export const adminQueryKeys = {
   organizations: ['admin', 'organizations'] as const,
   organization: (id: number) => ['admin', 'organizations', id] as const,
+  organizationLogo: (id: number) => ['admin', 'organizations', id, 'logo'] as const,
   apiariesByOrg: (orgId: number) => ['admin', 'organizations', orgId, 'apiaries'] as const,
   beehivesByOrg: (orgId: number) => ['admin', 'organizations', orgId, 'beehives'] as const,
   users: ['admin', 'users'] as const,
@@ -27,6 +28,19 @@ export const useAdminOrganization = (id: number) =>
     queryKey: adminQueryKeys.organization(id),
     queryFn: () => adminService.getOrganization(id),
     enabled: !!id,
+  })
+
+/**
+ * One organization logo as an object URL, cached so a re-render of the table does not re-download
+ * it. Only enabled for organizations the list says actually have one.
+ */
+export const useAdminOrganizationLogo = (id: number, enabled: boolean) =>
+  useQuery({
+    queryKey: adminQueryKeys.organizationLogo(id),
+    queryFn: async () => URL.createObjectURL(await adminService.fetchOrganizationLogoBlob(id)),
+    enabled,
+    staleTime: Infinity,
+    gcTime: 5 * 60_000,
   })
 
 export const useCreateOrganization = () => {

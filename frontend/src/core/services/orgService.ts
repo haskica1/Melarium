@@ -6,9 +6,48 @@ import type {
   UpdateBeehiveAssignmentsPayload,
   UpdateApiaryAssignmentPayload,
   CreateOrgMemberPayload,
+  MyOrganization,
+  UpdateMyOrganizationPayload,
 } from '../models'
 
 export const orgService = {
+  // ── Moja organizacija (SPEC-22) ──
+
+  async getMyOrganization(): Promise<MyOrganization> {
+    const { data } = await apiClient.get<MyOrganization>('/organizations/my')
+    return data
+  },
+
+  async updateMyOrganization(payload: UpdateMyOrganizationPayload): Promise<MyOrganization> {
+    const { data } = await apiClient.put<MyOrganization>('/organizations/my', payload)
+    return data
+  },
+
+  async uploadLogo(file: File): Promise<MyOrganization> {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await apiClient.post<MyOrganization>('/organizations/my/logo', form, {
+      // Left to the browser so it can set the multipart boundary (inspection-photo precedent).
+      headers: { 'Content-Type': undefined },
+      timeout: 60_000,
+    })
+    return data
+  },
+
+  async deleteLogo(): Promise<MyOrganization> {
+    const { data } = await apiClient.delete<MyOrganization>('/organizations/my/logo')
+    return data
+  },
+
+  /**
+   * Fetches the logo bytes through apiClient — an <img src> cannot carry the Bearer header.
+   * Callers turn the blob into an object URL and must revoke it on unmount.
+   */
+  async fetchLogoBlob(): Promise<Blob> {
+    const { data } = await apiClient.get<Blob>('/organizations/my/logo', { responseType: 'blob' })
+    return data
+  },
+
   async getMembers(): Promise<OrgMember[]> {
     const { data } = await apiClient.get<OrgMember[]>('/org/members')
     return data

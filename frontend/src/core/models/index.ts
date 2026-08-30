@@ -773,6 +773,14 @@ export interface AdminOrganization {
   beehiveCount: number
   createdByName?: string
   createdAt: string
+  /** Contact for the org: its founding OrganizationAdmin, or the longest-standing one. */
+  ownerName?: string | null
+  ownerEmail?: string | null
+  ownerPhone?: string | null
+  /** More than one means ownerName is one of several org admins. */
+  orgAdminCount: number
+  /** Streamed from /admin/organizations/{id}/logo — never a public URL. */
+  hasLogo: boolean
   /** Newest sign of life, derived server-side from the org's own records + sign-ins. Null = never. */
   lastActivityAt?: string | null
   // Subscription plan (SPEC-09)
@@ -812,6 +820,10 @@ export interface AdminUser {
   apiaryName?: string
   assignedBeehiveIds: number[]
   createdAt: string
+  /** Null = address never confirmed. Soft — it never blocks sign-in. */
+  emailVerifiedAt?: string | null
+  /** Newest issued session (sign-in or refresh). Null = never signed in. */
+  lastLoginAt?: string | null
 }
 
 export interface AdminApiaryListItem {
@@ -847,6 +859,25 @@ export interface UpdateAdminUserPayload {
   organizationId?: number | null
   apiaryId?: number | null
   assignedBeehiveIds: number[]
+}
+
+// ── Moja organizacija (SPEC-22) ───────────────────────────────────────────────
+
+export interface MyOrganization {
+  id: number
+  name: string
+  description?: string | null
+  /** Streamed from /organizations/my/logo — an <img src> cannot carry the Bearer header. */
+  hasLogo: boolean
+  createdAt: string
+  userCount: number
+  apiaryCount: number
+  beehiveCount: number
+}
+
+export interface UpdateMyOrganizationPayload {
+  name: string
+  description?: string | null
 }
 
 // ── Org Management ────────────────────────────────────────────────────────────

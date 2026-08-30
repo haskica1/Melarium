@@ -19,7 +19,7 @@ public class AdminPlanUpdateTests
 
     public AdminPlanUpdateTests()
     {
-        _service = new AdminService(_uow, Substitute.For<INotificationService>(), new SessionRevoker(_uow));
+        _service = new AdminService(_uow, Substitute.For<INotificationService>(), new SessionRevoker(_uow), Substitute.For<IFileStorage>());
 
         // The returned DTO carries the admin list's metrics, so every path that produces one reads
         // these. Empty = "no hives, never active", which is what an unconfigured substitute means.

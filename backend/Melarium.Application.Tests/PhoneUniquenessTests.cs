@@ -43,8 +43,14 @@ public class PhoneUniquenessTests
         new SessionRevoker(_uow),
         Substitute.For<INotificationService>());
 
-    private AdminService Admin() => new(
-        _uow, Substitute.For<INotificationService>(), new SessionRevoker(_uow));
+    private AdminService Admin()
+    {
+        // Mapping a user now reads "zadnja prijava" off the repository; an unstubbed NSubstitute
+        // call hands back null, which is not a shape the real repository can return.
+        _uow.Users.GetLastLoginAtAsync(Arg.Any<int?>()).Returns(new Dictionary<int, DateTime>());
+        return new AdminService(
+            _uow, Substitute.For<INotificationService>(), new SessionRevoker(_uow), Substitute.For<IFileStorage>());
+    }
 
     private static UpdateProfileDto ProfileDto(string? phone) =>
         new("Asim", "Tester", "asim@test.ba", phone, null, null);

@@ -1006,3 +1006,42 @@ between the assistant and the domain, not between two services.
 merge is committed and with its failure logged rather than thrown — the same ordering
 `BeehiveService.CreateAsync` uses, and for the same reason: a notification must never undo the write
 that produced it.
+
+---
+
+## ADR-040: "Zadnja prijava" Is `MAX(RefreshToken.CreatedAt)`, Not a Stored Column (SPEC-22)
+
+**Status:** Accepted (2026-08-30)
+
+**Context.** The SystemAdmin user table needed to answer "is anyone still using this account?" —
+the operational question behind an unpaid invoice, a support call, and a demo account nobody ever
+opened. The obvious implementation is a `User.LastLoginAt` column stamped by `AuthService`.
+
+**Decision.** No column. `IUserRepository.GetLastLoginAtAsync` returns one grouped
+`MAX(RefreshToken.CreatedAt)` per user, and `AdminService` passes that dictionary into `MapUser`.
+
+**Why the existing table is a better source than a new column.**
+
+- **It is already true for every account, retroactively.** A new column starts empty and only becomes
+  meaningful after weeks of traffic. The refresh-token table has been recording session issue since
+  the rotation scheme shipped, and nothing prunes it — so the maximum covers the account's whole
+  history from day one, including accounts that predate this feature.
+- **It cannot drift.** A stamped column is correct only while every sign-in path remembers to write
+  it. `IssueTokensAsync` is the single place a session is minted; measuring there measures reality
+  rather than a promise.
+- **It measures the better thing.** A token row is written on sign-in *and* on every refresh, so the
+  value reads as "last time this account was actually used", not "last time someone typed a
+  password". A user whose app has kept the session alive for months is active, and a
+  `LastLoginAt` column would call them stale.
+
+This is the same reasoning, and the same table, as **ADR-034** for organization activity: the data
+needed to answer the question is already being written for another reason, so nothing new has to be
+maintained. The UI even shares the 30/90-day colour scale, so both tables read with one set of eyes.
+
+**Cost, accepted.** One extra grouped query per admin list load, and the value is a *session* moment
+rather than strictly a login — which is why the column is labelled "Zadnja prijava" in the UI but
+documented as "newest issued session" everywhere it is defined. If refresh tokens are ever pruned,
+this becomes a floor rather than the truth; that is the one change that would force a real column.
+
+**Not applied to the organization's own screens.** `MyOrganizationDto` carries no activity or login
+data at all. Who signed in when is platform operations, not something a tenant reads about itself.

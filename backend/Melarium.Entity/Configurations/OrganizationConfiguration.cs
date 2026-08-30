@@ -25,6 +25,13 @@ public class OrganizationConfiguration : IEntityTypeConfiguration<Organization>
         builder.Property(o => o.PlanNotes)
             .HasMaxLength(300);
 
+        // ── Logo (SPEC-22) ── storage key + sniffed content type, both null until one is uploaded
+        builder.Property(o => o.LogoStoragePath)
+            .HasMaxLength(500);
+
+        builder.Property(o => o.LogoContentType)
+            .HasMaxLength(100);
+
         builder.HasOne(o => o.CreatedBy)
             .WithMany()
             .HasForeignKey(o => o.CreatedById)

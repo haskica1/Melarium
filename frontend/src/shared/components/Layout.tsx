@@ -51,8 +51,10 @@ export default function Layout() {
 
   // Role rules come from usePermissions — this used to re-derive them, so the nav and the pages
   // could disagree about who sees what.
-  const { isSystemAdmin, isOrgAdmin, isAdmin, canSeeExpenses, canManageMembers, canSeePastures } =
-    usePermissions()
+  const {
+    isSystemAdmin, isOrgAdmin, isAdmin,
+    canSeeExpenses, canManageMembers, canSeePastures, canEditOwnOrganization,
+  } = usePermissions()
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
   // Untriaged feedback count for the nav badge (SPEC-13) — only SystemAdmin has the endpoint.
@@ -72,6 +74,7 @@ export default function Layout() {
     canSeeExpenses,
     canManageMembers,
     canSeePastures,
+    canEditOwnOrganization,
     feedbackNewCount: feedbackSummary?.newCount,
     announcementUnreadCount: announcementBanner?.unreadCount,
   }

@@ -35,6 +35,8 @@ export function usePermissions() {
     // Navigation visibility — lives here so Layout and Sidebar don't re-derive role rules.
     canSeeExpenses: isSystemAdmin || isOrgAdmin || isAdmin,
     canManageMembers: isOrgAdmin || isAdmin,
+    /** "Moja organizacija" (SPEC-22) — the org admin editing the org they own. */
+    canEditOwnOrganization: isOrgAdmin,
     canSeePastures: isOrgAdmin || isSystemAdmin,
 
     isSystemAdmin,

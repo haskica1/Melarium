@@ -34,6 +34,7 @@ export const HELP_ROUTES = [
   '/expenses/:id/edit',
   '/expenses',
   '/pastures',
+  '/organization',
   '/members/:id/assignments',
   '/members',
   '/calendar/settings',

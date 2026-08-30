@@ -131,7 +131,8 @@ export const authService = {
     return !!localStorage.getItem(TOKEN_KEY)
   },
 
-  updateStoredUser(partial: Pick<AuthUser, 'firstName' | 'lastName' | 'email'>): void {
+  /** organizationName is in here because an OrgAdmin can rename their own organization (SPEC-22). */
+  updateStoredUser(partial: Partial<Pick<AuthUser, 'firstName' | 'lastName' | 'email' | 'organizationName'>>): void {
     const current = this.getUser()
     if (!current) return
     const updated = { ...current, ...partial }

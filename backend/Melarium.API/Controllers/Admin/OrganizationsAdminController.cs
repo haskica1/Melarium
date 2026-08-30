@@ -91,6 +91,17 @@ public class OrganizationsAdminController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Streams the organization logo (SPEC-22) so the system tables can show it. 404 when it has none.</summary>
+    [HttpGet("{id:int}/logo")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetOrganizationLogo(int id)
+    {
+        var (content, contentType) = await _service.OpenOrganizationLogoAsync(id);
+        Response.Headers.CacheControl = "private, no-cache";
+        return File(content, contentType);
+    }
+
     /// <summary>Returns apiaries for a given organization — used when assigning Admin users.</summary>
     [HttpGet("{id:int}/apiaries")]
     [ProducesResponseType(typeof(IEnumerable<AdminApiaryListItemDto>), StatusCodes.Status200OK)]

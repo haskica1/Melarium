@@ -12,6 +12,9 @@ public interface IAdminService
     Task<AdminOrganizationDto> UpdateOrganizationPlanAsync(int id, UpdateOrganizationPlanDto dto);
     Task DeleteOrganizationAsync(int id);
 
+    /// <summary>Streams an organization's logo (SPEC-22) for the system tables. 404 when it has none.</summary>
+    Task<(Stream Content, string ContentType)> OpenOrganizationLogoAsync(int id);
+
     // Apiaries (for org-scoped picker)
     Task<IEnumerable<AdminApiaryListItemDto>> GetApiariesByOrganizationAsync(int organizationId);
 

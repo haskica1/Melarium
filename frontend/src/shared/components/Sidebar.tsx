@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
-  BarChart2, CalendarDays, ChevronsLeft, ChevronsRight, Droplets, GraduationCap, Home,
+  BarChart2, Building2, CalendarDays, ChevronsLeft, ChevronsRight, Droplets, GraduationCap, Home,
   LayoutDashboard, Leaf, Megaphone, MessageSquareHeart, Pill, ReceiptText, Sparkles, Tent, Users,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -11,6 +11,7 @@ export interface NavRoleFlags {
   isSystemAdmin: boolean
   canSeeExpenses: boolean
   canManageMembers: boolean
+  canEditOwnOrganization: boolean
   canSeePastures: boolean
   /** Untriaged feedback count (SPEC-13) — SystemAdmin only, 0/undefined hides the badge. */
   feedbackNewCount?: number
@@ -32,6 +33,7 @@ export function getNavItems(flags: NavRoleFlags): NavItemDef[] {
     flags.isSystemAdmin
       ? { to: '/admin', icon: <LayoutDashboard className="w-4 h-4" />, label: 'Kontrolna ploča', visible: true }
       : { to: '/apiaries', icon: <Home className="w-4 h-4" />, label: 'Pčelinjaci', visible: true },
+    { to: '/organization', icon: <Building2 className="w-4 h-4" />, label: 'Moja organizacija', visible: flags.canEditOwnOrganization },
     { to: '/members', icon: <Users className="w-4 h-4" />, label: 'Članovi', visible: flags.canManageMembers },
     // Pčelinjak/organizacija-vezane stavke — SystemAdmin nema svoju organizaciju, pa mu ove stranice ne služe.
     { to: '/pastures', icon: <Tent className="w-4 h-4" />, label: 'Pašnjaci', visible: flags.canSeePastures && !flags.isSystemAdmin },

@@ -8,6 +8,7 @@ using Melarium.Application.Features.Apiaries;
 using Melarium.Application.Features.Assistant;
 using Melarium.Application.Features.Invitations;
 using Melarium.Application.Features.OrgManagement;
+using Melarium.Application.Features.OrgProfile;
 using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Calendar;
 using Melarium.Application.Features.Notifications;
@@ -68,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<IDailyAgendaService, DailyAgendaService>();
         services.AddScoped<IAdminService, AdminService>();
         services.AddScoped<IOrgManagementService, OrgManagementService>();
+        services.AddScoped<IOrgProfileService, OrgProfileService>();
         services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IStatsService, StatsService>();
         services.AddScoped<IAuthService, AuthService>();
