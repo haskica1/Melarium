@@ -320,6 +320,66 @@ public class OrgManagementService : IOrgManagementService
         return MapMember(created!);
     }
 
+    public async Task TransferOwnershipAsync(TransferOwnershipDto dto)
+    {
+        var orgId = RequireOrganization();
+
+        if (_currentUser.Role != UserRole.OrganizationAdmin)
+            throw new ForbiddenAccessException("Only Organization Admins can transfer ownership.");
+
+        var outgoingId = _currentUser.UserId
+            ?? throw new ForbiddenAccessException();
+
+        if (dto.MemberId == outgoingId)
+            throw new BusinessRuleException("Vlasništvo ne možete prenijeti na samog sebe.");
+
+        var successor = await _uow.Users.GetByIdAsync(dto.MemberId)
+            ?? throw new NotFoundException(nameof(User), dto.MemberId);
+
+        // Not a ForbiddenAccessException: an id outside the caller's organization must look exactly
+        // like an id that does not exist, or this endpoint answers "does user 412 exist?" for anyone.
+        if (successor.OrganizationId != orgId)
+            throw new NotFoundException(nameof(User), dto.MemberId);
+
+        var outgoing = await _uow.Users.GetByIdAsync(outgoingId)
+            ?? throw new NotFoundException(nameof(User), outgoingId);
+
+        var organization = await _uow.Organizations.GetByIdAsync(orgId)
+            ?? throw new NotFoundException(nameof(Organization), orgId);
+
+        // The successor stops being scoped to one apiary — an OrganizationAdmin runs all of them,
+        // and `ApiaryId` on a non-ApiaryAdmin is rejected by the role/apiary consistency rule.
+        successor.Role = UserRole.OrganizationAdmin;
+        successor.ApiaryId = null;
+
+        // The outgoing admin becomes a Beekeeper, not an ApiaryAdmin: an ApiaryAdmin must be tied to
+        // a specific apiary, and there is no honest way to pick one for them. As a Beekeeper with no
+        // hive assignments they keep their account and see nothing until the new owner grants access
+        // — which is the point of handing the organization over.
+        outgoing.Role = UserRole.Beekeeper;
+        outgoing.ApiaryId = null;
+
+        await _uow.Users.UpdateAsync(successor);
+        await _uow.Users.UpdateAsync(outgoing);
+
+        // Role, organization and apiary are all JWT claims, so both sessions are now describing
+        // permissions their owner no longer has. Same rule as every other role change in the app.
+        await _sessions.RevokeAllAsync(successor.Id);
+        await _sessions.RevokeAllAsync(outgoing.Id);
+
+        await _uow.SaveChangesAsync();
+
+        // After the commit, because NotifyAsync runs its own SaveChanges on the shared DbContext —
+        // notifying first would push the role change out early and on failure take it down with it.
+        await _notifications.NotifyAsync(
+            successor.Id,
+            "Postali ste administrator organizacije",
+            $"{outgoing.FirstName} {outgoing.LastName} vam je prenio/la vlasništvo nad organizacijom "
+            + $"'{organization.Name}'. Od sada vi upravljate njenim članovima, pčelinjacima i paketom. "
+            + "Prijavite se ponovo da biste vidjeli nove mogućnosti.",
+            NotificationType.OrganizationOwnershipTransferred);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private int RequireOrganization() =>

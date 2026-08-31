@@ -203,6 +203,64 @@ and it does not change).
 
 ---
 
+### Account deletion & ownership transfer
+
+Deleting your **own** account, and the handover that has to happen first when you are the
+administrator of an organization that still has members. Both are ordinary app features; they became
+a priority because the app stores require in-app account deletion (Apple 5.1.1(v), Google Play).
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/profile/deletion-preview` | `AccountDeletionPreviewDto` — what deleting this account would do |
+| DELETE | `/profile` | `204` — body `{ password, organizationNameConfirmation? }` |
+| POST | `/org/transfer-ownership` | `204` — body `{ memberId }`; OrgAdmin only |
+
+**AccountDeletionPreviewDto:** `{ mode, organizationName?, memberCount, apiaryCount, beehiveCount,
+deletesTreatmentRegister }`. `mode` is one of:
+
+| `mode` | Meaning | What the dialog must ask for |
+|---|---|---|
+| `account` | Only this account and its personal records go | password |
+| `organization` | Caller is the last member **and** the OrgAdmin — the organization and everything in it goes too | password **and** the organization's exact name |
+| `transfer-required` | Caller is the OrgAdmin of an organization that still has members | nothing — deletion is refused until they hand over |
+
+The rule lives in **one** private helper in `ProfileService`, which both the preview and the deletion
+call. A preview that said `account` while the deletion decided `organization` would destroy an
+organization nobody was warned about.
+
+`DELETE /profile` carries a **body** (the password). That is deliberate: the alternative, a password
+in the query string, would put a credential in server logs and browser history. The password is
+re-typed rather than taken from the session so an unlocked phone is not two taps from deleting the
+account. A wrong password is **422**, the same shape and cost as any other refusal.
+
+Refusals are all `BusinessRuleException` → **422**, not 409: wrong password, an OrgAdmin who still
+has members, a mistyped organization name, and the last SystemAdmin trying to delete themselves.
+
+**What deletion removes:** the user row, and by cascade their sessions, notifications, read markers,
+AI history, calendar settings and hive assignments. **What survives, anonymised** (`SetNull`, already
+the schema's design before this feature existed): feedback, invitations, and the `CreatedBy` of
+apiaries, hives, harvests, treatments, expenses, diets, moves and merges. Beekeeping records have no
+foreign key to a user at all — they hang off the organization.
+
+Assigned todos are released (`Todo.AssignedToId = null`) **before** the delete: that FK is the one
+configured `NoAction`, so PostgreSQL refuses the delete outright rather than clearing it. The same
+crash still exists in `AdminService.DeleteUserAsync` and is not fixed here.
+
+When the organization goes too, the user and the organization are removed in **one** `SaveChanges`.
+`Organization.Users` is `Restrict` and EF deletes dependents before principals, so the ordering is
+already correct; two separate saves could leave a deleted user beside an organization nobody can
+reach. Deleting the organization cascades into its apiaries and therefore into the **treatment
+register** — which is why `deletesTreatmentRegister` exists and why the dialog says so out loud.
+
+**Transfer of ownership** exists because an organization has exactly one `OrganizationAdmin` and no
+other way to appoint one. The successor becomes `OrganizationAdmin` with `ApiaryId` cleared; the
+caller steps down to `Beekeeper` (not `ApiaryAdmin` — that role must be tied to an apiary, and there
+is no honest way to pick one). Both sessions are revoked, the caller's included, because role is a
+JWT claim. A `memberId` from another organization answers **404**, not 403, so the endpoint cannot be
+used to ask whether a user id exists.
+
+---
+
 ### Plans & billing (SPEC-09)
 
 | Method | Path | Returns |

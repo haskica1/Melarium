@@ -40,6 +40,7 @@
 | 20 | [Kontakt i podrška](SPEC-20-contact-support.md) | Kontakt modal (WhatsApp, Viber, telefon, email) dostupan sa svake stranice **i s login/register ekrana**, uz obećanje odgovora u 24h. Frontend-only, bez rute | S | — (soft-link 13) | ✅ Implemented (2026-08-28) |
 | 21 | [Šta je novo](SPEC-21-announcements.md) | SystemAdmin objavi novu funkcionalnost (naslov + opis u markdownu, tip Novo/Poboljšanje/Ispravka) → banner na svakoj stranici → modal s cijelim tekstom → "x" ga trajno sklanja. Sve objave ostaju na stranici "Šta je novo". Bez stavke u zvonu, bez slike, bez ciljanja po paketu | M | — (prepisuje obrazac 06) | ✅ Implemented (2026-08-28) — migracija još nije primijenjena |
 | 22 | [Moja organizacija](SPEC-22-org-profile.md) | Administrator organizacije napokon može urediti organizaciju koju je sam napravio pri registraciji: naziv, opis i logotip, na stranici "Moja organizacija". Uz to, sistemske tabele dobijaju kontakt vlasnika, potvrdu e-pošte, zadnju prijavu, filtere i sortiranje | M | — (dodiruje 05, 09, 16) | ✅ Implemented (2026-08-30) — migracija još nije primijenjena |
+| 23 | [Mobilne aplikacije](SPEC-23-mobile-apps.md) | Melarium na Google Play i App Store kroz Capacitor, uz web koji ostaje netaknut: iste funkcije bez izuzetka, prave push notifikacije na telefon, i brisanje računa + prenos vlasništva organizacije koje prodavnice traže a kojih danas nema | L | — (dodiruje 04, 06, 07, 08, 09, 22) | 📋 Planned |
 
 **Recommended order = index order.** Rationale:
 
@@ -170,6 +171,32 @@
   remembering an access check. D6/ADR-040 explains why "zadnja prijava" is a query over refresh tokens
   and not a `User.LastLoginAt` column, and D7 why the "Vlasnik" column is the org's OrganizationAdmin
   rather than `CreatedBy` (for an org the SystemAdmin created, `CreatedById` is Asim).
+- **SPEC-23** was written 2026-08-31 from Asim's idea — users kept asking how to *download* the app —
+  with its product decisions settled one at a time before drafting and listed in § Decisions; the
+  document is the record, not the place they were made. It is the first spec whose deliverable is not
+  a screen but a **distribution channel**, and that is where its shape comes from: the web app is
+  explicitly untouched (D1 wraps the existing `vite build` output rather than rewriting it), so almost
+  nothing in the spec is a new feature. The bulk of it is the opposite — § Domain rules enumerates six
+  things that **already work on the web and would silently stop working** inside a webview, because
+  the one hard rule Asim set is that the mobile app may not have a single feature fewer than the web.
+  Two of those are invisible failures rather than errors and must not be "noticed later": jsPDF
+  `.save()` is a browser download and does nothing at all in a webview (the treatment register and the
+  QR sheets), and `useSpeech`'s `isSupported` guard would quietly *hide* the "Poslušaj" button on
+  Android rather than fail, which reads as a missing feature and not as a bug. D4 is the single
+  deliberate web/mobile difference in the whole spec — the upgrade CTA is hidden in the app (Apple
+  3.1.1) — and it is written down precisely so that any *other* difference someone finds later is
+  treated as a defect. Its riskiest part is not the native shell but § Brisanje računa, which the
+  stores require and which does not exist anywhere in the code today: step 3 (`Todo.AssignedToId = null`)
+  is not optional bookkeeping but the fix for a **pre-existing** FK crash that `AdminService.DeleteUserAsync`
+  still has, since `TodoConfiguration` binds that FK with `DeleteBehavior.NoAction`. D6's three-case
+  table is the other thing that must be implemented literally: the obvious simplification — "the org
+  admin leaves, so delete the organization" — would let one person destroy five other beekeepers'
+  hives, records and logins without their consent, which is why D7 (transfer of ownership) exists at
+  all. Deleting a solo admin's organization *does* destroy the legally-retained treatment register
+  that SPEC-19 was written to protect; that is correct here and is why the confirmation must say so
+  out loud. Finally, D5 has no code in it and is still the longest pole in the project: personal store
+  accounts mean Google requires ~12 testers running the app for 14 continuous days, so Phase 0 starts
+  the day Phase 1 does, not when the code is finished.
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD

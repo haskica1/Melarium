@@ -9,6 +9,7 @@ import type { UpdateProfilePayload } from '../../core/services/profileService'
 import FeedbackFormModal from '../../shared/components/FeedbackFormModal'
 import MyFeedbackSection from './MyFeedbackSection'
 import HelpPreferenceSection from './HelpPreferenceSection'
+import DeleteAccountSection from './DeleteAccountSection'
 import clsx from 'clsx'
 
 interface ProfileForm {
@@ -364,6 +365,9 @@ export default function ProfilePage() {
       <div className="mt-6 space-y-6">
         <HelpPreferenceSection />
         <MyFeedbackSection onNew={() => setFeedbackOpen(true)} />
+        {/* Last on the page on purpose — nobody should meet the delete button on their way to
+            changing a phone number. */}
+        <DeleteAccountSection />
       </div>
 
       <FeedbackFormModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />

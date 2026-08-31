@@ -4,8 +4,9 @@ using Microsoft.Extensions.Configuration;
 namespace Melarium.Infrastructure.Storage;
 
 /// <summary>
-/// Development file storage on the local disk. Root comes from <c>Storage:LocalPath</c>
-/// (default <c>./uploads</c>, git-ignored). Not for production — Render's disk is ephemeral.
+/// File storage on the local disk. Root comes from <c>Storage:LocalPath</c> — <c>./uploads</c>
+/// (git-ignored) in development, and <c>/app/uploads</c> in production, which docker-compose
+/// mounts as the persistent <c>uploads-data</c> volume so uploads survive a redeploy.
 /// </summary>
 public class LocalDiskFileStorage : IFileStorage
 {

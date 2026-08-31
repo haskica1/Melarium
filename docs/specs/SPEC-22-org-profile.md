@@ -202,5 +202,7 @@ bude nevidljiv.
 Provjereno bez baze i bez backenda, po `melarium-local-verification-limits`: privremena `/__preview`
 ruta koja seeda React Query mock podacima i renderuje **prave** stranice, vođena browser alatima
 (sortiranje, oba filtera, dirty-state dugmeta, boje ikona potvrde, 375 px i 1440 px, obje teme),
-zatim obrisana. Backend je provjeren `dotnet build` + `dotnet test`. **Migracija nije primijenjena** —
-`dotnet ef database update` ide na produkciju pri deployu.
+zatim obrisana. Backend je provjeren `dotnet build` + `dotnet test`. **Migracija nije primijenjena na
+produkciji** — primijeni je sam API pri sljedećem restartu kontejnera (`Program.cs` zove
+`db.Database.MigrateAsync()` bezuslovno), dakle kroz `deploy/deploy.sh`; nema ručnog
+`dotnet ef database update` koraka.

@@ -1,6 +1,6 @@
 # Deployment — Self-Hosted VPS (e.g. netcup)
 
-Alternative to the Render/Vercel setup described in the [README](../README.md#deployment):
+Full walkthrough for the deployment summarised in the [README](../README.md#deployment):
 everything (PostgreSQL, backend, frontend) runs on a single VPS you control, behind nginx,
 under one domain.
 

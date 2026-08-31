@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users, Pencil, AlertCircle, Search, UserPlus, Loader2, Eye, EyeOff } from 'lucide-react'
+import { Users, Pencil, AlertCircle, Search, UserPlus, Loader2, Eye, EyeOff, Crown } from 'lucide-react'
 import { useOrgMembers, useAvailableApiaries, useAvailableBeehives, useCreateOrgMember } from '../../core/services/orgQueries'
 import { useAuth } from '../../core/context/AuthContext'
+import { orgService } from '../../core/services/orgService'
+import type { OrgMember } from '../../core/models'
+import { errorMessage } from '../../core/services/apiClient'
 import { VitalCard, VitalsSkeleton, ErrorState, ErrorMessage, Modal } from '../../shared/components'
 
 interface AddMemberForm {
@@ -27,7 +30,7 @@ const EMPTY_FORM: AddMemberForm = {
 
 export default function MembersPage() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const { data: members = [], isLoading, isError, refetch } = useOrgMembers()
   const [query, setQuery] = useState('')
 
@@ -39,6 +42,14 @@ export default function MembersPage() {
   const [selectedBeehiveIds, setSelectedBeehiveIds] = useState<number[]>([])
   const [showPassword, setShowPassword] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // ── Transfer ownership state ───────────────────────────────────────────────
+  // The exit an OrganizationAdmin needs before they can delete their own account: without it the
+  // admin of an organization that still has members can never leave.
+  const [transferTarget, setTransferTarget] = useState<OrgMember | null>(null)
+  const [transferConfirm, setTransferConfirm] = useState('')
+  const [transferError, setTransferError] = useState<string | null>(null)
+  const [transferring, setTransferring] = useState(false)
 
   const { data: availableApiaries = [] } = useAvailableApiaries(isOrgAdmin && modalOpen)
   const { data: availableBeehives = [], isError: availableBeehivesError } = useAvailableBeehives()
@@ -265,16 +276,33 @@ export default function MembersPage() {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          {/* Org admins have nothing to assign — the assignments page rejects the role server-side. */}
-                          {member.role !== 'OrganizationAdmin' && (
-                            <button
-                              onClick={() => navigate(`/members/${member.id}/assignments`)}
-                              className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
-                              title="Uredi dodjele"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {/* Org admins have nothing to assign — the assignments page rejects the role server-side. */}
+                            {member.role !== 'OrganizationAdmin' && (
+                              <button
+                                onClick={() => navigate(`/members/${member.id}/assignments`)}
+                                className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
+                                title="Uredi dodjele"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                            {/* Only the current owner can hand the organization over, and only to
+                                someone who is not already the owner. */}
+                            {isOrgAdmin && member.role !== 'OrganizationAdmin' && (
+                              <button
+                                onClick={() => {
+                                  setTransferTarget(member)
+                                  setTransferConfirm('')
+                                  setTransferError(null)
+                                }}
+                                className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-slate-800 transition-colors"
+                                title="Prenesi vlasništvo organizacije"
+                              >
+                                <Crown className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -498,6 +526,85 @@ export default function MembersPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* ── Transfer ownership ─────────────────────────────────────────────────── */}
+      <Modal
+        open={transferTarget !== null}
+        onClose={() => setTransferTarget(null)}
+        title="Prenos vlasništva organizacije"
+        size="md"
+        closeOnBackdropClick={false}
+        icon={<Crown className="w-5 h-5 text-blue-500 mt-1" />}
+      >
+        {transferTarget && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700 dark:text-slate-300">
+              <strong>{transferTarget.firstName} {transferTarget.lastName}</strong> postaje
+              administrator organizacije i preuzima upravljanje članovima, pčelinjacima i paketom.
+            </p>
+
+            <ul className="text-sm text-gray-700 dark:text-slate-300 space-y-1.5 rounded-xl
+                           bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 px-4 py-3">
+              <li>• Vi postajete <strong>pčelar bez dodijeljenih košnica</strong> — novi vlasnik vam
+                može vratiti pristup.</li>
+              <li>• Oboje ćete biti odjavljeni i morate se prijaviti ponovo.</li>
+              <li>• Prenos ne možete poništiti sami — samo vam ga novi vlasnik može vratiti.</li>
+            </ul>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+                Za potvrdu upišite ime člana:{' '}
+                <span className="font-semibold">{transferTarget.firstName} {transferTarget.lastName}</span>
+              </label>
+              <input
+                value={transferConfirm}
+                onChange={e => setTransferConfirm(e.target.value)}
+                className="form-input"
+                placeholder={`${transferTarget.firstName} ${transferTarget.lastName}`}
+                autoComplete="off"
+              />
+            </div>
+
+            {transferError && <ErrorMessage message={transferError} />}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setTransferTarget(null)}
+                className="btn-secondary flex-1 justify-center"
+              >
+                Otkaži
+              </button>
+              <button
+                type="button"
+                disabled={
+                  transferring ||
+                  transferConfirm.trim() !== `${transferTarget.firstName} ${transferTarget.lastName}`
+                }
+                onClick={async () => {
+                  setTransferring(true)
+                  setTransferError(null)
+                  try {
+                    await orgService.transferOwnership(transferTarget.id)
+                    // The server revoked this session. The access token still carries
+                    // OrganizationAdmin for up to 30 minutes, so signing out here is what actually
+                    // ends the old role rather than waiting for the first 401.
+                    logout()
+                    navigate('/login', { replace: true })
+                  } catch (err) {
+                    setTransferError(errorMessage(err))
+                    setTransferring(false)
+                  }
+                }}
+                className="btn-primary flex-1 justify-center"
+              >
+                {transferring && <Loader2 className="w-4 h-4 animate-spin" />}
+                Prenesi vlasništvo
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

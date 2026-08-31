@@ -119,6 +119,8 @@ detail row.
 
 ## Deploy
 
-`dotnet ef database update` — migration `AddOrganizationLogo` (two nullable columns, no data
-change). Nothing else: no new env var, no new package, no new bucket. `Storage:Provider` already
-points at the same place inspection photos use.
+Nothing to run by hand: `Program.cs` calls `db.Database.MigrateAsync()` unconditionally at startup,
+so `AddOrganizationLogo` (two nullable columns, no data change) applies when `deploy/deploy.sh`
+restarts the `api` container. Nothing else either: no new env var, no new package, no new bucket —
+the logo lands on the same `uploads-data` volume as inspection photos, which also means the pg_dump
+cron in `deployment.md` §9 does **not** cover it.

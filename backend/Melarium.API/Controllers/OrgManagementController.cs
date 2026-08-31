@@ -20,13 +20,16 @@ public class OrgManagementController : ControllerBase
 {
     private readonly IOrgManagementService _service;
     private readonly IValidator<CreateOrgMemberDto> _createMemberValidator;
+    private readonly IValidator<TransferOwnershipDto> _transferValidator;
 
     public OrgManagementController(
         IOrgManagementService service,
-        IValidator<CreateOrgMemberDto> createMemberValidator)
+        IValidator<CreateOrgMemberDto> createMemberValidator,
+        IValidator<TransferOwnershipDto> transferValidator)
     {
         _service = service;
         _createMemberValidator = createMemberValidator;
+        _transferValidator = transferValidator;
     }
 
     /// <summary>Returns all User and Admin role members in the caller's organization.</summary>
@@ -103,6 +106,30 @@ public class OrgManagementController : ControllerBase
     {
         var beehives = await _service.GetAvailableBeehivesAsync();
         return Ok(beehives);
+    }
+
+    /// <summary>
+    /// Hands the organization over to an existing member. The member becomes OrganizationAdmin and
+    /// the caller steps down to Beekeeper. OrgAdmin only.
+    /// </summary>
+    /// <remarks>
+    /// Both accounts have their sessions revoked, the caller's included — the client must sign the
+    /// user out rather than carry on with a token that still claims OrganizationAdmin.
+    /// </remarks>
+    [HttpPost("transfer-ownership")]
+    [Authorize(Roles = Roles.OrganizationAdmin)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> TransferOwnership([FromBody] TransferOwnershipDto dto)
+    {
+        var validation = await _transferValidator.ValidateAsync(dto);
+        if (!validation.IsValid)
+            return BadRequest(validation.ToDictionary());
+
+        await _service.TransferOwnershipAsync(dto);
+        return NoContent();
     }
 
     /// <summary>Returns all apiaries in the organization for assigning to Admin users. OrgAdmin only.</summary>

@@ -47,6 +47,8 @@ import AssistantPage from './features/assistant/AssistantPage'
 import SmartRedirect from './shared/components/SmartRedirect'
 import NotFoundPage from './shared/components/NotFoundPage'
 import ScanPage from './features/beehives/ScanPage'
+import PrivacyPolicyPage from './features/legal/PrivacyPolicyPage'
+import TermsOfServicePage from './features/legal/TermsOfServicePage'
 import ProfilePage from './features/profile/ProfilePage'
 import StatsPage from './features/stats/StatsPage'
 import CalendarPage from './features/calendar/CalendarPage'
@@ -81,6 +83,10 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/scan/:uniqueId" element={<ScanPage />} />
+          {/* Public on purpose: the app stores open this URL themselves, and so does anyone
+              deciding whether to register at all. */}
+          <Route path="/privatnost" element={<PrivacyPolicyPage />} />
+          <Route path="/uslovi" element={<TermsOfServicePage />} />
 
           {/* Protected routes — redirect to /login if not authenticated */}
           <Route element={<ProtectedRoute />}>

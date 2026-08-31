@@ -1045,3 +1045,51 @@ this becomes a floor rather than the truth; that is the one change that would fo
 
 **Not applied to the organization's own screens.** `MyOrganizationDto` carries no activity or login
 data at all. Who signed in when is platform operations, not something a tenant reads about itself.
+
+---
+
+## ADR-041: Only the Last **OrganizationAdmin** Deletes the Organization; Everyone Else Just Leaves
+
+**Context:** Deleting your own account did not exist anywhere in the app — `AdminService.DeleteUserAsync`
+is a SystemAdmin tool. The app stores require it in-app (Apple 5.1.1(v), Google Play), but the design
+question is not theirs: an organization's records belong to the organization, and one member must not be
+able to destroy four other people's work by deleting their own account.
+
+**Decision:** Three outcomes, resolved by one private helper (`ProfileService.ResolveDeletionMode`) that
+both the preview endpoint and the deletion itself call:
+
+| Caller | Outcome |
+|---|---|
+| Any role other than `OrganizationAdmin` | `account` — the user and their personal rows only |
+| `OrganizationAdmin`, last member | `organization` — user **and** organization, confirmed by typing its name |
+| `OrganizationAdmin`, members remain | `transfer-required` — refused until ownership is handed over |
+
+Two readings were rejected. **"The last member deletes the organization"** (regardless of role) would let
+a lone Beekeeper in an org the SystemAdmin set up and still administers erase records that are not theirs.
+**"The OrgAdmin always deletes the organization"** — the first proposal — would let one person wipe five
+beekeepers' apiaries, inspection history and logins without their consent.
+
+Refusing the third case needs an exit, or the OrgAdmin of a staffed organization can never delete their
+account, which is itself a rejection. Hence **transfer of ownership** (`POST /org/transfer-ownership`),
+which also fixes a pre-existing gap: an organization had exactly one OrgAdmin and no way to appoint another.
+
+**Consequences:**
+
+- The outgoing owner becomes a **`Beekeeper`**, not an `ApiaryAdmin`: that role must be tied to a specific
+  apiary (`ValidateRoleOrgApiaryConsistency`) and there is no honest way to pick one. With no assignments
+  they see nothing until the new owner grants access — which is what handing an organization over means.
+- Deleting the organization cascades into its apiaries and therefore into the **treatment register** that
+  SPEC-19 exists to protect. Correct here — the user asked for their data to be gone — but it is stated
+  explicitly in the confirmation, and `deletesTreatmentRegister` is its own DTO field rather than something
+  the client infers from `mode`.
+- `Todo.AssignedToId` is the only user foreign key configured `NoAction`, so assignments are released before
+  the delete. Without it PostgreSQL refuses the delete outright. **The same crash still exists in
+  `AdminService.DeleteUserAsync`** and was deliberately left there (SPEC-16 Phase C owns it).
+- User and organization are removed in **one** `SaveChanges`. `Organization.Users` is `Restrict` and EF
+  deletes dependents before principals, so the ordering is already correct; two saves could leave a deleted
+  user beside an organization nobody can reach.
+- Everything that records *who did the work* survives anonymised (`SetNull`) — feedback, invitations, and the
+  `CreatedBy` of hives, harvests, treatments, expenses, diets, moves and merges. That was already the schema's
+  design; this is the first feature to rely on it.
+- No new exception type: every refusal is `BusinessRuleException` → **422**, per the frozen middleware mapping.
+  The spec's original `409` was dropped for that reason.

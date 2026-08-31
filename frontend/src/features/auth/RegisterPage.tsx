@@ -393,6 +393,19 @@ export default function RegisterPage() {
               form and discard whatever was already typed — and someone who cannot sign in is
               exactly the person reaching for it. */}
           <ContactLink className="mt-6" />
+
+          {/* At the point of sign-up on purpose: this is where someone decides to hand over their
+              data, so it is where the policy has to be readable. */}
+          <p className="mt-4 text-center text-xs text-gray-400 dark:text-slate-500">
+            Registracijom prihvatate{' '}
+            <Link to="/uslovi" className="underline underline-offset-2 hover:text-honey-600 dark:hover:text-honey-400 transition-colors">
+              uslove korištenja
+            </Link>{' '}
+            i{' '}
+            <Link to="/privatnost" className="underline underline-offset-2 hover:text-honey-600 dark:hover:text-honey-400 transition-colors">
+              politiku privatnosti
+            </Link>.
+          </p>
         </div>
       </div>
     </div>

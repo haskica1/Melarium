@@ -124,6 +124,13 @@
            dark:focus:ring-offset-slate-950;
   }
 
+  /* Inline text link inside prose (legal pages, help copy) — underlined so it is still a link
+     without colour, which the honey palette alone does not guarantee at small sizes. */
+  .link {
+    @apply text-honey-700 underline underline-offset-2 hover:text-honey-800
+           dark:text-honey-400 dark:hover:text-honey-300 transition-colors;
+  }
+
   /* Form input.
      `text-base sm:text-sm`: iOS Safari zooms the entire page in when a focused control's font-size
      is under 16px, and it does not zoom back out. The layout viewport then no longer matches the

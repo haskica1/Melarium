@@ -82,4 +82,13 @@ export const orgService = {
     const { data } = await apiClient.post<OrgMember>('/org/members', payload)
     return data
   },
+
+  /**
+   * Hands the organization over to an existing member. Returns nothing on purpose: the server
+   * revokes both sessions, so the caller has to sign out rather than carry on with a token that
+   * still claims OrganizationAdmin.
+   */
+  async transferOwnership(memberId: number): Promise<void> {
+    await apiClient.post('/org/transfer-ownership', { memberId })
+  },
 }

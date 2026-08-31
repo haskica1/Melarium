@@ -88,14 +88,10 @@ production startup; the real SystemAdmin comes exclusively from the `Bootstrap__
 
 ## Deployment
 
-- **Backend:** Render — set the env vars above; TLS terminates at Render's proxy; liveness probe at `/health`.
-- **Frontend:** Vercel — set `VITE_API_URL` to the deployed API base URL (e.g. `https://<app>.onrender.com/api`).
-
-### Self-hosted (VPS, e.g. netcup)
-
-Single-domain setup: nginx serves the built frontend and reverse-proxies `/api` to the
-backend, so the frontend can call the relative `/api` path (no `VITE_API_URL` needed, no
-cross-origin requests).
+Self-hosted on a netcup VPS. Single-domain setup: nginx serves the built frontend and
+reverse-proxies `/api` to the backend, so the frontend calls the relative `/api` path (no
+`VITE_API_URL` needed, no cross-origin requests). TLS terminates at nginx (Let's Encrypt);
+liveness probe at `/health`.
 
 - `docker-compose.yml` (repo root) — PostgreSQL + backend API as containers.
 - `.env.example` (repo root) — copy to `.env` on the server and fill in secrets.

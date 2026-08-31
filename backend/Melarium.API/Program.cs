@@ -80,7 +80,7 @@ builder.Services.AddSwaggerGen(c =>
 // Register Application, persistence (Entity), and Infrastructure layers via extension methods
 builder.Services.AddApplication();
 builder.Services.AddEntity(builder.Configuration);
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure();
 
 // Current-user abstraction — resolves the authenticated caller from JWT claims for the
 // Application layer's authorization (see ICurrentUser / IAccessGuard).
@@ -181,7 +181,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 // CORS — origins are configured via AllowedOrigins in appsettings.json.
-// On Render, override with the env var:  AllowedOrigins=https://your-app.vercel.app
+// Production serves the SPA and the API from the same origin behind nginx, so CORS is not
+// actually exercised there; docker-compose still sets AllowedOrigins=https://$DOMAIN so a
+// misconfigured deploy fails loudly instead of silently allowing the dev origin.
 var allowedOrigins = (builder.Configuration["AllowedOrigins"] ?? "http://localhost:5173")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
@@ -308,13 +310,13 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 
-// Reverse-proxy awareness. The API always runs behind a proxy that terminates TLS (nginx on the
-// VPS, Render's edge), so the socket peer is the proxy — not the client. Without this every
-// request looks like it comes from one address and the rate limiters above collapse into a
-// single shared bucket for the whole platform (5 logins/min for *everyone*).
+// Reverse-proxy awareness. The API always runs behind nginx, which terminates TLS, so the socket
+// peer is the proxy — not the client. Without this every request looks like it comes from one
+// address and the rate limiters above collapse into a single shared bucket for the whole
+// platform (5 logins/min for *everyone*).
 //
-// KnownProxies/KnownNetworks are cleared because the proxy's address is not fixed (Docker bridge
-// gateway, Render edge). That is safe only because the container is never exposed directly:
+// KnownProxies/KnownNetworks are cleared because the proxy's address is not fixed (it is the
+// Docker bridge gateway). That is safe only because the container is never exposed directly:
 // docker-compose binds it to 127.0.0.1 and nginx is the sole entry point. If that ever changes,
 // pin the proxy address here instead — otherwise clients could spoof X-Forwarded-For.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -351,8 +353,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseSecurityHeaders();
 
-// HTTPS redirect only in local dev — Render (and most cloud hosts) terminate
-// TLS at the proxy level; the container itself only serves plain HTTP.
+// HTTPS redirect only in local dev — in production nginx terminates TLS and redirects
+// http->https itself; the container behind it only ever serves plain HTTP.
 if (app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 app.UseCors("FrontendPolicy");

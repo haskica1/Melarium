@@ -255,6 +255,16 @@ export default function LoginPage() {
               form and discard whatever was already typed — and someone who cannot sign in is
               exactly the person reaching for it. */}
           <ContactLink className="mt-6" />
+
+          <p className="mt-4 flex items-center justify-center gap-3 text-xs text-gray-400 dark:text-slate-500">
+            <Link to="/privatnost" className="underline underline-offset-2 hover:text-honey-600 dark:hover:text-honey-400 transition-colors">
+              Politika privatnosti
+            </Link>
+            <span aria-hidden="true">·</span>
+            <Link to="/uslovi" className="underline underline-offset-2 hover:text-honey-600 dark:hover:text-honey-400 transition-colors">
+              Uslovi korištenja
+            </Link>
+          </p>
         </div>
       </div>
     </div>

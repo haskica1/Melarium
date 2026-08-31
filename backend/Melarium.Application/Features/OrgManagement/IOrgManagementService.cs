@@ -32,4 +32,14 @@ public interface IOrgManagementService
     /// Creates a new ApiaryAdmin or Beekeeper member in the caller's organization. OrgAdmin only.
     /// </summary>
     Task<OrgMemberDto> CreateMemberAsync(CreateOrgMemberDto dto);
+
+    /// <summary>
+    /// Hands the organization over to an existing member: they become the OrganizationAdmin and the
+    /// caller steps down to Beekeeper. OrgAdmin only.
+    /// </summary>
+    /// <remarks>
+    /// Returns nothing on purpose. Role is a JWT claim, so both accounts have their sessions
+    /// revoked and the caller is signed out — there is no screen left for a response to fill.
+    /// </remarks>
+    Task TransferOwnershipAsync(TransferOwnershipDto dto);
 }

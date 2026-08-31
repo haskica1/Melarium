@@ -3,7 +3,6 @@ using Melarium.Infrastructure.Alerts;
 using Melarium.Infrastructure.Email;
 using Melarium.Infrastructure.Reminders;
 using Melarium.Infrastructure.Storage;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Melarium.Infrastructure;
@@ -14,17 +13,13 @@ namespace Melarium.Infrastructure;
 /// </summary>
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IEmailService, EmailService>();
 
-        // Blob storage for uploaded files (SPEC-05): local disk in dev, S3-compatible in prod.
-        // Switching providers is config-only — no code changes (Storage:Provider = Local | S3).
-        var storageProvider = configuration["Storage:Provider"] ?? "Local";
-        if (storageProvider.Equals("S3", StringComparison.OrdinalIgnoreCase))
-            services.AddSingleton<IFileStorage, S3FileStorage>();
-        else
-            services.AddSingleton<IFileStorage, LocalDiskFileStorage>();
+        // Blob storage for uploaded files (SPEC-05). The VPS keeps uploads on a persistent
+        // Docker volume (Storage:LocalPath -> /app/uploads), so local disk is the only provider.
+        services.AddSingleton<IFileStorage, LocalDiskFileStorage>();
 
         // Notification emails are delivered by a background worker so SMTP never
         // blocks (or times out) the HTTP request that produced the notification.

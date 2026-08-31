@@ -1,10 +1,11 @@
 namespace Melarium.Application.Common.Interfaces;
 
 /// <summary>
-/// Blob storage abstraction for user-uploaded files (SPEC-05). Implementations:
-/// local disk for development, S3-compatible object storage for production
-/// (Render's disk is ephemeral). Files are always streamed through the API —
-/// storage paths are internal and never exposed as public URLs.
+/// Blob storage abstraction for user-uploaded files (SPEC-05). The only implementation is
+/// <c>LocalDiskFileStorage</c> — on the VPS that disk is a persistent Docker volume. The
+/// abstraction stays because files are always streamed through the API: storage paths are
+/// internal and never exposed as public URLs, so swapping in object storage later is a
+/// one-class change with no impact on callers.
 /// </summary>
 public interface IFileStorage
 {

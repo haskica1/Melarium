@@ -51,7 +51,6 @@ services:
       AllowedOrigins: "https://${DOMAIN}"
       FrontendUrl: "https://${DOMAIN}"
       App__PublicBaseUrl: "https://${DOMAIN}"
-      Storage__Provider: Local
       Storage__LocalPath: /app/uploads
     volumes:
       - uploads-data:/app/uploads

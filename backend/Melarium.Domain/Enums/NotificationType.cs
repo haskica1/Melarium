@@ -55,4 +55,8 @@ public enum NotificationType
     // ── Colony merge (SPEC-19 D6) — same audience and reason as BeehiveCreated: the hive count
     // of an apiary changed, and the person responsible for it did not do it themselves.
     BeehiveMerged          = 26,
+
+    // ── Organization ownership handover — the successor did not ask for this and has to be told
+    // that an entire organization is now theirs to run.
+    OrganizationOwnershipTransferred = 27,
 }

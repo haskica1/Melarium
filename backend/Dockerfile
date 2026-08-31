@@ -38,8 +38,7 @@ RUN mkdir -p /app/uploads && chown -R ${APP_UID}:${APP_UID} /app/uploads
 
 USER ${APP_UID}
 
-# Render injects $PORT at container startup.
-# The shell-form entrypoint expands $PORT at runtime (not build time).
-# Falls back to 8080 so `docker run` works locally without setting PORT.
 # Port 8080 (not 80) is required: a non-root process cannot bind privileged ports.
+# docker-compose maps it to 127.0.0.1:5080 on the host, where nginx proxies to it.
+# The shell-form entrypoint still honours $PORT at runtime for hosts that inject one.
 ENTRYPOINT ["sh", "-c", "ASPNETCORE_URLS=http://+:${PORT:-8080} exec dotnet Melarium.API.dll"]

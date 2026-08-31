@@ -1,4 +1,5 @@
 using AutoMapper;
+using Melarium.Application.Common;
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
@@ -25,7 +26,7 @@ public class BeehiveService : IBeehiveService
     private readonly IPlanGuard _plan;
     private readonly IHiveNumberOcrClient _ocr;
     private readonly ILogger<BeehiveService> _logger;
-    private readonly string _frontendUrl;
+    private readonly IConfiguration _config;
 
     public BeehiveService(
         IUnitOfWork uow,
@@ -48,7 +49,7 @@ public class BeehiveService : IBeehiveService
         _plan          = plan;
         _ocr           = ocr;
         _logger        = logger;
-        _frontendUrl   = config["FrontendUrl"] ?? "https://bee-hive-app.vercel.app";
+        _config        = config;
     }
 
     public async Task<IEnumerable<BeehiveDto>> GetByApiaryIdAsync(int apiaryId)
@@ -134,7 +135,7 @@ public class BeehiveService : IBeehiveService
         var beehive = _mapper.Map<Beehive>(dto);
         beehive.CreatedById  = _currentUser.UserId;
         beehive.UniqueId     = Guid.NewGuid();
-        beehive.QrCodeBase64 = _qr.GeneratePngBase64($"{_frontendUrl}/scan/{beehive.UniqueId}");
+        beehive.QrCodeBase64 = _qr.GeneratePngBase64(FrontendUrl.Build(_config, $"/scan/{beehive.UniqueId}"));
 
         await _uow.Beehives.AddAsync(beehive);
         await _uow.SaveChangesAsync();
@@ -316,7 +317,7 @@ public class BeehiveService : IBeehiveService
         int count = 0;
         foreach (var b in beehives)
         {
-            b.QrCodeBase64 = _qr.GeneratePngBase64($"{_frontendUrl}/scan/{b.UniqueId}");
+            b.QrCodeBase64 = _qr.GeneratePngBase64(FrontendUrl.Build(_config, $"/scan/{b.UniqueId}"));
             await _uow.Beehives.UpdateAsync(b);
             count++;
         }

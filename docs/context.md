@@ -71,6 +71,41 @@
   same source and reasoning as org activity (**ADR-040**)
 - Demo data (2 orgs, apiaries, hives) seeded via EF `HasData` migrations
 
+### Brisanje računa i prenos vlasništva
+- `DELETE /api/profile` — **a user deletes their own account**, which was impossible before. Body
+  carries the password (re-typed, not taken from the session); `GET /api/profile/deletion-preview`
+  says which of three things would happen so the dialog asks the right question
+- Three outcomes, resolved by one helper both the preview and the deletion call: an ordinary member
+  takes only their own records; an **OrganizationAdmin who is the last member** takes the whole
+  organization with them (confirmed by typing its name); an **OrganizationAdmin who still has
+  members** is refused until they hand over. A lone member of any *other* role leaves the
+  organization standing — those records are not theirs to erase
+- `POST /api/org/transfer-ownership` — **new**: the successor becomes `OrganizationAdmin`
+  (`ApiaryId` cleared), the caller steps down to `Beekeeper`, both sessions are revoked. Exists
+  because an org has exactly one OrgAdmin and there was no way to appoint another
+- Assigned todos are released before the delete — `Todo.AssignedToId` is the one user FK with
+  `NoAction`, so Postgres would refuse the delete. **The same crash still exists in
+  `AdminService.DeleteUserAsync`** (SPEC-16 Phase C)
+- Deleting the organization cascades into the **treatment register**; the dialog says so explicitly
+- Everything that records *who did the work* survives anonymised (`SetNull`), and beekeeping data
+  has no user FK at all. See `docs/features/account-deletion.md`
+
+### Pravne stranice (politika privatnosti + uslovi korištenja)
+- `/privatnost` and `/uslovi` — **public pages**, outside `ProtectedRoute` and `Layout`, sharing one
+  shell (`features/legal/LegalPage.tsx`) that cross-links them in its footer. Linked from login and
+  from register ("Registracijom prihvatate…"). The app had neither before. No API calls at all
+- The privacy policy is an **audit of the code, not a template**: the third parties listed (Groq,
+  Resend, Open-Meteo, OpenStreetMap) are the ones actually called. **It changes whenever an external
+  service does**
+- Terms §7 states the AI assistant is **not professional advice** and to verify doses and withdrawal
+  periods before acting — the one clause written against a concrete harm. §8 keeps the treatment
+  register the user's own legal obligation. Plan limits are deliberately **not** restated as numbers
+  (they live in `Plans:` and on `/plans`)
+- Both name **Asim Haskić as a natural person** — correct: an individual providing the service is
+  the controller. See `docs/features/legal-pages.md`
+- Still missing before store submission: a **physical address** (Google Play publishes it publicly),
+  and the public account-deletion request page (both stay with SPEC-23)
+
 ### Moja organizacija (SPEC-22)
 - `/organization` — an **OrganizationAdmin edits the organization they created at sign-up**: name,
   description, and a logo. Until this shipped the org was unreachable to its own owner
@@ -140,8 +175,8 @@
   Groq client); what survives that is a **503** with a Bosnian instruction, not a generic error.
   Timeout chain — nginx 180 s > browser 120 s > backend ~96 s worst case — must stay in that order (ADR-036).
 - **Photos (SPEC-05)**: up to 5 per inspection (8 MB, JPEG/PNG/WebP by header bytes), stored via
-  `IFileStorage` (`Storage:Provider = Local | S3`, prod → S3-compatible bucket e.g. Cloudflare R2;
-  new package `AWSSDK.S3`), streamed through the API (private bucket). Optional **AI frame analysis**
+  `IFileStorage` → `LocalDiskFileStorage` (`Storage:LocalPath`; in prod the persistent `uploads-data`
+  volume), streamed through the API — never a public URL. Optional **AI frame analysis**
   (`Groq:VisionModel`, default `qwen/qwen3.6-27b` since 2026-08-17 — Llama 4 Scout was retired;
   rate limit `photo-analyze` 5/min/IP; images ≤ ~3 MB — Groq 4 MB base64 cap).
   See `features/inspection-photos.md` + ADR-027/035.
@@ -403,7 +438,7 @@
 | Auth | JWT Bearer HS256, 30 min access + 14 d refresh rotation |
 | Secrets | **Not in the repo.** Env vars in production (`Jwt__Secret`, `Smtp__Password`, `Groq__ApiKey`, `ConnectionStrings__DefaultConnection`, `Bootstrap__*`, `Feedback__NotifyEmail`); `appsettings.Development.json` / user-secrets locally |
 | Rate limiting | Fixed-window per IP: login/register 5/min, refresh 20/min, parse-voice 10/min, feedback 3/min |
-| Health check | `GET /health` (liveness, used by Render) |
+| Health check | `GET /health` (liveness; proxied by nginx, see `deploy/nginx.melarium.conf.example`) |
 | CORS | `AllowedOrigins` config (comma-separated), overridable via env var |
 | API docs | Swagger UI at `/swagger` — **Development only** (not exposed in production) |
 | Security headers | `SecurityHeadersMiddleware` (nosniff, DENY framing, Referrer/Permissions-Policy, CSP) on the API; HSTS + SPA headers in nginx |
@@ -411,7 +446,7 @@
 | Frontend caching | TanStack Query v5; 30 s notification polling; PWA (Workbox NetworkFirst, 24 h) |
 | Localization | UI + API `*Name` fields + notifications in Bosnian (`BsLabels` backend, label maps frontend) |
 | Tests | `Melarium.Application.Tests` (xunit + NSubstitute): AccessGuard authorization matrix, Diet state machine, refresh-token rotation |
-| Deployment | Backend: Render (Docker, TLS at proxy). Frontend: Vercel (`VITE_API_URL`). Dev proxy → `http://localhost:62648` |
+| Deployment | netcup VPS, single domain: nginx (TLS) → static SPA + `/api` proxy → Docker (API + PostgreSQL). Dev proxy → `http://localhost:62648` |
 
 ---
 
