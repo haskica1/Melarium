@@ -64,6 +64,11 @@ export interface Apiary {
   beehiveCount: number
   createdByName?: string
   createdAt: string
+  /**
+   * The plan no longer reaches this apiary (SPEC-24). It is still listed, but the server has
+   * stripped every field except the name and refuses every route into it with a 402.
+   */
+  isLocked?: boolean
 }
 
 export interface ApiaryDetail extends Apiary {
@@ -130,6 +135,8 @@ export interface Beehive {
   mergedIntoBeehiveId?: number
   mergedIntoBeehiveName?: string
   mergedAt?: string
+  /** The plan no longer reaches this hive (SPEC-24) — listed, stripped, and 402 on every route in. */
+  isLocked?: boolean
 }
 
 export interface BeehiveDetail extends Beehive {
@@ -1426,6 +1433,11 @@ export interface PlanUsage {
   /** AI assistant interactions this month — questions and commands both (SPEC-18); 0 = no access, null = unlimited. */
   aiInteractionsThisMonth: number
   aiInteractionsLimit?: number | null
+  // ── Downgrade lock (SPEC-24): how much of the org's own data the plan no longer reaches ──
+  lockedApiaries: number
+  lockedBeehives: number
+  /** Additional members who lost write access because they rank past membersLimit. */
+  readOnlyMembers: number
 }
 
 export interface MyPlan {
@@ -1435,6 +1447,8 @@ export interface MyPlan {
   effectivePlanName: string
   planValidUntil?: string | null
   planNotes?: string | null
+  /** This account is an extra member past the plan's seats and can only read (SPEC-24). */
+  isReadOnlyMember: boolean
   usage: PlanUsage
 }
 

@@ -39,7 +39,7 @@ public class PlanGuardTests
     }
 
     private PlanGuard Guard(UserRole role = UserRole.OrganizationAdmin, int? orgId = 1) =>
-        new(_uow, new TestCurrentUser { UserId = 1, Role = role, OrganizationId = orgId }, Config());
+        new(_uow, new TestCurrentUser { UserId = 1, Role = role, OrganizationId = orgId }, Config(), TestPlanLock.Unlocked());
 
     private void OrgOnPlan(int orgId, PlanType plan, DateTime? validUntil = null) =>
         _uow.Organizations.GetByIdAsync(orgId)

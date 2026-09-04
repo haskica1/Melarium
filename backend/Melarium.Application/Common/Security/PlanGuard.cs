@@ -14,12 +14,14 @@ public class PlanGuard : IPlanGuard
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUser _currentUser;
     private readonly IConfiguration _config;
+    private readonly IPlanLock _planLock;
 
-    public PlanGuard(IUnitOfWork uow, ICurrentUser currentUser, IConfiguration config)
+    public PlanGuard(IUnitOfWork uow, ICurrentUser currentUser, IConfiguration config, IPlanLock planLock)
     {
         _uow = uow;
         _currentUser = currentUser;
         _config = config;
+        _planLock = planLock;
     }
 
     public async Task EnsureCanAddApiaryAsync(int organizationId)
@@ -110,8 +112,15 @@ public class PlanGuard : IPlanGuard
 
         var aiQuota = effective == PlanType.Free ? 0 : Limit(effective, "AiInteractionsPerMonth");
 
+        // What the plan no longer reaches (SPEC-24). Computed the same way the access guard computes
+        // it, so the meters on /plans and the padlocks on the lists can never disagree.
+        var locked = await _planLock.GetForOrganizationAsync(organizationId);
+        var membersLimit = Limit(effective, "MaxMembers");
+        var additionalMembers = await CountAdditionalMembersAsync(organizationId);
+
         return new MyPlanDto
         {
+            IsReadOnlyMember = await _planLock.IsCurrentUserReadOnlyAsync(),
             Plan = org.Plan,
             PlanName = BsLabels.Label(org.Plan),
             EffectivePlan = effective,
@@ -124,10 +133,13 @@ public class PlanGuard : IPlanGuard
                 ApiariesLimit = Limit(effective, "MaxApiaries"),
                 Beehives = await _uow.Beehives.CountByOrganizationAsync(organizationId),
                 BeehivesLimit = Limit(effective, "MaxBeehives"),
-                Members = await CountAdditionalMembersAsync(organizationId),
-                MembersLimit = Limit(effective, "MaxMembers"),
+                Members = additionalMembers,
+                MembersLimit = membersLimit,
                 AiInteractionsThisMonth = await CountAiInteractionsThisMonthAsync(organizationId),
                 AiInteractionsLimit = aiQuota,
+                LockedApiaries = locked.ApiaryIds.Count,
+                LockedBeehives = locked.BeehiveIds.Count,
+                ReadOnlyMembers = membersLimit is int max ? Math.Max(0, additionalMembers - max) : 0,
             },
         };
     }

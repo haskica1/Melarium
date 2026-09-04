@@ -10,11 +10,13 @@ public sealed class AccessGuard : IAccessGuard
 {
     private readonly ICurrentUser _user;
     private readonly IUnitOfWork _uow;
+    private readonly IPlanLock _planLock;
 
-    public AccessGuard(ICurrentUser user, IUnitOfWork uow)
+    public AccessGuard(ICurrentUser user, IUnitOfWork uow, IPlanLock planLock)
     {
         _user = user;
         _uow = uow;
+        _planLock = planLock;
     }
 
     public bool IsSystemAdmin => _user.Role == UserRole.SystemAdmin;
@@ -41,42 +43,50 @@ public sealed class AccessGuard : IAccessGuard
         }
     }
 
-    public async Task EnsureCanManageApiaryAsync(int apiaryId)
+    public async Task EnsureCanManageApiaryAsync(int apiaryId, bool allowLocked = false)
     {
-        if (_user.Role == UserRole.SystemAdmin) return;
+        if (!await HasRoleAccessToApiaryAsync(apiaryId))
+            throw new ForbiddenAccessException();
+
+        // Role first, plan second: the two denials mean different things to the caller (403 "not
+        // yours" vs 402 "yours, but above your plan"), and only the second one should offer an upsell.
+        if (!allowLocked)
+            await _planLock.EnsureApiaryUnlockedAsync(apiaryId);
+    }
+
+    public async Task<bool> CanManageApiaryAsync(int apiaryId) =>
+        await HasRoleAccessToApiaryAsync(apiaryId)
+        && !await _planLock.IsApiaryLockedAsync(apiaryId);
+
+    public async Task EnsureCanAccessBeehiveAsync(int beehiveId, bool allowLocked = false)
+    {
+        if (!await HasRoleAccessToBeehiveAsync(beehiveId))
+            throw new ForbiddenAccessException();
+
+        if (!allowLocked)
+            await _planLock.EnsureBeehiveUnlockedAsync(beehiveId);
+    }
+
+    public async Task<bool> CanAccessBeehiveAsync(int beehiveId) =>
+        await HasRoleAccessToBeehiveAsync(beehiveId)
+        && !await _planLock.IsBeehiveLockedAsync(beehiveId);
+
+    // ── Role rules, without the plan lock ─────────────────────────────────────────
+
+    private async Task<bool> HasRoleAccessToApiaryAsync(int apiaryId)
+    {
+        if (_user.Role == UserRole.SystemAdmin) return true;
 
         // An ApiaryAdmin is bound to a single apiary id, so no lookup is needed.
-        if (_user.Role == UserRole.ApiaryAdmin)
-        {
-            if (_user.ApiaryId == apiaryId) return;
-            throw new ForbiddenAccessException();
-        }
+        if (_user.Role == UserRole.ApiaryAdmin) return _user.ApiaryId == apiaryId;
 
-        var apiary = await _uow.Apiaries.GetByIdAsync(apiaryId)
-            ?? throw new ForbiddenAccessException();
-        EnsureCanManageApiary(apiaryId, apiary.OrganizationId);
+        var apiary = await _uow.Apiaries.GetByIdAsync(apiaryId);
+        return apiary is not null
+            && _user.Role == UserRole.OrganizationAdmin
+            && _user.OrganizationId == apiary.OrganizationId;
     }
 
-    public async Task<bool> CanManageApiaryAsync(int apiaryId)
-    {
-        try
-        {
-            await EnsureCanManageApiaryAsync(apiaryId);
-            return true;
-        }
-        catch (ForbiddenAccessException)
-        {
-            return false;
-        }
-    }
-
-    public async Task EnsureCanAccessBeehiveAsync(int beehiveId)
-    {
-        if (!await CanAccessBeehiveAsync(beehiveId))
-            throw new ForbiddenAccessException();
-    }
-
-    public async Task<bool> CanAccessBeehiveAsync(int beehiveId)
+    private async Task<bool> HasRoleAccessToBeehiveAsync(int beehiveId)
     {
         switch (_user.Role)
         {
@@ -106,6 +116,8 @@ public sealed class AccessGuard : IAccessGuard
         }
     }
 
+    // ── Assignment sets ───────────────────────────────────────────────────────────
+
     public async Task<HashSet<int>> GetAssignedBeehiveIdsAsync()
     {
         if (_user.UserId is not int userId) return [];
@@ -118,7 +130,20 @@ public sealed class AccessGuard : IAccessGuard
         return await _uow.Users.GetAssignedApiaryIdsAsync(userId);
     }
 
-    public async Task<IReadOnlyList<Beehive>> GetAccessibleBeehivesAsync()
+    // ── Visible sets ──────────────────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<Beehive>> GetAccessibleBeehivesAsync(bool includeLocked = false)
+    {
+        var beehives = await RoleScopedBeehivesAsync();
+        if (includeLocked) return beehives;
+
+        var locked = await _planLock.GetForCurrentUserAsync();
+        return locked.BeehiveIds.Count == 0
+            ? beehives
+            : beehives.Where(b => !locked.BeehiveIds.Contains(b.Id)).ToList();
+    }
+
+    private async Task<IReadOnlyList<Beehive>> RoleScopedBeehivesAsync()
     {
         switch (_user.Role)
         {
@@ -144,7 +169,18 @@ public sealed class AccessGuard : IAccessGuard
         }
     }
 
-    public async Task<IReadOnlyList<Apiary>> GetAccessibleApiariesAsync()
+    public async Task<IReadOnlyList<Apiary>> GetAccessibleApiariesAsync(bool includeLocked = false)
+    {
+        var apiaries = await RoleScopedApiariesAsync();
+        if (includeLocked) return apiaries;
+
+        var locked = await _planLock.GetForCurrentUserAsync();
+        return locked.ApiaryIds.Count == 0
+            ? apiaries
+            : apiaries.Where(a => !locked.ApiaryIds.Contains(a.Id)).ToList();
+    }
+
+    private async Task<IReadOnlyList<Apiary>> RoleScopedApiariesAsync()
     {
         switch (_user.Role)
         {

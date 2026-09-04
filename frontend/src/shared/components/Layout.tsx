@@ -16,6 +16,7 @@ import HelpButton from './HelpButton'
 import HelpPanel from './HelpPanel'
 import WelcomeModal from './WelcomeModal'
 import AnnouncementBanner from './AnnouncementBanner'
+import ReadOnlyMemberBanner from './ReadOnlyMemberBanner'
 import { useAnnouncementBanner } from '../../core/services/announcementQueries'
 import { useFeedbackSummary } from '../../core/services/feedbackQueries'
 import { useHelp } from '../../core/help/useHelp'
@@ -486,6 +487,9 @@ export default function Layout() {
           {/* Outside the boundary on purpose (SPEC-21): the banner is not part of any page, so a
               page that crashes should not take the announcement down with it. */}
           <AnnouncementBanner />
+          {/* Same reasoning (SPEC-24): a read-only member needs to know why saving will fail
+              before they try, on every page, not only where they happen to hit a 402. */}
+          <ReadOnlyMemberBanner />
           {/* Keyed on the path so navigating away clears a crashed page — without the key the
               boundary would stay in its error state for the rest of the session. */}
           <ErrorBoundary key={pathname}>

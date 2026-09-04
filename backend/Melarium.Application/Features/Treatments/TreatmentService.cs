@@ -18,12 +18,14 @@ public class TreatmentService : ITreatmentService
 {
     private readonly IUnitOfWork _uow;
     private readonly IAccessGuard _access;
+    private readonly Common.Security.IPlanLock _planLock;
     private readonly ICurrentUser _currentUser;
 
-    public TreatmentService(IUnitOfWork uow, IAccessGuard access, ICurrentUser currentUser)
+    public TreatmentService(IUnitOfWork uow, IAccessGuard access, ICurrentUser currentUser, Common.Security.IPlanLock planLock)
     {
         _uow = uow;
         _access = access;
+        _planLock = planLock;
         _currentUser = currentUser;
     }
 
@@ -46,12 +48,20 @@ public class TreatmentService : ITreatmentService
             return (await _uow.Treatments.GetByApiaryAsync(aid, year)).Select(ToListDto);
         }
 
+        // Treatments of a locked apiary stay out of the organization-wide register (SPEC-24) — the
+        // register is one of the places its data would otherwise still be fully readable.
+        var locked = await _planLock.GetForCurrentUserAsync();
+
         return _currentUser.Role switch
         {
             UserRole.ApiaryAdmin when _currentUser.ApiaryId is int myApiary =>
-                (await _uow.Treatments.GetByApiaryAsync(myApiary, year)).Select(ToListDto),
+                locked.ApiaryIds.Contains(myApiary)
+                    ? []
+                    : (await _uow.Treatments.GetByApiaryAsync(myApiary, year)).Select(ToListDto),
             UserRole.OrganizationAdmin when _currentUser.OrganizationId is int orgId =>
-                (await _uow.Treatments.GetByOrganizationAsync(orgId, year)).Select(ToListDto),
+                (await _uow.Treatments.GetByOrganizationAsync(orgId, year))
+                    .Where(t => !locked.ApiaryIds.Contains(t.ApiaryId))
+                    .Select(ToListDto),
             _ => [], // SystemAdmin (no org) must pass a filter
         };
     }

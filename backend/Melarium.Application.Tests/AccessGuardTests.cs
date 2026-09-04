@@ -17,9 +17,10 @@ namespace Melarium.Application.Tests;
 public class AccessGuardTests
 {
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+    private readonly IPlanLock _planLock = TestPlanLock.Unlocked();
 
     private AccessGuard CreateGuard(UserRole? role, int? userId = 1, int? organizationId = null, int? apiaryId = null) =>
-        new(new TestCurrentUser { UserId = userId, Role = role, OrganizationId = organizationId, ApiaryId = apiaryId }, _uow);
+        new(new TestCurrentUser { UserId = userId, Role = role, OrganizationId = organizationId, ApiaryId = apiaryId }, _uow, _planLock);
 
     // ── EnsureInOrganization ───────────────────────────────────────────────────
 
@@ -173,6 +174,86 @@ public class AccessGuardTests
         var guard = CreateGuard(UserRole.Beekeeper, organizationId: 7);
 
         await Assert.ThrowsAsync<ForbiddenAccessException>(() => guard.EnsureCanAccessBeehiveAsync(10));
+    }
+
+    // ── Downgrade lock (SPEC-24) ───────────────────────────────────────────────
+    //
+    // The lock rides on this guard because everything that reads apiary or hive data already passes
+    // through it. These lock the two things that make that safe: the refusal is a 402 and not a 403
+    // (so the UI offers an upgrade rather than "not yours"), and the escape hatches stay open.
+
+    private AccessGuard GuardWithLock(IPlanLock planLock, UserRole role = UserRole.OrganizationAdmin) =>
+        new(new TestCurrentUser { UserId = 1, Role = role, OrganizationId = 7 }, _uow, planLock);
+
+    private void OwnedHive(int hiveId = 10, int apiaryId = 3)
+    {
+        _uow.Beehives.GetByIdAsync(hiveId).Returns(new Beehive { Id = hiveId, ApiaryId = apiaryId });
+        _uow.Apiaries.GetByIdAsync(apiaryId).Returns(new Apiary { Id = apiaryId, OrganizationId = 7 });
+    }
+
+    [Fact]
+    public async Task EnsureCanAccessBeehive_LockedByPlan_ThrowsPlanLimit_Not403()
+    {
+        OwnedHive();
+        var guard = GuardWithLock(TestPlanLock.Locking([], [10]));
+
+        // Their own hive, so the role check passes — the refusal must be the payment one.
+        await Assert.ThrowsAsync<PlanLimitException>(() => guard.EnsureCanAccessBeehiveAsync(10));
+    }
+
+    [Fact]
+    public async Task EnsureCanAccessBeehive_LockedByPlan_AllowLocked_Passes()
+    {
+        OwnedHive();
+        var guard = GuardWithLock(TestPlanLock.Locking([], [10]));
+
+        // Deleting a hive and syncing an offline inspection both come through here.
+        await guard.EnsureCanAccessBeehiveAsync(10, allowLocked: true);
+    }
+
+    [Fact]
+    public async Task EnsureCanAccessBeehive_NotYours_StillThrows403_EvenWhenLocked()
+    {
+        _uow.Beehives.GetByIdAsync(10).Returns(new Beehive { Id = 10, ApiaryId = 3 });
+        _uow.Apiaries.GetByIdAsync(3).Returns(new Apiary { Id = 3, OrganizationId = 999 });
+        var guard = GuardWithLock(TestPlanLock.Locking([], [10]));
+
+        // An outsider must not learn anything about another organization's plan.
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => guard.EnsureCanAccessBeehiveAsync(10));
+    }
+
+    [Fact]
+    public async Task CanAccessBeehive_LockedByPlan_False()
+    {
+        OwnedHive();
+        var guard = GuardWithLock(TestPlanLock.Locking([], [10]));
+
+        // The assistant and the scan flow resolve targets through this — a locked hive is unreachable.
+        Assert.False(await guard.CanAccessBeehiveAsync(10));
+    }
+
+    [Fact]
+    public async Task EnsureCanManageApiary_LockedByPlan_ThrowsPlanLimit()
+    {
+        _uow.Apiaries.GetByIdAsync(3).Returns(new Apiary { Id = 3, OrganizationId = 7 });
+        var guard = GuardWithLock(TestPlanLock.Locking([3], []));
+
+        await Assert.ThrowsAsync<PlanLimitException>(() => guard.EnsureCanManageApiaryAsync(3));
+        await guard.EnsureCanManageApiaryAsync(3, allowLocked: true);   // the delete path
+    }
+
+    [Fact]
+    public async Task GetAccessibleBeehives_ExcludesLockedByDefault_AndIncludesThemOnRequest()
+    {
+        _uow.Beehives.GetByOrganizationAsync(7).Returns(new[]
+        {
+            new Beehive { Id = 10, ApiaryId = 3 },
+            new Beehive { Id = 11, ApiaryId = 3 },
+        });
+        var guard = GuardWithLock(TestPlanLock.Locking([], [11]));
+
+        Assert.Equal([10], (await guard.GetAccessibleBeehivesAsync()).Select(b => b.Id));
+        Assert.Equal([10, 11], (await guard.GetAccessibleBeehivesAsync(includeLocked: true)).Select(b => b.Id));
     }
 
     // ── Assigned id lookups ────────────────────────────────────────────────────

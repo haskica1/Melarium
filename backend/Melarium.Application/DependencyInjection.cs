@@ -52,6 +52,10 @@ public static class DependencyInjection
         // Subscription-plan enforcement (SPEC-09) — single source of truth for plan gates
         services.AddScoped<IPlanGuard, PlanGuard>();
 
+        // Downgrade locking (SPEC-24) — which rows a shrunken plan can no longer reach.
+        // Scoped, and it caches per request: the access guard consults it on every resource check.
+        services.AddScoped<IPlanLock, PlanLock>();
+
         // Granting plan time (SPEC-15) — the only place allowed to do arithmetic on PlanValidUntil
         services.AddScoped<IPlanCredit, PlanCredit>();
 

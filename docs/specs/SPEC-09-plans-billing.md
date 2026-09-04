@@ -44,7 +44,7 @@ Logika paketa (obrazloženje za buduće izmjene): sve što je besplatno za servi
 dnevnu naviku (prognoza je Open-Meteo bez API ključa, kalendar, alarmi, edukacija koristi
 browserski TTS) ide u besplatni paket — to vraća korisnika u aplikaciju i pokreće preporuke od
 usta do usta. **Unos podataka i zakonske evidencije se nikad ne naplaćuju** (PDF registar
-tretmana je zakonska obaveza), a prelazak na niži paket ništa ne zaključava. Naplaćuje se stvarni
+tretmana je zakonska obaveza), a prelazak na niži paket ništa ne zaključava **(obrnuto u SPEC-24 — vidi ADR-042)**. Naplaćuje se stvarni
 trošak (Groq AI), skala (**košnice su jedina mjera skale** — pčelinjaci su besplatni redovi u
 bazi, ograničeni samo na Besplatnom paketu gdje 1 pčelinjak označava hobistu) i komercijalni
 signali (dodatni članovi, selidbe na pašu — oboje ukazuje na ozbiljnu proizvodnju, a ništa ne
@@ -81,7 +81,7 @@ UI labela preko `BsLabels`/frontend mapa.)
   Plans:Trial:Days` (30), `PlanNotes = "Probni period"`. Nula novih mehanizama — probni period je
   samo unaprijed postavljeni Pro s istekom; po isteku pada na Besplatni kroz izračunati efektivni
   paket.
-- Prelazak na niži paket / istek nikad ne dira podatke: košnice/pčelinjaci/pašnjaci/članovi iznad
+- ⚠️ **Zamijenjeno SPEC-24 / ADR-042 (2026-09-04).** Ovo je bilo originalno pravilo: prelazak na niži paket / istek nikad ne dira podatke: košnice/pčelinjaci/pašnjaci/članovi iznad
   limita ostaju čitljivi i izmjenjivi — limiti se provjeravaju **samo pri kreiranju**. AI
   endpointi i kreiranje pašnjaka/selidbi prestaju raditi odmah.
 - **Partner** je u enforcementu identičan Max-u (bez limita, sve omogućeno), ali se nikad ne
@@ -217,7 +217,7 @@ faktura, tabela historije/audita promjena paketa.
 - [x] Registracija kreira organizaciju kao Pro sa `PlanValidUntil = +30 dana` i `PlanNotes =
       "Probni period"` (`RegistrationTrialTests`); istekli paket se ponaša identično Besplatnom
       (`PlanHelperTests`, uklj. granicu istog dana).
-- [x] Prelazak na niži paket ništa ne zaključava: gejtovi su samo na *kreiranju* (Update/Delete
+- [x] ~~Prelazak na niži paket ništa ne zaključava~~ **(više ne važi — SPEC-24):** gejtovi su samo na *kreiranju* (Update/Delete
       putanje netaknute); live-provjereno — Free org sa 5 postojećih članova / 4 košnice ostaje
       čitljiva i mjerači prikazuju prekoračenje bez blokiranja.
 - [x] SystemAdmin endpoint za promjenu paketa je zaštićen po roli (`[Authorize(Roles=SystemAdmin)]`),

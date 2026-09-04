@@ -24,6 +24,7 @@ public class BeehiveService : IBeehiveService
     private readonly ICurrentUser _currentUser;
     private readonly IAccessGuard _access;
     private readonly IPlanGuard _plan;
+    private readonly IPlanLock _planLock;
     private readonly IHiveNumberOcrClient _ocr;
     private readonly ILogger<BeehiveService> _logger;
     private readonly IConfiguration _config;
@@ -36,6 +37,7 @@ public class BeehiveService : IBeehiveService
         ICurrentUser currentUser,
         IAccessGuard access,
         IPlanGuard plan,
+        IPlanLock planLock,
         IHiveNumberOcrClient ocr,
         ILogger<BeehiveService> logger,
         IConfiguration config)
@@ -47,6 +49,7 @@ public class BeehiveService : IBeehiveService
         _currentUser   = currentUser;
         _access        = access;
         _plan          = plan;
+        _planLock      = planLock;
         _ocr           = ocr;
         _logger        = logger;
         _config        = config;
@@ -70,12 +73,16 @@ public class BeehiveService : IBeehiveService
             beehives = beehives.Where(b => assignedIds.Contains(b.Id)).ToList();
         }
 
-        return beehives.Select(b =>
+        var dtos = beehives.Select(b =>
         {
             var dto = _mapper.Map<BeehiveDto>(b);
             dto.InspectionCount = inspectionCounts.GetValueOrDefault(b.Id);
             return dto;
         }).ToList();
+
+        // The apiary is reachable (the guard above said so), but hives inside it can still rank past
+        // the plan's hive limit — those stay listed, flagged and stripped (SPEC-24).
+        return dtos.Redact(await _planLock.GetForCurrentUserAsync()).ToList();
     }
 
     /// <summary>
@@ -161,6 +168,10 @@ public class BeehiveService : IBeehiveService
         // Must be able to manage the beehive's current apiary…
         await _access.EnsureCanManageApiaryAsync(beehive.ApiaryId);
 
+        // …and the hive itself must not be one the plan locked away (SPEC-24) — the apiary can be
+        // reachable while this particular hive ranks past the limit.
+        await _planLock.EnsureBeehiveUnlockedAsync(id);
+
         if (!await _uow.Apiaries.ExistsAsync(dto.ApiaryId))
             throw new NotFoundException(nameof(Apiary), dto.ApiaryId);
 
@@ -182,7 +193,9 @@ public class BeehiveService : IBeehiveService
         var beehive = await _uow.Beehives.GetByIdAsync(id)
             ?? throw new NotFoundException(nameof(Beehive), id);
 
-        await _access.EnsureCanManageApiaryAsync(beehive.ApiaryId);
+        // allowLocked (SPEC-24): deleting is the one thing a locked hive still permits, and the only
+        // way an organization that shrank its plan can get back under the limit without paying.
+        await _access.EnsureCanManageApiaryAsync(beehive.ApiaryId, allowLocked: true);
 
         await _uow.Beehives.DeleteAsync(beehive);
         await _uow.SaveChangesAsync();
@@ -192,6 +205,11 @@ public class BeehiveService : IBeehiveService
     {
         var beehive = await _uow.Beehives.GetByUniqueIdAsync(uniqueId);
         if (beehive is null) return null;
+
+        // Scanning a locked hive's sticker resolves to the upsell rather than to a dead end: without
+        // this the code would hand back a name and an id that every following call then refuses.
+        await _planLock.EnsureBeehiveUnlockedAsync(beehive.Id);
+
         return new BeehiveScanDto
         {
             Id                    = beehive.Id,
@@ -223,6 +241,11 @@ public class BeehiveService : IBeehiveService
             beehives = beehives.Where(b => assignedIds.Contains(b.Id));
         }
 
+        // No labels for hives the plan locked away — the sheet is for hives you can actually work.
+        var locked = await _planLock.GetForCurrentUserAsync();
+        if (locked.BeehiveIds.Count > 0)
+            beehives = beehives.Where(b => !locked.BeehiveIds.Contains(b.Id));
+
         return beehives
             .OrderBy(b => b.Name)
             .Select(b => new BeehiveQrDto
@@ -238,8 +261,19 @@ public class BeehiveService : IBeehiveService
     public Task<bool> CanCurrentUserAccessAsync(int beehiveId) =>
         _access.CanAccessBeehiveAsync(beehiveId);
 
-    public async Task<IEnumerable<BeehiveDto>> GetAllForCurrentUserAsync() =>
-        _mapper.Map<IEnumerable<BeehiveDto>>(await GetAccessibleBeehivesAsync());
+    /// <summary>
+    /// The full hive list. Unlike every other consumer of the accessible set, this one asks for the
+    /// locked hives too (SPEC-24) — the list is where the beekeeper sees that they still exist. They
+    /// come back flagged and stripped; matching, scanning and the assistant use the default set and
+    /// therefore cannot reach them at all.
+    /// </summary>
+    public async Task<IEnumerable<BeehiveDto>> GetAllForCurrentUserAsync()
+    {
+        var beehives = await _access.GetAccessibleBeehivesAsync(includeLocked: true);
+        var dtos = _mapper.Map<IEnumerable<BeehiveDto>>(beehives).ToList();
+
+        return dtos.Redact(await _planLock.GetForCurrentUserAsync()).ToList();
+    }
 
     /// <summary>
     /// Role-scoped set of beehive entities the current caller may see. The rules moved to

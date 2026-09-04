@@ -24,6 +24,7 @@ public class WeeklySummaryService : IWeeklySummaryService
     private readonly INotificationService _notifications;
     private readonly IWeatherService _weather;
     private readonly IConfiguration _config;
+    private readonly Common.Security.IPlanLock _planLock;
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
@@ -41,13 +42,15 @@ public class WeeklySummaryService : IWeeklySummaryService
         IUnitOfWork uow,
         INotificationService notifications,
         IWeatherService weather,
-        IConfiguration config)
+        IConfiguration config,
+        Common.Security.IPlanLock planLock)
     {
         _http = http;
         _uow = uow;
         _notifications = notifications;
         _weather = weather;
         _config = config;
+        _planLock = planLock;
 
         var apiKey = config["Groq:ApiKey"];
         if (!string.IsNullOrWhiteSpace(apiKey))
@@ -70,11 +73,17 @@ public class WeeklySummaryService : IWeeklySummaryService
             if (PlanHelper.Effective(org.Plan, org.PlanValidUntil, DateTime.UtcNow) < PlanType.Standard)
                 continue;
 
-            var apiaries = (await _uow.Apiaries.GetAllByOrganizationAsync(org.Id)).ToList();
+            // A Standard organization that came down from Pro can still have locked apiaries — the
+            // summary must not describe hives the reader cannot open (SPEC-24).
+            var locked = await _planLock.GetForOrganizationAsync(org.Id);
+
+            var apiaries = (await _uow.Apiaries.GetAllByOrganizationAsync(org.Id))
+                .Where(a => !locked.ApiaryIds.Contains(a.Id))
+                .ToList();
             if (apiaries.Count == 0) continue;
             var apiaryIds = apiaries.Select(a => a.Id).ToList();
 
-            var input = await GatherAsync(org, apiaries, weekAgo);
+            var input = await GatherAsync(org, apiaries, weekAgo, locked);
             if (!input.HasActivity) continue; // no noise for idle organizations
 
             string bullets;
@@ -109,13 +118,15 @@ public class WeeklySummaryService : IWeeklySummaryService
 
     // ── Deterministic data gathering ─────────────────────────────────────────────
 
-    private async Task<WeeklyDigestInput> GatherAsync(Organization org, List<Apiary> apiaries, DateTime weekAgo)
+    private async Task<WeeklyDigestInput> GatherAsync(Organization org, List<Apiary> apiaries, DateTime weekAgo, PlanLockResult locked)
     {
         var now = DateTime.UtcNow;
         var apiaryIds = apiaries.Select(a => a.Id).ToList();
         var apiaryNames = apiaries.ToDictionary(a => a.Id, a => a.Name);
 
-        var beehives = (await _uow.Beehives.GetByOrganizationAsync(org.Id)).ToList();
+        var beehives = (await _uow.Beehives.GetByOrganizationAsync(org.Id))
+            .Where(b => !locked.BeehiveIds.Contains(b.Id))
+            .ToList();
         var hiveIds = beehives.Select(b => b.Id).ToList();
         var hiveNames = beehives.ToDictionary(b => b.Id, b => b.Name);
         var hiveApiary = beehives.ToDictionary(b => b.Id, b => b.ApiaryId);

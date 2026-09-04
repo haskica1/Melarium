@@ -60,7 +60,12 @@ public class InspectionService : IInspectionService
         var beehive = await _uow.Beehives.GetByIdAsync(dto.BeehiveId)
             ?? throw new NotFoundException(nameof(Beehive), dto.BeehiveId);
 
-        await _access.EnsureCanAccessBeehiveAsync(dto.BeehiveId);
+        // allowLocked (SPEC-24): recording an inspection is the one write a locked hive still takes.
+        // A beekeeper who worked an apiary offline (SPEC-07) and syncs after the plan shrank would
+        // otherwise lose that round of work — the outbox posts through this exact call. The data
+        // lands; reading it back stays locked until the plan is upgraded. Nothing else can reach
+        // here anyway, since a locked hive cannot be opened to start an inspection online.
+        await _access.EnsureCanAccessBeehiveAsync(dto.BeehiveId, allowLocked: true);
 
         var inspection = _mapper.Map<Inspection>(dto);
 

@@ -1093,3 +1093,53 @@ which also fixes a pre-existing gap: an organization had exactly one OrgAdmin an
   design; this is the first feature to rely on it.
 - No new exception type: every refusal is `BusinessRuleException` → **422**, per the frozen middleware mapping.
   The spec's original `409` was dropped for that reason.
+
+---
+
+## ADR-042: A Downgrade Locks Data Instead of Grandfathering It — Computed, Oldest-First (SPEC-24, reverses ADR-028)
+
+**Context:** SPEC-09 decided that a downgrade never touches existing data — limits are checked on create
+only. In production that made the free plan meaningless: register, get the 30-day Pro trial, build 3
+apiaries and 50 hives, and keep full access to all of it forever once the trial lapses. Nobody had to
+pay to keep what a paid plan had let them build.
+
+**Decision:** Rows above the effective plan's limits become **locked** — still listed, greyed out and
+stripped to their name, and refused with 402 on every route that would open them. Three sub-decisions
+carry the design:
+
+**Computed, never stored.** Same precedent as `PlanHelper.Effective` and ADR-034. No migration, no
+background job, no column that can go stale. Two behaviours come free rather than being written: an
+upgrade unlocks everything the instant it lands, and deleting an active hive promotes the oldest locked
+one. A stored `IsLocked` flag would have needed a job to detect expiry, which the plan model does not have.
+
+**The system picks, oldest first (`CreatedAt`, then `Id`).** Letting the beekeeper choose what to keep is
+the friendlier design and was considered; it costs a new nullable ordering column and a "choose what
+survives" screen, and it was cut. The `Id` tiebreaker is not cosmetic — without it two hives created in the
+same second could swap rank between requests, flickering a hive in and out of reach.
+
+**Enforced in `IAccessGuard`, not in each service.** The guard already sits under ~60 call sites across
+inspections, harvests, queens, treatments, todos, feeding, photos and the assistant. Putting the check
+there covers all of them at once; the alternative is sixty places to keep in step, and **one missed call
+is a hole in the paywall**. The guard now raises two different refusals, and the order matters: role first
+(403 `ForbiddenAccessException`), plan second (402 `PlanLimitException`). Reversed, an outsider probing
+another organization's hive would learn something about that organization's plan.
+
+**Consequences:**
+
+- **Deleting a locked row is allowed** — the single exception, and a necessary one. An organization that
+  can neither open nor delete its extra hives can never get back under the limit except by paying; that is
+  a trap, not a paywall. `allowLocked: true` appears in exactly two service methods.
+- **Creating an inspection is allowed on a locked hive.** The SPEC-07 outbox replays through the ordinary
+  `POST /inspections`, with nothing marking it as offline, so refusing locked hives there would silently
+  destroy a round of fieldwork done before the plan changed. The data lands and stays unreadable until an
+  upgrade. Nothing else can reach that path: a locked hive cannot be opened to start an inspection online.
+- **Extra members go read-only, not locked out.** Enforced at the edge (`ReadOnlyMemberMiddleware`): any
+  non-GET is a write, which no future endpoint can forget. Four prefixes stay open — auth, own profile,
+  notifications, feedback — each because closing it breaks something that is not about billing.
+- Seven aggregate paths read straight from repositories and had to filter locked ids by hand (stats,
+  alerts, calendar, weekly summary, and the treatment/harvest/diet organization lists). They are listed in
+  SPEC-24; a new org-wide list is the thing most likely to leak a locked row in future.
+- **The rollout has no grace period, by explicit decision.** Organizations whose plan already expired in
+  the past are locked at deploy time with no warning at all — the two-day `PlanLockPending` alert is
+  driven by an upcoming expiry date and cannot fire for one in the past. SPEC-24 carries the SQL to see
+  who that hits before deploying.

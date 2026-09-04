@@ -20,6 +20,12 @@ public class BeehiveDto
     public DateTime CreatedAt { get; set; }
     public Guid? UniqueId { get; set; }
 
+    /// <summary>
+    /// True when the organization's plan no longer reaches this hive (SPEC-24) — either it ranks past
+    /// the hive limit, or its whole apiary is locked. Listed but stripped; opening it returns 402.
+    /// </summary>
+    public bool IsLocked { get; set; }
+
     // ── Colony merge (SPEC-19). Null on every hive that is still in service, which is every hive
     // a normal list returns — these are populated only in the archive and on the detail DTO. ──
     public int? MergedIntoBeehiveId { get; set; }

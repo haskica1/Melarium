@@ -35,8 +35,8 @@ public plan list or checkout — for friends/family/associations/demo accounts.
 ## Enforcement — `IPlanGuard` (Common/Security, `IAccessGuard` precedent)
 
 Limits live in config (`Plans:{PlanType}:{Key}`, absent key = unlimited); Max/Partner have no
-entries. Enforced **on create only** — downgrades never lock existing data. The org-less
-SystemAdmin bypasses all gates.
+entries. `IPlanGuard` gates **creation**; since SPEC-24 a separate `IPlanLock` also locks what
+already exists once a plan shrinks (see below). The org-less SystemAdmin bypasses all gates.
 
 | Method | Called by | Config key |
 |---|---|---|
@@ -52,10 +52,35 @@ Violations throw `PlanLimitException` → **402** with `code: "plan-limit"` + Bo
 (`GlobalExceptionMiddleware`). `WeeklySummaryService` skips orgs whose effective plan < Standard
 (no Groq call).
 
+## Downgrade lock — `IPlanLock` (SPEC-24, reverses the original "downgrades never lock")
+
+Rows above the effective plan's limits become **locked**: still listed, stripped to their name, and
+refused with 402 on every route that would open them. Computed on every request like
+`PlanHelper.Effective` — no column, no migration, no background job, so an upgrade unlocks
+everything instantly and deleting an active hive promotes the oldest locked one.
+
+Ranking is oldest-first (`CreatedAt`, then `Id`): apiaries past `MaxApiaries` lock, their hives lock
+with them and do **not** consume the hive quota, and the hives in the surviving apiaries rank across
+the whole organization against `MaxBeehives`. Merged-away hives (SPEC-19) are skipped.
+
+Enforcement is wired into `IAccessGuard`, so every feature that already checks access is covered by
+construction. Seven aggregate paths read straight from repositories and filter by hand — stats,
+alerts, calendar, weekly summary, and the treatment/harvest/diet organization lists.
+
+Two deliberate exceptions: **deleting** a locked row is allowed (otherwise an organization can never
+get back under the limit without paying), and **creating an inspection** is allowed on a locked hive
+(the SPEC-07 outbox replays through the ordinary endpoint, so refusing would destroy fieldwork done
+before the plan changed — the data lands but stays unreadable).
+
+Extra members past `MaxMembers` become **read-only** rather than locked out, enforced at the edge by
+`ReadOnlyMemberMiddleware`. The owner is never read-only. `PlanLockPending` (NotificationType 28)
+warns the organizations that will actually lose something, two days before expiry, by e-mail and
+in-app. Full detail and the deploy note: [`../specs/SPEC-24-downgrade-lock.md`](../specs/SPEC-24-downgrade-lock.md).
+
 ## Endpoints
 
 - `GET /api/organizations/my-plan` → `MyPlanDto` (plan, effectivePlan, validUntil, notes, usage
-  meters). Org-less SystemAdmin → 404.
+  meters, `isReadOnlyMember`, locked counts). Org-less SystemAdmin → 404.
 - `PUT /api/admin/organizations/{id}/plan` (SystemAdmin) → `UpdateOrganizationPlanDto { plan,
   planValidUntil?, planNotes? }`; accepts all five plans incl. Partner.
 - Admin org DTOs (`AdminOrganizationDto`) gained `plan`/`planName`/`planValidUntil`/`planNotes`.

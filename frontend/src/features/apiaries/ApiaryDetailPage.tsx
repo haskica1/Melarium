@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Download, Pencil, Plus, Trash2, MapPin, Wind, Droplets, Thermometer, Search } from 'lucide-react'
 import { format, parseISO, isPast, isToday } from 'date-fns'
 import { bs } from 'date-fns/locale'
+import clsx from 'clsx'
 import { downloadBeehivesQrPdf } from '../../shared/utils/qrPdf'
 import { beehiveService } from '../../core/services/beehiveService'
 import {
@@ -17,6 +18,9 @@ import {
   EmptyState,
   ConfirmDialog,
   VitalCard,
+  LockedBadge,
+  showLockedUpsell,
+  LOCKED_BEEHIVE_MESSAGE,
 } from '../../shared/components'
 import { TodoSection } from '../../shared/components/TodoSection'
 import { CollapsibleSection } from '../../shared/components/CollapsibleSection'
@@ -354,25 +358,39 @@ export default function ApiaryDetailPage() {
                     {filteredBeehives.map((beehive: Beehive) => (
                   <div
                     key={beehive.id}
-                    className="card hover:shadow-honey hover:-translate-y-0.5 transition-all duration-200 group cursor-pointer"
-                    onClick={() => navigate(`/beehives/${beehive.id}`)}
+                    className={clsx(
+                      'card transition-all duration-200 group',
+                      beehive.isLocked
+                        ? 'cursor-not-allowed opacity-60 grayscale'
+                        : 'cursor-pointer hover:shadow-honey hover:-translate-y-0.5',
+                    )}
+                    onClick={() => beehive.isLocked
+                      ? showLockedUpsell(LOCKED_BEEHIVE_MESSAGE)
+                      : navigate(`/beehives/${beehive.id}`)}
                   >
                     <div className="flex items-start gap-3">
                       <span className="text-2xl shrink-0 mt-0.5">🏠</span>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-semibold text-gray-800 dark:text-slate-100 truncate group-hover:text-honey-700 dark:group-hover:text-honey-400 transition-colors flex items-center gap-1.5 min-w-0">
+                          <h3 className={clsx(
+                            'font-semibold text-gray-800 dark:text-slate-100 truncate transition-colors flex items-center gap-1.5 min-w-0',
+                            !beehive.isLocked && 'group-hover:text-honey-700 dark:group-hover:text-honey-400',
+                          )}>
                             <span className="truncate">{beehive.name}</span>
-                            <ActiveFeedingChip infos={activeByHive.get(beehive.id) ?? []} />
+                            {!beehive.isLocked && <ActiveFeedingChip infos={activeByHive.get(beehive.id) ?? []} />}
                           </h3>
                           {canEditDelete && (
                             <div className="flex gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                              <Link
-                                to={`/beehives/${beehive.id}/edit`}
-                                className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </Link>
+                              {/* Editing a locked hive is refused server-side; deleting it is the
+                                  way back under the limit, so that stays available. */}
+                              {!beehive.isLocked && (
+                                <Link
+                                  to={`/beehives/${beehive.id}/edit`}
+                                  className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </Link>
+                              )}
                               <button
                                 onClick={() => setDeleteTarget({ id: beehive.id, name: beehive.name })}
                                 className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
@@ -382,13 +400,20 @@ export default function ApiaryDetailPage() {
                             </div>
                           )}
                         </div>
-                        <div className="flex flex-wrap gap-1.5 mt-1.5">
-                          <span className="badge bg-honey-100 text-honey-700 dark:bg-honey-500/15 dark:text-honey-300">{beehive.typeName}</span>
-                          <span className="badge bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300">{beehive.materialName}</span>
-                        </div>
-                        <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
-                          📋 {beehive.inspectionCount} {beehive.inspectionCount === 1 ? 'pregled' : 'pregleda'}
-                        </p>
+                        {/* A locked hive shows its name and nothing else — the server sent nothing else. */}
+                        {beehive.isLocked ? (
+                          <div className="mt-1.5"><LockedBadge /></div>
+                        ) : (
+                          <>
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              <span className="badge bg-honey-100 text-honey-700 dark:bg-honey-500/15 dark:text-honey-300">{beehive.typeName}</span>
+                              <span className="badge bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-300">{beehive.materialName}</span>
+                            </div>
+                            <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
+                              📋 {beehive.inspectionCount} {beehive.inspectionCount === 1 ? 'pregled' : 'pregleda'}
+                            </p>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

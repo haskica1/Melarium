@@ -1,4 +1,4 @@
-import { Check, Crown, Loader2, Mail, Minus } from 'lucide-react'
+import { Check, Crown, Loader2, Lock, Mail, Minus } from 'lucide-react'
 import { useMyPlan, PLAN_PRICING, UPGRADE_EMAIL } from '../../core/services/planService'
 import { useAuth } from '../../core/context/AuthContext'
 import { PlanType, PlanTypeLabels, type MyPlan } from '../../core/models'
@@ -70,6 +70,8 @@ export default function PlansPage() {
         </p>
       </div>
 
+      <LockSummary plan={plan} />
+
       <UsageMeters plan={plan} />
 
       {isPartner ? (
@@ -84,6 +86,39 @@ export default function PlansPage() {
           <PaymentInstructions orgId={user?.organizationId} orgName={user?.organizationName} />
         </>
       )}
+    </div>
+  )
+}
+
+/**
+ * What the current plan no longer reaches (SPEC-24). This is the one page that has to say it in
+ * full: the padlocks on the lists say *that* something is locked, this says how much and why, and
+ * makes the point that nothing was deleted — the single most common fear after a plan expires.
+ * Renders nothing for an organization that fits inside its plan, which is most of them.
+ */
+function LockSummary({ plan }: { plan: MyPlan }) {
+  const u = plan.usage
+  const nothingLocked = u.lockedApiaries === 0 && u.lockedBeehives === 0 && u.readOnlyMembers === 0
+  if (nothingLocked) return null
+
+  const parts: string[] = []
+  if (u.lockedApiaries > 0) parts.push(`${u.lockedApiaries} ${u.lockedApiaries === 1 ? 'pčelinjak' : 'pčelinjaka'}`)
+  if (u.lockedBeehives > 0) parts.push(`${u.lockedBeehives} ${u.lockedBeehives === 1 ? 'košnica' : 'košnica'}`)
+  if (u.readOnlyMembers > 0) parts.push(`${u.readOnlyMembers} ${u.readOnlyMembers === 1 ? 'član' : 'članova'} bez prava unosa`)
+
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+      <Lock className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+      <div className="text-sm text-amber-900 dark:text-amber-200">
+        <p className="font-medium">
+          {plan.effectivePlanName} paket ne pokriva sve vaše podatke — {parts.join(', ')}{' '}
+          {parts.length === 1 ? 'je zaključan' : 'su zaključani'}.
+        </p>
+        <p className="mt-0.5 text-amber-800/80 dark:text-amber-200/70">
+          Ništa nije obrisano. Sve se otključava čim nadogradite paket, a možete i obrisati košnice
+          koje više ne koristite da se ostale otključaju.
+        </p>
+      </div>
     </div>
   )
 }

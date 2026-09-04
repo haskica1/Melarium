@@ -41,6 +41,7 @@
 | 21 | [Šta je novo](SPEC-21-announcements.md) | SystemAdmin objavi novu funkcionalnost (naslov + opis u markdownu, tip Novo/Poboljšanje/Ispravka) → banner na svakoj stranici → modal s cijelim tekstom → "x" ga trajno sklanja. Sve objave ostaju na stranici "Šta je novo". Bez stavke u zvonu, bez slike, bez ciljanja po paketu | M | — (prepisuje obrazac 06) | ✅ Implemented (2026-08-28) — migracija još nije primijenjena |
 | 22 | [Moja organizacija](SPEC-22-org-profile.md) | Administrator organizacije napokon može urediti organizaciju koju je sam napravio pri registraciji: naziv, opis i logotip, na stranici "Moja organizacija". Uz to, sistemske tabele dobijaju kontakt vlasnika, potvrdu e-pošte, zadnju prijavu, filtere i sortiranje | M | — (dodiruje 05, 09, 16) | ✅ Implemented (2026-08-30) — migracija još nije primijenjena |
 | 23 | [Mobilne aplikacije](SPEC-23-mobile-apps.md) | Melarium na Google Play i App Store kroz Capacitor, uz web koji ostaje netaknut: iste funkcije bez izuzetka, prave push notifikacije na telefon, i brisanje računa + prenos vlasništva organizacije koje prodavnice traže a kojih danas nema | L | — (dodiruje 04, 06, 07, 08, 09, 22) | 📋 Planned |
+| 24 | [Zaključavanje pri prelasku na niži paket](SPEC-24-downgrade-lock.md) | Nakon isteka probnog perioda ili pada na niži paket, sve iznad limita novog paketa se zaključava: vidi se u listi, ali se ne može otvoriti ni pročitati. Sistem bira šta ostaje (najstarije prvo), računa se a ne pohranjuje, brisanje ostaje dozvoljeno kao izlaz. Dodatni članovi preko limita postaju samo-za-čitanje | M | 09, 07, 19 | ✅ Implemented (2026-09-04) |
 
 **Recommended order = index order.** Rationale:
 
@@ -197,6 +198,24 @@
   out loud. Finally, D5 has no code in it and is still the longest pole in the project: personal store
   accounts mean Google requires ~12 testers running the app for 14 continuous days, so Phase 0 starts
   the day Phase 1 does, not when the code is finished.
+- **SPEC-24** was written 2026-09-04 **after** the feature was built, from Asim's observation that a
+  30-day Pro trial was effectively permanent: build 3 apiaries and 50 hives during it, keep all of it
+  forever on the free plan. Its eight product decisions were settled one at a time before any code,
+  and four of them cut scope the obvious design would have added — the system picks what survives
+  (no "choose what to keep" screen), the lock lands immediately (no grace period), the treatment
+  register gets no legal exemption, and the rollout has no start date. Two decisions run the other
+  way and must not be "simplified" later: **deleting a locked row stays allowed**, without which an
+  organization with 50 hives on the free plan can neither open nor remove them and is trapped for
+  good; and **creating an inspection stays allowed on a locked hive**, because the SPEC-07 outbox
+  replays through the ordinary `POST /inspections` with nothing marking it as offline, so refusing it
+  would silently destroy a round of fieldwork done before the plan changed. The implementation's one
+  structural bet is putting the lock inside `IAccessGuard` rather than in each service: that guard
+  already sits under ~60 call sites, and one missed call is a hole in the paywall rather than a bug.
+  Its known weak spot is the seven aggregate paths that read straight from repositories and filter
+  locked ids by hand (§ Agregati) — a **new organization-wide list is the thing most likely to leak a
+  locked row**. Deploy note in the spec is not optional reading: organizations whose plan already
+  expired in the past are locked the second the code ships, with no warning, because the two-day
+  alert keys on an upcoming expiry date and cannot fire for one in the past.
 - **SPEC-09/10** were added 2026-07-03 and are **not yet prioritized** (against 05, the last
   remaining roadmap item). 09 changes the business model — implement deliberately, not casually;
   its v1 is manual billing (Stripe unavailable in BiH; Paddle in Phase 2). 10 is independent CRUD

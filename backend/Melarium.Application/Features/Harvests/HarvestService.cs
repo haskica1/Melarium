@@ -17,12 +17,14 @@ public class HarvestService : IHarvestService
 {
     private readonly IUnitOfWork _uow;
     private readonly IAccessGuard _access;
+    private readonly Common.Security.IPlanLock _planLock;
     private readonly ICurrentUser _currentUser;
 
-    public HarvestService(IUnitOfWork uow, IAccessGuard access, ICurrentUser currentUser)
+    public HarvestService(IUnitOfWork uow, IAccessGuard access, ICurrentUser currentUser, Common.Security.IPlanLock planLock)
     {
         _uow = uow;
         _access = access;
+        _planLock = planLock;
         _currentUser = currentUser;
     }
 
@@ -45,12 +47,19 @@ public class HarvestService : IHarvestService
             return (await _uow.Harvests.GetByApiaryAsync(aid, year)).Select(ToListDto);
         }
 
+        // Same as the treatment register (SPEC-24): a locked apiary's rows stay out of the org list.
+        var locked = await _planLock.GetForCurrentUserAsync();
+
         return _currentUser.Role switch
         {
             UserRole.ApiaryAdmin when _currentUser.ApiaryId is int myApiary =>
-                (await _uow.Harvests.GetByApiaryAsync(myApiary, year)).Select(ToListDto),
+                locked.ApiaryIds.Contains(myApiary)
+                    ? []
+                    : (await _uow.Harvests.GetByApiaryAsync(myApiary, year)).Select(ToListDto),
             UserRole.OrganizationAdmin when _currentUser.OrganizationId is int orgId =>
-                (await _uow.Harvests.GetByOrganizationAsync(orgId, year)).Select(ToListDto),
+                (await _uow.Harvests.GetByOrganizationAsync(orgId, year))
+                    .Where(h => !locked.ApiaryIds.Contains(h.ApiaryId))
+                    .Select(ToListDto),
             // SystemAdmin (no organization) must pass an apiary filter; nothing else to scope to.
             _ => [],
         };

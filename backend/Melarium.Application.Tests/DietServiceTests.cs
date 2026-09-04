@@ -32,7 +32,8 @@ public class DietServiceTests
         _service = new DietService(
             _uow,
             new TestCurrentUser { UserId = 1, Role = UserRole.OrganizationAdmin, OrganizationId = 7 },
-            _access);
+            _access,
+            TestPlanLock.Unlocked());
     }
 
     /// <summary>A service whose caller is a Beekeeper assigned to the given hives.</summary>
@@ -43,7 +44,8 @@ public class DietServiceTests
         return new DietService(
             _uow,
             new TestCurrentUser { UserId = 2, Role = UserRole.Beekeeper, OrganizationId = 7 },
-            _access);
+            _access,
+            TestPlanLock.Unlocked());
     }
 
     private Diet? _savedDiet;

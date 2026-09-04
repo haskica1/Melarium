@@ -29,7 +29,7 @@ public class TreatmentServiceTests
         Entries = hiveIds.Select(h => new TreatmentEntry { BeehiveId = h }).ToList(),
     };
 
-    private TreatmentService Service(ICurrentUser user) => new(_uow, _access, user);
+    private TreatmentService Service(ICurrentUser user) => new(_uow, _access, user, TestPlanLock.Unlocked());
 
     [Fact]
     public async Task Create_WithHiveNotInApiary_ThrowsValidation()

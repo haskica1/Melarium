@@ -17,6 +17,13 @@ public class MyPlanDto
     /// <summary>"Probni period" marks the registration trial (frontend shows a trial note).</summary>
     public string? PlanNotes { get; set; }
 
+    /// <summary>
+    /// True when this account is an additional member past the plan's <c>MaxMembers</c> and can only
+    /// read (SPEC-24). The frontend uses it for a standing banner and to disable write controls; the
+    /// server refuses the writes regardless.
+    /// </summary>
+    public bool IsReadOnlyMember { get; set; }
+
     public PlanUsageDto Usage { get; set; } = new();
 }
 
@@ -32,6 +39,14 @@ public class PlanUsageDto
     /// <summary>Additional accounts beyond the owner (ukupno naloga − 1).</summary>
     public int Members { get; set; }
     public int? MembersLimit { get; set; }
+
+    // ── Downgrade lock (SPEC-24). How much of the org's own data its plan no longer reaches —
+    // what the /plans page turns into "7 od 50 košnica je dostupno". Zero on a plan that fits. ──
+    public int LockedApiaries { get; set; }
+    public int LockedBeehives { get; set; }
+
+    /// <summary>Additional members who lost write access because they rank past MembersLimit.</summary>
+    public int ReadOnlyMembers { get; set; }
 
     /// <summary>AI assistant interactions this month — questions and commands both (SPEC-18).</summary>
     public int AiInteractionsThisMonth { get; set; }

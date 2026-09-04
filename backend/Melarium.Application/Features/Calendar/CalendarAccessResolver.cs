@@ -13,9 +13,38 @@ public class CalendarAccessResolver : ICalendarAccessResolver
 {
     private readonly IUnitOfWork _uow;
 
-    public CalendarAccessResolver(IUnitOfWork uow) => _uow = uow;
+    private readonly Common.Security.IPlanLock _planLock;
 
+    public CalendarAccessResolver(IUnitOfWork uow, Common.Security.IPlanLock planLock)
+    {
+        _uow = uow;
+        _planLock = planLock;
+    }
+
+    /// <summary>
+    /// Resolves the role scope, then removes whatever the organization's plan has locked away
+    /// (SPEC-24). Done here rather than in each branch below: the feed, the daily agenda and the ICS
+    /// export all come through this one method, so a locked hive cannot reach any of them — and an
+    /// obligation for a hive the beekeeper cannot open is a dead end wherever it shows up.
+    /// </summary>
     public async Task<CalendarScope> ResolveAsync(CalendarUserContext ctx)
+    {
+        var scope = await ResolveRoleScopeAsync(ctx);
+
+        if (ctx.OrganizationId is not int lockOrgId) return scope;
+
+        var locked = await _planLock.GetForOrganizationAsync(lockOrgId);
+        if (locked.IsEmpty) return scope;
+
+        scope.BeehiveIds.ExceptWith(locked.BeehiveIds);
+        scope.ApiaryIds.ExceptWith(locked.ApiaryIds);
+        foreach (var id in locked.BeehiveIds) scope.BeehiveNames.Remove(id);
+        foreach (var id in locked.ApiaryIds) scope.ApiaryNames.Remove(id);
+
+        return scope;
+    }
+
+    private async Task<CalendarScope> ResolveRoleScopeAsync(CalendarUserContext ctx)
     {
         if (ctx.Role == UserRole.SystemAdmin)
         {

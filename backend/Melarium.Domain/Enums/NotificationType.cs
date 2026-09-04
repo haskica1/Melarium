@@ -59,4 +59,10 @@ public enum NotificationType
     // ── Organization ownership handover — the successor did not ask for this and has to be told
     // that an entire organization is now theirs to run.
     OrganizationOwnershipTransferred = 27,
+
+    // ── Downgrade lock (SPEC-24) — two days before a plan expires, the warning that data is about
+    // to become unreachable. Distinct from PlanExpiring: that one says the plan is ending, this one
+    // says what specifically stops opening, and it is only sent to organizations that actually lose
+    // something. An organization inside its limits never sees it.
+    PlanLockPending = 28,
 }

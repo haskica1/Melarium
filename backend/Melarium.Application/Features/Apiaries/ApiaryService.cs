@@ -15,14 +15,16 @@ public class ApiaryService : IApiaryService
     private readonly ICurrentUser _currentUser;
     private readonly IAccessGuard _access;
     private readonly IPlanGuard _plan;
+    private readonly IPlanLock _planLock;
 
-    public ApiaryService(IUnitOfWork uow, IMapper mapper, ICurrentUser currentUser, IAccessGuard access, IPlanGuard plan)
+    public ApiaryService(IUnitOfWork uow, IMapper mapper, ICurrentUser currentUser, IAccessGuard access, IPlanGuard plan, IPlanLock planLock)
     {
         _uow = uow;
         _mapper = mapper;
         _currentUser = currentUser;
         _access = access;
         _plan = plan;
+        _planLock = planLock;
     }
 
     /// <inheritdoc />
@@ -50,12 +52,16 @@ public class ApiaryService : IApiaryService
                 break;
         }
 
-        return rows.Select(r =>
+        var dtos = rows.Select(r =>
         {
             var dto = _mapper.Map<ApiaryDto>(r.Apiary);
             dto.BeehiveCount = r.BeehiveCount;
             return dto;
         }).ToList();
+
+        // Locked apiaries stay in the list, flagged and stripped (SPEC-24) — the beekeeper keeps
+        // seeing that they exist, which is the whole difference between a lock and a deletion.
+        return dtos.Redact(await _planLock.GetForOrganizationAsync(organizationId)).ToList();
     }
 
     /// <inheritdoc />
@@ -64,12 +70,24 @@ public class ApiaryService : IApiaryService
         var apiary = await _uow.Apiaries.GetWithBeehivesAsync(id)
             ?? throw new NotFoundException(nameof(Apiary), id);
 
+        // Managers must own the apiary (same org / same apiary). Checked before the plan lock so an
+        // outsider always gets 403 — a 402 would tell them something about another org's plan.
+        if (_currentUser.Role != UserRole.Beekeeper)
+            _access.EnsureCanManageApiary(apiary.Id, apiary.OrganizationId);
+
+        // A locked apiary cannot be opened at all (SPEC-24) — the list showed it, this is where it stops.
+        await _planLock.EnsureApiaryUnlockedAsync(id);
+
         // Inspection counts come from a grouped query — the rows themselves are never loaded.
         var inspectionCounts = await _uow.Inspections.CountByBeehiveForApiaryAsync(id);
 
         var dto = _mapper.Map<ApiaryDetailDto>(apiary);
         foreach (var hive in dto.Beehives)
             hive.InspectionCount = inspectionCounts.GetValueOrDefault(hive.Id);
+
+        // The apiary itself is reachable, but hives inside it can still rank past the hive limit.
+        var locked = await _planLock.GetForOrganizationAsync(apiary.OrganizationId);
+        dto.Beehives = dto.Beehives.Redact(locked).ToList();
 
         // A Beekeeper may view an apiary only through the beehives assigned to them.
         if (_currentUser.Role == UserRole.Beekeeper)
@@ -84,8 +102,6 @@ public class ApiaryService : IApiaryService
             return dto;
         }
 
-        // Managers must own the apiary (same org / same apiary).
-        _access.EnsureCanManageApiary(apiary.Id, apiary.OrganizationId);
         return dto;
     }
 
@@ -117,6 +133,7 @@ public class ApiaryService : IApiaryService
             ?? throw new NotFoundException(nameof(Apiary), id);
 
         _access.EnsureCanManageApiary(apiary.Id, apiary.OrganizationId);
+        await _planLock.EnsureApiaryUnlockedAsync(id);
 
         _mapper.Map(dto, apiary);
         // While at the matična lokacija (no pasture), the location field IS the home location —
@@ -140,6 +157,8 @@ public class ApiaryService : IApiaryService
         var apiary = await _uow.Apiaries.GetByIdAsync(id)
             ?? throw new NotFoundException(nameof(Apiary), id);
 
+        // Deliberately no plan-lock check (SPEC-24): deleting is the way out of a downgrade. An
+        // organization that can neither open nor delete its extra apiaries would be stuck for good.
         _access.EnsureCanManageApiary(apiary.Id, apiary.OrganizationId);
 
         // Apiary → Todos has NO ACTION cascade (to avoid multiple-cascade-path errors).

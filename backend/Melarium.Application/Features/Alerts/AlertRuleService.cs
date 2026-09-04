@@ -19,17 +19,20 @@ public class AlertRuleService : IAlertRuleService
     private readonly INotificationService _notifications;
     private readonly IWeatherService _weather;
     private readonly IConfiguration _config;
+    private readonly Common.Security.IPlanLock _planLock;
 
     public AlertRuleService(
         IUnitOfWork uow,
         INotificationService notifications,
         IWeatherService weather,
-        IConfiguration config)
+        IConfiguration config,
+        Common.Security.IPlanLock planLock)
     {
         _uow = uow;
         _notifications = notifications;
         _weather = weather;
         _config = config;
+        _planLock = planLock;
     }
 
     public async Task RunDailyScanAsync(CancellationToken cancellationToken = default)
@@ -55,13 +58,24 @@ public class AlertRuleService : IAlertRuleService
         if (GetBool("Alerts:PlanExpiring:Enabled", true))
             await ApplyPlanExpiringAsync(now);
 
+        if (GetBool("Alerts:PlanLockPending:Enabled", true))
+            await ApplyPlanLockPendingAsync(now);
+
         var apiaries = (await _uow.Apiaries.GetAllAsync()).ToList();
 
         foreach (var apiary in apiaries)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var hives = (await _uow.Beehives.GetByApiaryIdAsync(apiary.Id)).ToList();
+            // Never alert about something the recipient cannot open (SPEC-24). "Pregled kasni za
+            // košnicu X" that leads to a paywall is worse than silence, and it would also leak the
+            // state of a hive the plan has locked away.
+            var locked = await _planLock.GetForOrganizationAsync(apiary.OrganizationId);
+            if (locked.ApiaryIds.Contains(apiary.Id)) continue;
+
+            var hives = (await _uow.Beehives.GetByApiaryIdAsync(apiary.Id))
+                .Where(h => !locked.BeehiveIds.Contains(h.Id))
+                .ToList();
             if (hives.Count == 0)
             {
                 if (frostEnabled) await ApplyFrostAsync(apiary);
@@ -295,6 +309,69 @@ public class AlertRuleService : IAlertRuleService
                 $"Vaš {Common.Localization.BsLabels.Label(org.Plan)} paket ističe {validUntil:dd.MM.yyyy.} — produžite da zadržite AI funkcije i limite.",
                 NotificationType.PlanExpiring, org.Id, nameof(Organization), TimeSpan.FromDays(7));
         }
+    }
+
+    // ── Rule 8: data about to be locked (SPEC-24) — org-level, OrgAdmins only ────
+
+    /// <summary>
+    /// Two days before a plan expires, tell the organizations that will actually lose reach of their
+    /// own data exactly what stops opening. Deliberately separate from <see cref="ApplyPlanExpiringAsync"/>:
+    /// that one goes to everyone whose plan is ending, while this one stays silent for an organization
+    /// that fits inside the free limits and would notice nothing.
+    ///
+    /// This only covers expiry, which is how almost every downgrade happens — the registration trial
+    /// running out, or a paid year ending. A SystemAdmin moving an organization down by hand takes
+    /// effect immediately and is announced by the person who did it.
+    /// </summary>
+    private async Task ApplyPlanLockPendingAsync(DateTime now)
+    {
+        var noticeDays = GetInt("Alerts:PlanLockNoticeDays", 2);
+        var orgs = await _uow.Organizations.GetAllAsync();
+
+        foreach (var org in orgs)
+        {
+            if (org.PlanValidUntil is not DateTime validUntil) continue;
+
+            // Already expired — the lock is on, and this warning is about something still to come.
+            if (PlanHelper.Effective(org.Plan, org.PlanValidUntil, now) == PlanType.Free) continue;
+
+            var daysLeft = (validUntil.Date - now.Date).TotalDays;
+            if (daysLeft > noticeDays) continue;
+
+            // What the org will look like the morning after: expiry always lands on Free.
+            var pending = await _planLock.PreviewForPlanAsync(org.Id, PlanType.Free);
+            if (pending.IsEmpty) continue;
+
+            var recipients = await _uow.Users.GetOrganizationAdminIdsAsync(org.Id);
+            await DispatchAsync(recipients,
+                "Dio podataka postaje nedostupan",
+                $"Vaš {Common.Localization.BsLabels.Label(org.Plan)} paket ističe {validUntil:dd.MM.yyyy.}. " +
+                $"Nakon toga {LockSummary(pending)} ostaje nedostupno dok ne produžite paket — podaci se ne brišu.",
+                NotificationType.PlanLockPending, org.Id, nameof(Organization),
+                // Wider than the notice window, so the two-day run-up produces one message, not two.
+                TimeSpan.FromDays(noticeDays + 1));
+        }
+    }
+
+    /// <summary>"3 pčelinjaka i 43 košnice" — only the parts that are actually non-zero.</summary>
+    private static string LockSummary(PlanLockResult pending)
+    {
+        var parts = new List<string>();
+        if (pending.ApiaryIds.Count > 0) parts.Add(Plural(pending.ApiaryIds.Count, "pčelinjak", "pčelinjaka", "pčelinjaka"));
+        if (pending.BeehiveIds.Count > 0) parts.Add(Plural(pending.BeehiveIds.Count, "košnica", "košnice", "košnica"));
+        return string.Join(" i ", parts);
+    }
+
+    /// <summary>Bosnian plural: 1 košnica, 2–4 košnice, 5+ košnica — with the usual 11–14 exception.</summary>
+    private static string Plural(int count, string one, string few, string many)
+    {
+        var lastTwo = count % 100;
+        var last = count % 10;
+        var word = lastTwo is >= 11 and <= 14 ? many
+            : last == 1 ? one
+            : last is >= 2 and <= 4 ? few
+            : many;
+        return $"{count} {word}";
     }
 
     // ── Recipients ───────────────────────────────────────────────────────────────

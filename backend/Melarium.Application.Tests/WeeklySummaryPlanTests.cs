@@ -29,7 +29,8 @@ public class WeeklySummaryPlanTests
             _uow,
             Substitute.For<INotificationService>(),
             Substitute.For<IWeatherService>(),
-            config);
+            config,
+            TestPlanLock.Unlocked());
     }
 
     [Fact]

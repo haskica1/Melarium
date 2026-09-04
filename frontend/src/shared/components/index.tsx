@@ -7,6 +7,13 @@ export type { VitalCardProps } from './VitalCard'
 export { Modal } from './Modal'
 export type { ModalProps } from './Modal'
 export { MarkdownMessage } from './MarkdownMessage'
+export {
+  LockedBadge,
+  PlanLockNotice,
+  showLockedUpsell,
+  LOCKED_APIARY_MESSAGE,
+  LOCKED_BEEHIVE_MESSAGE,
+} from './PlanLocked'
 
 // ── LoadingSpinner ─────────────────────────────────────────────────────────────
 

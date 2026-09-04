@@ -13,6 +13,10 @@ import {
   EmptyState,
   ConfirmDialog,
   VitalCard,
+  LockedBadge,
+  PlanLockNotice,
+  showLockedUpsell,
+  LOCKED_APIARY_MESSAGE,
 } from '../../shared/components'
 import type { Apiary } from '../../core/models'
 import { usePermissions } from '../../core/hooks/usePermissions'
@@ -41,9 +45,13 @@ export default function ApiaryListPage() {
   const apiaries = useMemo(() => data ?? [], [data])
 
   // ── Overview vitals (derived from the loaded list — no extra requests) ──
-  const totalBeehives = apiaries.reduce((s, a) => s + a.beehiveCount, 0)
-  const mappedCount   = apiaries.filter(a => a.hasLocation).length
-  const avgHives      = apiaries.length ? (totalBeehives / apiaries.length) : 0
+  // Locked apiaries (SPEC-24) carry no counts and no location, so they are left out of the vitals:
+  // averaging over rows the server deliberately zeroed would understate every number on screen.
+  const reachable     = apiaries.filter(a => !a.isLocked)
+  const lockedCount   = apiaries.length - reachable.length
+  const totalBeehives = reachable.reduce((s, a) => s + a.beehiveCount, 0)
+  const mappedCount   = reachable.filter(a => a.hasLocation).length
+  const avgHives      = reachable.length ? (totalBeehives / reachable.length) : 0
 
   // ── Filter + sort ──
   const visible = useMemo(() => {
@@ -182,16 +190,21 @@ export default function ApiaryListPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 stagger">
-              {visible.map(apiary => (
-                <ApiaryCard
-                  key={apiary.id}
-                  apiary={apiary}
-                  canManage={canManageApiaries}
-                  onOpen={() => navigate(`/apiaries/${apiary.id}`)}
-                  onDelete={() => setDeleteTarget({ id: apiary.id, name: apiary.name })}
-                />
-              ))}
+            <div className="space-y-4">
+              <PlanLockNotice locked={lockedCount} kind="apiaries" />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 stagger">
+                {visible.map(apiary => (
+                  <ApiaryCard
+                    key={apiary.id}
+                    apiary={apiary}
+                    canManage={canManageApiaries}
+                    onOpen={() => apiary.isLocked
+                      ? showLockedUpsell(LOCKED_APIARY_MESSAGE)
+                      : navigate(`/apiaries/${apiary.id}`)}
+                    onDelete={() => setDeleteTarget({ id: apiary.id, name: apiary.name })}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </>
@@ -217,10 +230,17 @@ function ApiaryCard({ apiary, canManage, onOpen, onDelete }: {
   onOpen: () => void
   onDelete: () => void
 }) {
+  const locked = apiary.isLocked === true
+
   return (
     <div
       onClick={onOpen}
-      className="group relative card cursor-pointer flex flex-col hover:-translate-y-0.5 hover:shadow-honey dark:hover:shadow-none hover:border-honey-300 dark:hover:border-honey-500/40 transition-all duration-200"
+      className={clsx(
+        'group relative card flex flex-col transition-all duration-200',
+        locked
+          ? 'cursor-not-allowed opacity-60 grayscale'
+          : 'cursor-pointer hover:-translate-y-0.5 hover:shadow-honey dark:hover:shadow-none hover:border-honey-300 dark:hover:border-honey-500/40',
+      )}
     >
       {/* Header */}
       <div className="flex items-start gap-3">
@@ -228,28 +248,40 @@ function ApiaryCard({ apiary, canManage, onOpen, onDelete }: {
           🏡
         </div>
         <div className="flex-1 min-w-0">
-          <h2 className="font-display text-lg font-semibold text-gray-800 dark:text-slate-100 truncate group-hover:text-honey-700 dark:group-hover:text-honey-400 transition-colors">
+          <h2 className={clsx(
+            'font-display text-lg font-semibold text-gray-800 dark:text-slate-100 truncate transition-colors',
+            !locked && 'group-hover:text-honey-700 dark:group-hover:text-honey-400',
+          )}>
             {apiary.name}
           </h2>
-          <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 truncate">
-            {format(new Date(apiary.createdAt), 'dd MMM yyyy')}
-            {apiary.createdByName ? ` · ${apiary.createdByName}` : ''}
-          </p>
+          {/* A locked card carries nothing but its name — the server stripped the rest. */}
+          {!locked && (
+            <p className="text-xs text-gray-400 dark:text-slate-500 mt-0.5 truncate">
+              {format(new Date(apiary.createdAt), 'dd MMM yyyy')}
+              {apiary.createdByName ? ` · ${apiary.createdByName}` : ''}
+            </p>
+          )}
         </div>
-        <ChevronRight className="w-5 h-5 text-gray-300 dark:text-slate-600 group-hover:text-honey-500 group-hover:translate-x-0.5 shrink-0 mt-1 transition-all" />
+        {!locked && (
+          <ChevronRight className="w-5 h-5 text-gray-300 dark:text-slate-600 group-hover:text-honey-500 group-hover:translate-x-0.5 shrink-0 mt-1 transition-all" />
+        )}
       </div>
 
       {/* Description */}
-      {apiary.description && (
+      {apiary.description && !locked && (
         <p className="text-sm text-gray-500 dark:text-slate-400 mt-3 line-clamp-2">{apiary.description}</p>
       )}
 
       {/* Footer */}
       <div className="flex items-center gap-2 mt-4 pt-3 border-t border-honey-100 dark:border-slate-800">
-        <span className="badge bg-honey-100 text-honey-700 dark:bg-honey-500/15 dark:text-honey-300 gap-1">
-          🐝 {apiary.beehiveCount} {apiary.beehiveCount === 1 ? 'košnica' : 'košnica'}
-        </span>
-        {apiary.hasLocation && (
+        {locked ? (
+          <LockedBadge />
+        ) : (
+          <span className="badge bg-honey-100 text-honey-700 dark:bg-honey-500/15 dark:text-honey-300 gap-1">
+            🐝 {apiary.beehiveCount} {apiary.beehiveCount === 1 ? 'košnica' : 'košnica'}
+          </span>
+        )}
+        {apiary.hasLocation && !locked && (
           <span className="badge bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 gap-1">
             <MapPin className="w-3 h-3" /> Locirano
           </span>
@@ -260,13 +292,17 @@ function ApiaryCard({ apiary, canManage, onOpen, onDelete }: {
             className="ml-auto flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             onClick={e => e.stopPropagation()}
           >
-            <Link
-              to={`/apiaries/${apiary.id}/edit`}
-              className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
-              title="Uredi"
-            >
-              <Pencil className="w-4 h-4" />
-            </Link>
+            {/* Editing a locked apiary is refused by the server; deleting it is the way out of a
+                downgrade, so that button stays. */}
+            {!locked && (
+              <Link
+                to={`/apiaries/${apiary.id}/edit`}
+                className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-honey-600 dark:hover:text-honey-400 hover:bg-honey-50 dark:hover:bg-slate-800 transition-colors"
+                title="Uredi"
+              >
+                <Pencil className="w-4 h-4" />
+              </Link>
+            )}
             <button
               onClick={onDelete}
               className="p-1.5 rounded-lg text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"

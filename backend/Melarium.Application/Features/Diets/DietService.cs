@@ -20,12 +20,14 @@ public class DietService : IDietService
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUser _currentUser;
     private readonly IAccessGuard _access;
+    private readonly Common.Security.IPlanLock _planLock;
 
-    public DietService(IUnitOfWork uow, ICurrentUser currentUser, IAccessGuard access)
+    public DietService(IUnitOfWork uow, ICurrentUser currentUser, IAccessGuard access, Common.Security.IPlanLock planLock)
     {
         _uow         = uow;
         _currentUser = currentUser;
         _access      = access;
+        _planLock    = planLock;
     }
 
     // ── Queries ───────────────────────────────────────────────────────────────
@@ -49,12 +51,18 @@ public class DietService : IDietService
             return await MapDietsWithCostAsync(await _uow.Diets.GetByApiaryAsync(aid, year));
         }
 
+        // Same as the treatment and harvest lists (SPEC-24): a locked apiary's rows stay out.
+        var locked = await _planLock.GetForCurrentUserAsync();
+
         var byRole = _currentUser.Role switch
         {
             UserRole.ApiaryAdmin when _currentUser.ApiaryId is int myApiary =>
-                await _uow.Diets.GetByApiaryAsync(myApiary, year),
+                locked.ApiaryIds.Contains(myApiary)
+                    ? Enumerable.Empty<Diet>()
+                    : await _uow.Diets.GetByApiaryAsync(myApiary, year),
             UserRole.OrganizationAdmin when _currentUser.OrganizationId is int orgId =>
-                await _uow.Diets.GetByOrganizationAsync(orgId, year),
+                (await _uow.Diets.GetByOrganizationAsync(orgId, year))
+                    .Where(d => !locked.ApiaryIds.Contains(d.ApiaryId)),
             _ => Enumerable.Empty<Diet>(), // SystemAdmin (no org) must pass a filter
         };
         return await MapDietsWithCostAsync(byRole);

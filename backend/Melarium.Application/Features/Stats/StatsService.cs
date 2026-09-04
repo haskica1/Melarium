@@ -11,11 +11,13 @@ public class StatsService : IStatsService
 {
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUser _currentUser;
+    private readonly Common.Security.IPlanLock _planLock;
 
-    public StatsService(IUnitOfWork uow, ICurrentUser currentUser)
+    public StatsService(IUnitOfWork uow, ICurrentUser currentUser, Common.Security.IPlanLock planLock)
     {
         _uow = uow;
         _currentUser = currentUser;
+        _planLock = planLock;
     }
 
     public async Task<StatsDto> GetStatsAsync()
@@ -27,16 +29,27 @@ public class StatsService : IStatsService
 
         // ── Fetch base data ────────────────────────────────────────────────────
 
-        var apiaries = organizationId.HasValue
-            ? (await _uow.Apiaries.GetAllByOrganizationAsync(organizationId.Value)).ToList()
-            : (await _uow.Apiaries.GetAllAsync()).ToList();
+        // Rows the plan locked away are dropped before anything is derived from them (SPEC-24) —
+        // every count, average and chart below reads off these two lists, so filtering here is what
+        // keeps the dashboard from reporting on 50 hives while only 7 of them can be opened.
+        var locked = organizationId.HasValue
+            ? await _planLock.GetForOrganizationAsync(organizationId.Value)
+            : PlanLockResult.Empty;
+
+        var apiaries = (organizationId.HasValue
+                ? (await _uow.Apiaries.GetAllByOrganizationAsync(organizationId.Value))
+                : (await _uow.Apiaries.GetAllAsync()))
+            .Where(a => !locked.ApiaryIds.Contains(a.Id))
+            .ToList();
 
         var apiaryIds   = apiaries.Select(a => a.Id).ToHashSet();
         var apiaryNames = apiaries.ToDictionary(a => a.Id, a => a.Name);
 
-        var beehives = organizationId.HasValue
-            ? (await _uow.Beehives.GetByOrganizationAsync(organizationId.Value)).ToList()
-            : (await _uow.Beehives.GetAllActiveAsync()).ToList();
+        var beehives = (organizationId.HasValue
+                ? (await _uow.Beehives.GetByOrganizationAsync(organizationId.Value))
+                : (await _uow.Beehives.GetAllActiveAsync()))
+            .Where(b => !locked.BeehiveIds.Contains(b.Id))
+            .ToList();
 
         var beehiveIds = beehives.Select(b => b.Id).ToHashSet();
         var beehiveNamesById = beehives.ToDictionary(b => b.Id, b => b.Name);

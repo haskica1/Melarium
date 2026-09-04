@@ -24,7 +24,7 @@ public class AlertRuleServiceTests
 
     public AlertRuleServiceTests()
     {
-        _service = new AlertRuleService(_uow, _notifications, _weather, _config);
+        _service = new AlertRuleService(_uow, _notifications, _weather, _config, TestPlanLock.Unlocked());
 
         // Defaults: no queens, a single assigned beekeeper (id 1) as recipient, dedup never hit.
         _uow.Queens.GetActiveByBeehiveIdsAsync(Arg.Any<IReadOnlyCollection<int>>())

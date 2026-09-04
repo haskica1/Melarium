@@ -268,7 +268,28 @@ used to ask whether a user id exists.
 | GET | `/organizations/my-plan` | `MyPlanDto` — any authenticated org member; org-less SystemAdmin → `404` |
 | PUT | `/admin/organizations/{id}/plan` | `200 + AdminOrganizationDto` — SystemAdmin only; body `{ plan, planValidUntil?, planNotes? }`; accepts all five plans incl. Partner |
 
-**MyPlanDto:** `{ plan, planName, effectivePlan, effectivePlanName, planValidUntil?, planNotes?, usage: { apiaries, apiariesLimit?, beehives, beehivesLimit?, members, membersLimit?, aiInteractionsThisMonth, aiInteractionsLimit? } }` — a null limit means unlimited for the effective plan. `aiInteractionsThisMonth`/`Limit` (SPEC-18) cover both AI questions and commands under one combined quota — previously two separate fields for the advisor and the assistant.
+**MyPlanDto:** `{ plan, planName, effectivePlan, effectivePlanName, planValidUntil?, planNotes?, isReadOnlyMember, usage: { apiaries, apiariesLimit?, beehives, beehivesLimit?, members, membersLimit?, aiInteractionsThisMonth, aiInteractionsLimit?, lockedApiaries, lockedBeehives, readOnlyMembers } }` — a null limit means unlimited for the effective plan. `aiInteractionsThisMonth`/`Limit` (SPEC-18) cover both AI questions and commands under one combined quota — previously two separate fields for the advisor and the assistant. The `locked*`/`readOnlyMember*` fields are the downgrade lock (SPEC-24); all zero/false for an organization inside its plan.
+
+### Downgrade lock (SPEC-24)
+
+`ApiaryDto` and `BeehiveDto` gained **`isLocked`**. A locked row is still returned by every list
+endpoint, but with its fields stripped to the name (`PlanLockRedaction`): no description,
+coordinates, counts, notes, label number, type/material names, or `uniqueId`. Clients must render
+locked rows as unreachable rather than showing zeroed numbers as real values.
+
+New `402 plan-limit` responses, all with the same ProblemDetails shape as SPEC-09:
+
+| Situation | Endpoint |
+|---|---|
+| Opening a locked apiary | `GET /apiaries/{id}` |
+| Opening or editing a locked hive | `GET /beehives/{id}`, `PUT /beehives/{id}`, `PUT /apiaries/{id}` |
+| Listing a locked apiary's hives | `GET /apiaries/{id}/beehives` |
+| Scanning a locked hive's QR | `GET /beehives/scan/{uniqueId}` |
+| Any non-GET request from a read-only member | every `/api/*` except `/api/auth`, `/api/profile`, `/api/notifications`, `/api/feedback` |
+
+**Deliberately still allowed on a locked row:** `DELETE /beehives/{id}`, `DELETE /apiaries/{id}`
+(the way back under the limit) and `POST /inspections` (so an offline round syncing after the plan
+changed is not lost — it writes but stays unreadable). See ADR-042.
 
 **PlanType:** `Free=1, Standard=2, Pro=3, Max=4, Partner=5` (Partner is hidden from public UI).
 

@@ -361,6 +361,11 @@ app.UseCors("FrontendPolicy");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// After authorization (it needs the signed-in identity) and inside the exception handler above
+// (it signals refusal by throwing PlanLimitException). SPEC-24.
+app.UseReadOnlyMemberGuard();
+
 app.MapControllers();
 app.MapHealthChecks("/health");
 

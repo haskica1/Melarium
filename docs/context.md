@@ -134,6 +134,22 @@
   /api/organizations/my-plan`; `/plans` page + global UpsellModal on 402; `PlanExpiring` alert (type 18).
   See `features/plans-billing.md` + ADR-028.
 
+### Downgrade lock (SPEC-24)
+- Falling to a smaller plan **locks** what is above its limits — the reverse of SPEC-09's original
+  "downgrades never lock". `IPlanLock` + `PlanLockPolicy` rank oldest-first (`CreatedAt`, then `Id`):
+  apiaries past `MaxApiaries` lock, their hives lock with them and do not consume the hive quota, and
+  the rest rank org-wide against `MaxBeehives`. **Computed, never stored** — no migration, no job; an
+  upgrade unlocks instantly and deleting an active hive promotes the oldest locked one.
+- Locked rows stay in lists with `isLocked: true`, stripped to their name (`PlanLockRedaction`);
+  every route that would open one → **402 `plan-limit`**. Enforced inside `IAccessGuard`, which covers
+  ~60 call sites at once; seven aggregate paths filter by hand (stats, alerts, calendar, weekly
+  summary, treatment/harvest/diet org lists).
+- Two exceptions: **delete** stays allowed (the way back under the limit) and **inspection create**
+  stays allowed on a locked hive (SPEC-07 outbox replay — writes, but unreadable until upgrade).
+- Members past `MaxMembers` become **read-only**, not locked out (`ReadOnlyMemberMiddleware`; owner
+  never); `PlanLockPending` alert (type 28) warns 2 days before expiry, only orgs that lose something.
+  See `features/plans-billing.md`, `specs/SPEC-24-downgrade-lock.md` + ADR-042.
+
 ### Apiaries
 - Full CRUD via `/api/apiaries`, org-scoped; ApiaryAdmin sees only their apiary,
   Beekeeper only apiaries containing their assigned hives
@@ -456,7 +472,7 @@
 
 **All roadmap specs shipped** (see `docs/specs/README.md`).
 
-**Shipped (were specced):** SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-20 Kontakt i podrška ✅, SPEC-21 Šta je novo ✅, SPEC-22 Moja organizacija ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
+**Shipped (were specced):** SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-20 Kontakt i podrška ✅, SPEC-21 Šta je novo ✅, SPEC-22 Moja organizacija ✅, SPEC-24 Downgrade lock ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
 
 **Unspecced ideas:**
 

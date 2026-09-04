@@ -27,7 +27,7 @@ public class HarvestServiceTests
         Entries = hiveIds.Select(h => new HarvestEntry { BeehiveId = h, QuantityKg = 5m }).ToList(),
     };
 
-    private HarvestService Service(ICurrentUser user) => new(_uow, _access, user);
+    private HarvestService Service(ICurrentUser user) => new(_uow, _access, user, TestPlanLock.Unlocked());
 
     [Fact]
     public async Task Create_WithHiveNotInApiary_ThrowsValidation()
