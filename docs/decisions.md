@@ -1143,3 +1143,56 @@ another organization's hive would learn something about that organization's plan
   the past are locked at deploy time with no warning at all — the two-day `PlanLockPending` alert is
   driven by an upcoming expiry date and cannot fire for one in the past. SPEC-24 carries the SQL to see
   who that hits before deploying.
+
+---
+
+## ADR-043: The Season Report Is Its Own Slice, and Its Period Is a Local Calendar (SPEC-25)
+
+**Context:** The consolidated season report needed yield, expenses, revenue and treatments for an
+arbitrary period. `StatsService` already aggregates most of those — but for the current calendar
+year, always the whole organization, always the same fixed shape, computed from
+`DateTime.UtcNow.Year`.
+
+**Decision:** A separate `Features/Reports` slice, with three rules that the stats path does not have.
+
+**Not an extension of `StatsDto`.** Stats answer "the current year, the whole organization, on one
+screen"; the report answers "any period, optionally one apiary, as a document". Merging them would
+put fields on the dashboard DTO that are meaningless there, and make the report carry 12-month series
+it never renders. The cost is a second aggregation over the same tables, paid deliberately.
+
+**Period membership is decided in the application time zone, not in UTC.** `ReportPeriod.Contains`
+converts the stored instant with `AppTimeZone` and compares calendar dates. `StatsService`'s
+`h.Date.Year == currentYear` is fine for a dashboard and wrong for a document: a harvest recorded at
+23:30 local on 30 September is an October row under a UTC comparison, and the September report is
+quietly short by that amount with nothing on screen to suggest it. The SQL prefilter
+(`ReportPeriod.UtcBounds`) is deliberately one day wider on each side and never decides membership.
+
+**A treatment belongs to the period of its `StartDate`, never to every period it overlaps.** Overlap
+counting is more truthful about "what happened during these months", but it breaks the property that
+the four quarters add up to the year — which, in a document handed to a municipality, reads as an
+error in the document rather than as a definition.
+
+**Consequences:**
+
+- **The report states its own uncertainty.** `Harvest.PricePerKg` is nullable and revenue sums only
+  priced harvests, so `unpricedKg` travels with every response and both exports print it. Without it
+  the estimate is not conservative, it is simply wrong, and nothing on the page says so.
+- **Currencies are grouped and the balance is BAM-only.** Inherited from
+  `IExpenseRepository.GetTotalsByDietsAsync`. Revenue is denominated in KM by construction
+  (`PricePerKg` is KM/kg), so netting a euro expense against it produces a number in no currency;
+  non-BAM expenses are reported and excluded from the balance, and the document says which.
+- **SPEC-24 locking needed no new code.** Scope comes from
+  `IAccessGuard.GetAccessibleApiariesAsync()`, which is already role-scoped and already drops locked
+  apiaries, and every other collection is keyed off that set. This is the first org-wide aggregate
+  that does *not* join the seven hand-filtered paths ADR-042 lists — the pattern worth copying.
+- **`Expense` gained a nullable `ApiaryId`.** `NULL` means **shared**, not unknown, which is what
+  makes the migration safe: every pre-existing expense is null and reports correctly without a
+  backfill. Attribution sits on the receipt rather than the line item; the cost is that a receipt
+  covering two apiaries is entered twice or left shared.
+- **A contradiction between `Expense.ApiaryId` and an item's `Diet.ApiaryId` is refused (400).**
+  There are now two paths from an expense to an apiary, and letting them disagree would leave a row
+  that belongs to two apiaries at once, with the report picking one silently. The check rides along
+  in `EnsureAttributionValidAsync`, which already loads the diet and its apiary — no extra query.
+- **Both exports render from one DTO.** The server computes; jsPDF and `write-excel-file` only draw.
+  Had each format aggregated for itself, two documents for the same period would eventually disagree
+  on a number, and there would be no way to tell which one was handed in.

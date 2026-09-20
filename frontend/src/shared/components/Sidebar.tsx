@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   BarChart2, Building2, CalendarDays, ChevronsLeft, ChevronsRight, Droplets, GraduationCap, Home,
-  LayoutDashboard, Leaf, Megaphone, MessageSquareHeart, Pill, ReceiptText, Sparkles, Tent, Users,
+  FileText, LayoutDashboard, Leaf, Megaphone, MessageSquareHeart, Pill, ReceiptText, Sparkles, Tent,
+  Users,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -13,6 +14,7 @@ export interface NavRoleFlags {
   canManageMembers: boolean
   canEditOwnOrganization: boolean
   canSeePastures: boolean
+  canSeeReports: boolean
   /** Untriaged feedback count (SPEC-13) — SystemAdmin only, 0/undefined hides the badge. */
   feedbackNewCount?: number
   /** Unseen announcements (SPEC-21 D8) — everyone, 0/undefined hides the badge. */
@@ -53,6 +55,7 @@ export function getNavItems(flags: NavRoleFlags): NavItemDef[] {
     },
     { to: '/calendar', icon: <CalendarDays className="w-4 h-4" />, label: 'Kalendar', visible: !flags.isSystemAdmin },
     { to: '/stats', icon: <BarChart2 className="w-4 h-4" />, label: 'Statistike', visible: !flags.isSystemAdmin },
+    { to: '/reports', icon: <FileText className="w-4 h-4" />, label: 'Izvještaji', visible: flags.canSeeReports && !flags.isSystemAdmin },
     {
       to: '/admin/feedback',
       icon: <MessageSquareHeart className="w-4 h-4" />,

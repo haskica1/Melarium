@@ -11,12 +11,14 @@ public class ExpenseMappingProfile : AutoMapper.Profile
         CreateMap<Expense, ExpenseDto>()
             .ForMember(d => d.SourceName, o => o.MapFrom(s => s.Source.ToString()))
             .ForMember(d => d.ItemCount, o => o.MapFrom(s => s.Items.Count))
+            .ForMember(d => d.ApiaryName, o => o.MapFrom(s => s.Apiary != null ? s.Apiary.Name : null))
             .ForMember(d => d.CreatedByName, o => o.MapFrom(s =>
                 s.CreatedBy != null ? $"{s.CreatedBy.FirstName} {s.CreatedBy.LastName}" : null));
 
         CreateMap<Expense, ExpenseDetailDto>()
             .ForMember(d => d.SourceName, o => o.MapFrom(s => s.Source.ToString()))
             .ForMember(d => d.ItemCount, o => o.MapFrom(s => s.Items.Count))
+            .ForMember(d => d.ApiaryName, o => o.MapFrom(s => s.Apiary != null ? s.Apiary.Name : null))
             .ForMember(d => d.CreatedByName, o => o.MapFrom(s =>
                 s.CreatedBy != null ? $"{s.CreatedBy.FirstName} {s.CreatedBy.LastName}" : null));
 

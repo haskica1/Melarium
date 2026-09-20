@@ -12,6 +12,16 @@ public class Expense : BaseEntity
     public int OrganizationId { get; set; }
     public Organization Organization { get; set; } = null!;
 
+    /// <summary>
+    /// Optional attribution to an apiary (SPEC-25). <c>null</c> means <b>shared</b> — a purchase made
+    /// for the whole operation — not "unknown": every expense predating this field is null, and the
+    /// season report counts those as shared rather than guessing an apiary for them.
+    /// SET NULL on delete, like <see cref="ExpenseItem.DietId"/>: deleting an apiary must never
+    /// delete the accounting record of money that actually left the account.
+    /// </summary>
+    public int? ApiaryId { get; set; }
+    public Apiary? Apiary { get; set; }
+
     public int? CreatedById { get; set; }
     public User? CreatedBy { get; set; }
 

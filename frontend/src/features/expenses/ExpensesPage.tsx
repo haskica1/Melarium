@@ -226,6 +226,14 @@ function ExpenseCard({ expense, isDeleting, onEdit, onDelete }: ExpenseCardProps
           <span className="text-xs text-gray-400 dark:text-slate-400 bg-gray-100 dark:bg-slate-800 rounded-full px-2 py-0.5">
             {ExpenseSourceLabels[expense.source]}
           </span>
+          <span className={clsx(
+            'text-xs rounded-full px-2 py-0.5',
+            expense.apiaryName
+              ? 'text-emerald-700 bg-emerald-50 dark:text-emerald-300 dark:bg-emerald-500/15'
+              : 'text-gray-400 bg-gray-100 dark:text-slate-400 dark:bg-slate-800',
+          )}>
+            {expense.apiaryName ?? 'Zajednički'}
+          </span>
         </div>
         <div className="flex items-center gap-3 mt-0.5 text-sm text-gray-500 dark:text-slate-400">
           <span className="shrink-0">{format(new Date(expense.purchaseDate), 'dd.MM.yyyy')}</span>

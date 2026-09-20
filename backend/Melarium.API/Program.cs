@@ -381,6 +381,9 @@ using (var scope = app.Services.CreateScope())
         await DatabaseInitializer.SeedUsersAsync(db);
         // Starter learning topics (SPEC-06) — production content is authored by SystemAdmin.
         await DatabaseInitializer.SeedLearningTopicsAsync(db);
+        // Harvests/expenses/treatments for the season report (SPEC-25) — the InitialCreate
+        // migration seeds none of these, so /reports would otherwise be all zeros.
+        await ReportDataSeeder.SeedAsync(db);
     }
     else
     {

@@ -221,6 +221,46 @@
 ### Expenses
 - Full CRUD via `/api/expenses` with line items (`ExpenseItem`)
 - Client-side receipt scanning (`ReceiptScanPage`): tesseract.js OCR (`hrv` model) + heuristic line parser
+- **`Expense.ApiaryId` (nullable, SPEC-25)** — a receipt is attributed to one apiary or left
+  **shared**. `NULL` means shared, *not* unknown: every expense predating the field is null and is
+  reported as shared, which is what makes the migration safe. Attribution is on the receipt, not the
+  line item. An expense whose apiary contradicts the apiary of an item's feeding programme is
+  refused with **400** (`ExpenseService.EnsureAttributionValidAsync`, no extra query — it already
+  loads the diet and its apiary); a shared receipt conflicts with nothing
+
+### Sezonski i godišnji izvještaj (SPEC-25)
+- `/reports` — one consolidated document for an **arbitrary period**: yield per apiary/honey
+  type/hive/pasture, expenses, estimated revenue, balance and a treatment summary. Exported to
+  **PDF and Excel**, for subsidy applications. Before this, only QR labels and the treatment
+  register produced a PDF; yield, costs and stats lived on screen only
+- `GET /api/reports/season?from=&to=&apiaryId=` → `SeasonReportDto`, `Roles.Managers`
+  (OrgAdmin + ApiaryAdmin; **Beekeeper is excluded** — already read-only on harvests and treatments,
+  and the report carries the organization's finances). No organization → **403**. No plan gate
+- Free `od–do` range with presets (year, previous year, season 1.3.–31.10., Q1–Q4, single month) —
+  one mechanism covers the monthly, quarterly, seasonal and yearly report
+- **Section checkboxes + format picker** (D13): Prinos (with its four sub-tables), Troškovi, Bilansa,
+  Tretmani; PDF or Excel, then one export button. The same selection drives the on-screen preview and
+  both exports. **Notes are not optional** — they are what keeps a figure honest. In Excel a
+  deselected section loses its whole sheet rather than leaving an empty one; `Sažetak` always stays.
+  "Po košnici" is off by default (one row per hive fills a page). The choice is remembered in
+  `localStorage`, merged over the defaults so a stored object written before a new section existed
+  does not leave it permanently off
+- **Period boundaries are local, not UTC** (`Domain/Common/ReportPeriod`, via `AppTimeZone`): a
+  harvest at 23:30 on the last day of the period otherwise lands in the next month. Treatments belong
+  to the period of their **`StartDate`** — overlap counting would break "the four quarters add up to
+  the year"
+- **Revenue is always labelled an estimate**, with `unpricedKg` stated alongside: `PricePerKg` is
+  nullable, so kg without a price would silently shrink the figure. **Currencies are grouped, never
+  summed**; the balance is BAM-only and says so
+- **Own slice, not an extension of `StatsDto`** (ADR-043): stats answer "current year, whole org, one
+  screen", the report answers "any period, optionally one apiary, one document"
+- SPEC-24 locking comes free — scope is `IAccessGuard.GetAccessibleApiariesAsync()`, which already
+  drops locked apiaries, and every other collection is keyed off that set
+- PDF is client-side jsPDF, A4 **portrait**, sharing the lazy DejaVu Sans chunk with the treatment
+  register; Excel is `write-excel-file` (MIT, lazy), four sheets. Both are rendered from the **same
+  DTO** so they cannot disagree. Header carries **blank fill-in lines for address and JIB** — the
+  organization has no such fields (SPEC-22 D1). No charts; treatments are a summary, not a second
+  copy of the register. See `docs/features/season-report.md`.
 
 ### Harvests (Vrcanja)
 - Full CRUD via `/api/harvests` (apiary-scoped event + per-hive `HarvestEntry`); `HoneyType` with Bosnian `BsLabels`

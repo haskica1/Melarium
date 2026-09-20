@@ -44,7 +44,7 @@ public class ExpenseService : IExpenseService
     public async Task<ExpenseDetailDto> CreateAsync(CreateExpenseDto dto)
     {
         var orgId = RequireOrganization();
-        await EnsureItemDietsAttributableAsync(orgId, dto.Items);
+        await EnsureAttributionValidAsync(orgId, dto.ApiaryId, dto.Items);
 
         var expense = _mapper.Map<Expense>(dto);
         expense.OrganizationId = orgId;
@@ -65,7 +65,7 @@ public class ExpenseService : IExpenseService
     public async Task<ExpenseDetailDto> UpdateAsync(int id, UpdateExpenseDto dto)
     {
         var orgId = RequireOrganization();
-        await EnsureItemDietsAttributableAsync(orgId, dto.Items);
+        await EnsureAttributionValidAsync(orgId, dto.ApiaryId, dto.Items);
 
         var expense = await _uow.Expenses.GetWithItemsAsync(id)
             ?? throw new NotFoundException(nameof(Expense), id);
@@ -109,14 +109,25 @@ public class ExpenseService : IExpenseService
 
     /// <summary>
     /// Every attributed dietId must belong to a diet whose apiary is in the caller's own
-    /// organization. Expense is organization-scoped while Diet is apiary-scoped, so this is the
-    /// boundary check between the two. A cross-organization id is well-formed but simply not
-    /// attributable — that is a <see cref="Melarium.Application.Common.Exceptions.ValidationException"/>
-    /// (400), not a 404 (the diet does exist) and not a 403 (this is a data-shape rule, not a
-    /// per-apiary permission the way managing a diet directly is).
+    /// organization, and — since SPEC-25 — must not contradict the expense's own apiary. Expense is
+    /// organization-scoped while Diet is apiary-scoped, so this is the boundary check between the
+    /// two. A cross-organization id is well-formed but simply not attributable — that is a
+    /// <see cref="Melarium.Application.Common.Exceptions.ValidationException"/> (400), not a 404
+    /// (the diet does exist) and not a 403 (this is a data-shape rule, not a per-apiary permission
+    /// the way managing a diet directly is).
     /// </summary>
-    private async Task EnsureItemDietsAttributableAsync(int orgId, IEnumerable<CreateExpenseItemDto> items)
+    private async Task EnsureAttributionValidAsync(int orgId, int? apiaryId, IEnumerable<CreateExpenseItemDto> items)
     {
+        if (apiaryId is int expenseApiaryId)
+        {
+            var own = await _uow.Apiaries.GetByIdAsync(expenseApiaryId);
+            if (own is null || own.OrganizationId != orgId)
+                throw new ValidationException(new Dictionary<string, string[]>
+                {
+                    ["apiaryId"] = ["Pčelinjak ne pripada vašoj organizaciji."]
+                });
+        }
+
         var dietIds = items.Where(i => i.DietId.HasValue).Select(i => i.DietId!.Value).Distinct().ToList();
         if (dietIds.Count == 0) return;
 
@@ -130,6 +141,17 @@ public class ExpenseService : IExpenseService
                 throw new ValidationException(new Dictionary<string, string[]>
                 {
                     ["items"] = [$"Program prehrane {dietId} ne pripada vašoj organizaciji."]
+                });
+
+            // SPEC-25 D2: an expense attributed to one apiary must not carry an item attributed to a
+            // feeding programme on another — the row would belong to two apiaries at once, and the
+            // season report would have to pick one silently. A shared expense (null) conflicts with
+            // nothing: "shared" is a deliberate state, not a missing answer.
+            if (apiaryId is int ownApiaryId && diet.ApiaryId != ownApiaryId)
+                throw new ValidationException(new Dictionary<string, string[]>
+                {
+                    ["items"] = [$"Stavka je vezana za program prehrane na pčelinjaku „{apiary.Name}“, " +
+                                 "a trošak je označen za drugi pčelinjak. Uskladite ih ili ostavite trošak kao zajednički."]
                 });
         }
     }

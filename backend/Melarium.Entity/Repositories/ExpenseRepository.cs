@@ -13,15 +13,28 @@ public class ExpenseRepository : Repository<Expense>, IExpenseRepository
             .AsNoTracking()
             .Include(e => e.Items)
             .Include(e => e.CreatedBy)
+            .Include(e => e.Apiary)
             .Where(e => e.OrganizationId == organizationId)
             .OrderByDescending(e => e.PurchaseDate)
             .ThenByDescending(e => e.CreatedAt)
+            .ToListAsync();
+
+    public async Task<IEnumerable<Expense>> GetByOrganizationInRangeAsync(int organizationId, DateTime fromUtc, DateTime toUtc) =>
+        await _context.Expenses
+            .AsNoTracking()
+            .Include(e => e.Items)
+            .Include(e => e.Apiary)
+            .Where(e => e.OrganizationId == organizationId
+                     && e.PurchaseDate >= fromUtc
+                     && e.PurchaseDate <= toUtc)
+            .OrderByDescending(e => e.PurchaseDate)
             .ToListAsync();
 
     public async Task<Expense?> GetWithItemsAsync(int id) =>
         await _context.Expenses
             .Include(e => e.Items.OrderBy(i => i.SortOrder))
             .Include(e => e.CreatedBy)
+            .Include(e => e.Apiary)
             .FirstOrDefaultAsync(e => e.Id == id);
 
     public async Task<Dictionary<int, List<(string Currency, decimal Total)>>> GetTotalsByDietsAsync(IEnumerable<int> dietIds)

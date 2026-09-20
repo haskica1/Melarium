@@ -54,7 +54,7 @@ export default function Layout() {
   // could disagree about who sees what.
   const {
     isSystemAdmin, isOrgAdmin, isAdmin,
-    canSeeExpenses, canManageMembers, canSeePastures, canEditOwnOrganization,
+    canSeeExpenses, canManageMembers, canSeePastures, canEditOwnOrganization, canSeeReports,
   } = usePermissions()
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 
@@ -76,6 +76,7 @@ export default function Layout() {
     canManageMembers,
     canSeePastures,
     canEditOwnOrganization,
+    canSeeReports,
     feedbackNewCount: feedbackSummary?.newCount,
     announcementUnreadCount: announcementBanner?.unreadCount,
   }

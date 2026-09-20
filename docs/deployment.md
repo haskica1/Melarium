@@ -276,6 +276,71 @@ skipped, and the skip is logged. Verify with:
 docker compose exec api printenv Feedback__NotifyEmail
 ```
 
+### Season report (SPEC-25) — nothing one-time, but check the migration backlog
+
+The report itself needs **no new environment variable, no secret and no manual step**. `deploy.sh`
+covers all of it: `npm ci` picks up the new `write-excel-file` dependency from the committed
+lockfile, and the API applies migrations itself on startup.
+
+What does need a look is **how many migrations this deploy carries**. `Program.cs` calls
+`MigrateAsync()` unconditionally, so the container applies *every* pending migration the moment it
+starts — and per the notes in `specs/README.md`, three earlier ones may never have run in
+production:
+
+| Migration | Shipped with |
+|---|---|
+| `20260821143619_AddBeehiveMerge` | SPEC-19 |
+| `20260828132327_AddAnnouncements` | SPEC-21 |
+| `20260830112029_AddOrganizationLogo` | SPEC-22 |
+| `20260912112937_AddExpenseApiary` | SPEC-25 |
+
+All four are **additive** — new tables, and one nullable column with a `SET NULL` foreign key. None
+drops or retypes an existing column, so none can lose data. Still, take the backup first and check
+what is actually pending before starting:
+
+```bash
+cd /opt/melarium
+docker compose exec -T postgres psql -U melarium -d MelariumDB -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId" DESC LIMIT 6;'
+```
+
+Whatever is missing from that list is what the next start will apply.
+
+#### Deploy
+
+```bash
+cd /opt/melarium
+docker compose exec -T postgres pg_dump -U melarium MelariumDB | gzip > /opt/backups/pre-spec25-$(date +%F).sql.gz
+./deploy/deploy.sh
+```
+
+#### Verify
+
+```bash
+# 1. Migration applied — expected output: ApiaryId | YES
+docker compose exec -T postgres psql -U melarium -d MelariumDB -c "SELECT column_name, is_nullable FROM information_schema.columns WHERE table_name = 'Expenses' AND column_name = 'ApiaryId';"
+
+# 2. No startup errors
+docker compose logs --tail=50 api
+```
+
+Then in the browser, signed in as an OrganizationAdmin:
+
+- **Izvještaji** appears in the menu; sign in as a Beekeeper and it must **not**.
+- `/reports` loads; pick a period and export once as PDF and once as Excel.
+- Open the PDF and confirm č/ć/đ/š/ž render — a broken embedded font shows up here and nowhere else.
+- Open a trošak: the **Pčelinjak** field is there, existing expenses show as **Zajednički**.
+
+#### Rollback
+
+The frontend rolls back by checking out the previous commit and re-running `deploy.sh`. The column
+does **not** need reverting — an older API simply ignores it. Only restore the dump if the
+migration itself fails, which for an additive column means something is wrong with the database
+rather than with this change.
+
+> **No demo data in production.** `ReportDataSeeder` runs only under
+> `app.Environment.IsDevelopment()`, alongside the demo accounts — a production container never
+> calls it.
+
 ### One-time: uploads volume ownership (non-root container)
 
 The API container now runs as the unprivileged user `1654` instead of root. A **newly created**

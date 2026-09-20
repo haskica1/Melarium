@@ -194,4 +194,132 @@ public class ExpenseServiceTests
         // Rejected before even loading the expense — the boundary check runs first.
         await _uow.Expenses.DidNotReceive().GetWithItemsAsync(Arg.Any<int>());
     }
+
+    // ── Apiary attribution (SPEC-25 D1/D2) ─────────────────────────────────────
+
+    [Fact]
+    public async Task Create_AttributesExpenseToApiary_WhenApiaryBelongsToCallersOrg()
+    {
+        _uow.Apiaries.GetByIdAsync(Apiary).Returns(new Apiary { Id = Apiary, OrganizationId = OrgId });
+        Expense? saved = null;
+        _uow.Expenses.AddAsync(Arg.Do<Expense>(e => saved = e)).Returns(ci => ci.Arg<Expense>());
+        _uow.Expenses.GetWithItemsAsync(Arg.Any<int>()).Returns(_ => saved);
+
+        await _service.CreateAsync(new CreateExpenseDto
+        {
+            ApiaryId     = Apiary,
+            PurchaseDate = DateTime.UtcNow,
+            Currency     = "BAM",
+            Items        = [Item()],
+        });
+
+        Assert.Equal(Apiary, saved!.ApiaryId);
+    }
+
+    [Fact]
+    public async Task Create_ApiaryOfAnotherOrganization_ThrowsValidation()
+    {
+        _uow.Apiaries.GetByIdAsync(Apiary).Returns(new Apiary { Id = Apiary, OrganizationId = 999 });
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _service.CreateAsync(new CreateExpenseDto
+            {
+                ApiaryId     = Apiary,
+                PurchaseDate = DateTime.UtcNow,
+                Currency     = "BAM",
+                Items        = [Item()],
+            }));
+
+        await _uow.Expenses.DidNotReceive().AddAsync(Arg.Any<Expense>());
+    }
+
+    [Fact]
+    public async Task Create_NullApiary_IsSharedAndConflictsWithNothing()
+    {
+        // "Shared" is a deliberate state, not a missing answer: a shared receipt may carry items
+        // attributed to feeding programmes on any apiary. This is what keeps the migration safe —
+        // every pre-SPEC-25 expense is null and must stay saveable exactly as it is.
+        var diet = DietIn(Apiary);
+        WireDiet(diet);
+        Expense? saved = null;
+        _uow.Expenses.AddAsync(Arg.Do<Expense>(e => saved = e)).Returns(ci => ci.Arg<Expense>());
+        _uow.Expenses.GetWithItemsAsync(Arg.Any<int>()).Returns(_ => saved);
+
+        await _service.CreateAsync(new CreateExpenseDto
+        {
+            ApiaryId     = null,
+            PurchaseDate = DateTime.UtcNow,
+            Currency     = "BAM",
+            Items        = [Item(dietId: diet.Id)],
+        });
+
+        Assert.Null(saved!.ApiaryId);
+        Assert.Equal(diet.Id, saved.Items.Single().DietId);
+    }
+
+    [Fact]
+    public async Task Create_ApiaryContradictingItemsDiet_ThrowsValidation()
+    {
+        // SPEC-25 D2: the expense says apiary 3, the item's feeding programme says apiary 4.
+        const int OtherApiary = 4;
+        var diet = DietIn(OtherApiary);
+        WireDiet(diet);
+        _uow.Apiaries.GetByIdAsync(Apiary).Returns(new Apiary { Id = Apiary, OrganizationId = OrgId });
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _service.CreateAsync(new CreateExpenseDto
+            {
+                ApiaryId     = Apiary,
+                PurchaseDate = DateTime.UtcNow,
+                Currency     = "BAM",
+                Items        = [Item(dietId: diet.Id)],
+            }));
+
+        await _uow.Expenses.DidNotReceive().AddAsync(Arg.Any<Expense>());
+    }
+
+    [Fact]
+    public async Task Create_ApiaryMatchingItemsDiet_IsAccepted()
+    {
+        var diet = DietIn(Apiary);
+        WireDiet(diet);
+        Expense? saved = null;
+        _uow.Expenses.AddAsync(Arg.Do<Expense>(e => saved = e)).Returns(ci => ci.Arg<Expense>());
+        _uow.Expenses.GetWithItemsAsync(Arg.Any<int>()).Returns(_ => saved);
+
+        await _service.CreateAsync(new CreateExpenseDto
+        {
+            ApiaryId     = Apiary,
+            PurchaseDate = DateTime.UtcNow,
+            Currency     = "BAM",
+            Items        = [Item(dietId: diet.Id)],
+        });
+
+        Assert.Equal(Apiary, saved!.ApiaryId);
+    }
+
+    [Fact]
+    public async Task Update_ChangesApiaryAttribution()
+    {
+        // The same Items.Clear()-then-remap path that DietId goes through: ApiaryId lives on the
+        // expense itself, so it must survive AutoMapper's UpdateExpenseDto -> Expense mapping.
+        _uow.Apiaries.GetByIdAsync(Apiary).Returns(new Apiary { Id = Apiary, OrganizationId = OrgId });
+        var existing = new Expense
+        {
+            Id = 1, OrganizationId = OrgId, Currency = "BAM", PurchaseDate = DateTime.UtcNow,
+            ApiaryId = null,
+            Items = [new ExpenseItem { Id = 100, Name = "Šećer", Quantity = 1, UnitPrice = 10, TotalPrice = 10, SortOrder = 0 }],
+        };
+        _uow.Expenses.GetWithItemsAsync(1).Returns(existing);
+
+        await _service.UpdateAsync(1, new UpdateExpenseDto
+        {
+            ApiaryId     = Apiary,
+            PurchaseDate = existing.PurchaseDate,
+            Currency     = "BAM",
+            Items        = [Item()],
+        });
+
+        Assert.Equal(Apiary, existing.ApiaryId);
+    }
 }

@@ -51,6 +51,7 @@ import PrivacyPolicyPage from './features/legal/PrivacyPolicyPage'
 import TermsOfServicePage from './features/legal/TermsOfServicePage'
 import ProfilePage from './features/profile/ProfilePage'
 import StatsPage from './features/stats/StatsPage'
+import ReportPage from './features/reports/ReportPage'
 import CalendarPage from './features/calendar/CalendarPage'
 import CalendarSettingsPage from './features/calendar/CalendarSettingsPage'
 import PlansPage from './features/plans/PlansPage'
@@ -65,6 +66,7 @@ const MEMBER_MANAGERS   = ['OrganizationAdmin', 'ApiaryAdmin']
 // one through /admin (SPEC-22).
 const ORG_OWNERS        = ['OrganizationAdmin']
 const EXPENSE_MANAGERS  = ['ApiaryAdmin', 'OrganizationAdmin', 'SystemAdmin']
+const REPORT_MANAGERS   = ['ApiaryAdmin', 'OrganizationAdmin']
 
 export default function App() {
   return (
@@ -169,6 +171,12 @@ export default function App() {
               <Route element={<RoleRoute allowedRoles={MEMBER_MANAGERS} />}>
                 <Route path="members"                        element={<MembersPage />} />
                 <Route path="members/:id/assignments"        element={<MemberAssignmentPage />} />
+              </Route>
+
+              {/* Reports (SPEC-25) — ApiaryAdmin + OrgAdmin. A Beekeeper is read-only on harvests
+                  and treatments anyway, and the report carries the organization's finances. */}
+              <Route element={<RoleRoute allowedRoles={REPORT_MANAGERS} />}>
+                <Route path="reports" element={<ReportPage />} />
               </Route>
 
               {/* Expenses — Admin, OrgAdmin, SystemAdmin */}

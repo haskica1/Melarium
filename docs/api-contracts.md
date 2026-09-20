@@ -621,6 +621,43 @@ SystemAdmin only — `/api/admin/feedback`:
 e-mail per admin. A status change or reply notifies the submitter with bell **and** e-mail. Saving never
 depends on either succeeding. Unset `Feedback:NotifyEmail` → e-mail silently skipped and logged.
 
+## Reports (SPEC-25)
+
+| Method | Path | Ko | Returns |
+|---|---|---|---|
+| GET | `/api/reports/season?from=&to=&apiaryId=` | `Roles.Managers` | `SeasonReportDto` |
+
+`from` and `to` are required `yyyy-MM-dd`, **inclusive on both ends**; `apiaryId` is optional
+(omitted = every apiary the caller can reach). `from > to` or a range over 5 years → **400**.
+An `apiaryId` outside the caller's scope → **403**; a locked one → **402** (`IAccessGuard`).
+A caller with no organization (the org-less SystemAdmin) → **403**.
+
+Period membership is decided by the record's date **in the application time zone**, not by its UTC
+components — see `Domain/Common/ReportPeriod`. Treatments belong to the period of their `StartDate`.
+
+```
+SeasonReportDto
+  header     { organizationName, from, to, generatedAt, apiaryNames[] }
+  yield      { totalKg, pricedKg, unpricedKg, harvestCount,
+               byApiary[], byHoneyType[], byBeehive[], byPasture[] }   // NamedKg { name, kg }
+  expenses   { count, byCurrency[], byApiary[], sharedByCurrency[], byDiet[] }
+  balance    { estimatedRevenueBam, totalExpenseBam, netBam, byApiary[] }
+  treatments { count, hivesTreated, activeKarencaCount, byProduct[] }
+  notes      { unpricedKg, unassignedExpenseCount, nonBamCurrencies[] }
+```
+
+`byCurrency` / `sharedByCurrency` are `CurrencyAmount { currency, amount }` — **grouped, never
+summed across currencies**. The balance is BAM-only: revenue is denominated in KM by construction
+(`Harvest.PricePerKg` is KM/kg), so netting a euro expense against it would yield a number in no
+currency. `notes` carries what the document must state out loud so a figure is not read as more
+certain than it is.
+
+`GET /api/expenses` and `POST|PUT /api/expenses` gain **`apiaryId` (`int?`)**, plus `apiaryName` on
+the response. `null` = **shared expense**, not "unknown". An `apiaryId` outside the caller's
+organization, or one contradicting the apiary of an item's `dietId`, → **400**.
+
+---
+
 **No endpoints for in-app help (SPEC-14)** — its content is a static frontend registry, by design.
 
 ---

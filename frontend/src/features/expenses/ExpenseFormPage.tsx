@@ -4,6 +4,7 @@ import { useFieldArray, useForm, useWatch } from 'react-hook-form'
 import { AlertCircle, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useExpense, useCreateExpense, useUpdateExpense } from '../../core/services/expenseQueries'
 import { useDiets } from '../../core/services/dietQueries'
+import { useApiaries } from '../../core/services/queries'
 import { ExpenseSource } from '../../core/models'
 import type { CreateExpenseItemPayload } from '../../core/models'
 import { FormHeader } from '../../shared/components'
@@ -11,6 +12,8 @@ import { useFormNavigation } from '../../shared/hooks/useFormNavigation'
 import { decimalInputProps, parseDecimal, sanitizeDecimal } from '../../shared/utils/decimalInput'
 
 interface FormValues {
+  /** '' means "shared across the operation" (SPEC-25 D1), not "unknown". */
+  apiaryId: string
   purchaseDate: string
   totalAmount: string
   currency: string
@@ -57,6 +60,7 @@ export default function ExpenseFormPage() {
 
   // "Current and previous year" per SPEC-12 — two small requests rather than one unbounded one.
   const currentYear = new Date().getFullYear()
+  const { data: apiaries = [] } = useApiaries()
   const { data: dietsThisYear = [] } = useDiets({ year: currentYear })
   const { data: dietsLastYear = [] } = useDiets({ year: currentYear - 1 })
   const dietOptions = useMemo<DietOption[]>(
@@ -83,6 +87,7 @@ export default function ExpenseFormPage() {
     getValues,
   } = useForm<FormValues>({
     defaultValues: {
+      apiaryId: '',
       purchaseDate: new Date().toISOString().split('T')[0],
       totalAmount: '',
       currency: 'BAM',
@@ -104,6 +109,7 @@ export default function ExpenseFormPage() {
   useEffect(() => {
     if (existing && isEdit) {
       reset({
+        apiaryId: existing.apiaryId != null ? String(existing.apiaryId) : '',
         purchaseDate: existing.purchaseDate.split('T')[0],
         totalAmount: String(existing.totalAmount),
         currency: existing.currency,
@@ -155,6 +161,7 @@ export default function ExpenseFormPage() {
 
     if (isEdit && expenseId) {
       await updateExpense.mutateAsync({
+        apiaryId: values.apiaryId ? Number(values.apiaryId) : null,
         purchaseDate: values.purchaseDate,
         totalAmount,
         currency: values.currency,
@@ -164,6 +171,7 @@ export default function ExpenseFormPage() {
     } else {
       await createExpense.mutateAsync({
         source: prefilled?.source ?? ExpenseSource.Manual,
+        apiaryId: values.apiaryId ? Number(values.apiaryId) : null,
         purchaseDate: values.purchaseDate,
         totalAmount,
         currency: values.currency,
@@ -224,9 +232,26 @@ export default function ExpenseFormPage() {
             </div>
           </div>
 
+          {/* Apiary attribution (SPEC-25 D1) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Pčelinjak</label>
+            <select
+              {...register('apiaryId')}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-slate-700 text-sm outline-none bg-gray-50 focus:bg-white dark:bg-slate-800 dark:focus:bg-slate-800 dark:text-slate-100 focus:border-honey-400 focus:ring-2 focus:ring-honey-100 transition-all"
+            >
+              <option value="">Zajednički trošak (svi pčelinjaci)</option>
+              {apiaries.map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-gray-500 dark:text-slate-400">
+              Trošak vezan za pčelinjak ulazi u njegovu bilansu u izvještaju. Zajednički troškovi se prikazuju odvojeno.
+            </p>
+          </div>
+
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Napomene</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Napomene</label>
             <input
               type="text"
               placeholder="npr. Proljetne zalihe, lokalna prodavnica"

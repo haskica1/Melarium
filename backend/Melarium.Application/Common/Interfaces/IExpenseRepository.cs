@@ -8,6 +8,13 @@ public interface IExpenseRepository : IRepository<Expense>
     /// <summary>Returns all expenses for an organization, ordered by purchase date descending.</summary>
     Task<IEnumerable<Expense>> GetByOrganizationAsync(int organizationId);
 
+    /// <summary>
+    /// Expenses whose <c>PurchaseDate</c> falls inside an inclusive UTC range, items + apiary loaded
+    /// (SPEC-25). The boundaries are computed by the caller from local dates — the report's period is
+    /// a local-calendar notion, not a UTC one.
+    /// </summary>
+    Task<IEnumerable<Expense>> GetByOrganizationInRangeAsync(int organizationId, DateTime fromUtc, DateTime toUtc);
+
     /// <summary>Returns a single expense with its items eagerly loaded.</summary>
     Task<Expense?> GetWithItemsAsync(int id);
 

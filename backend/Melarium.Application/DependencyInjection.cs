@@ -13,6 +13,7 @@ using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Calendar;
 using Melarium.Application.Features.Notifications;
 using Melarium.Application.Features.Profile;
+using Melarium.Application.Features.Reports;
 using Melarium.Application.Features.Stats;
 using Melarium.Application.Features.Beehives;
 using Melarium.Application.Features.BeehiveMerges;
@@ -76,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<IOrgProfileService, OrgProfileService>();
         services.AddScoped<IProfileService, ProfileService>();
         services.AddScoped<IStatsService, StatsService>();
+        services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IApiaryService, ApiaryService>();
         services.AddScoped<IBeehiveService, BeehiveService>();

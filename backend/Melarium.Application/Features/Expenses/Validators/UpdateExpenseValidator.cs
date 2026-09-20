@@ -7,6 +7,12 @@ public class UpdateExpenseValidator : AbstractValidator<UpdateExpenseDto>
 {
     public UpdateExpenseValidator()
     {
+        // Whether the apiary belongs to the caller's organization is a service-layer check —
+        // it needs a DB lookup, which validators in this codebase don't do (SPEC-25 D1).
+        RuleFor(x => x.ApiaryId)
+            .GreaterThan(0).WithMessage("Neispravan pčelinjak.")
+            .When(x => x.ApiaryId.HasValue);
+
         RuleFor(x => x.PurchaseDate)
             .NotEmpty().WithMessage("Purchase date is required.");
 

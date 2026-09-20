@@ -34,6 +34,12 @@ public class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
             .HasForeignKey(e => e.OrganizationId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasOne(e => e.Apiary)
+            .WithMany()
+            .HasForeignKey(e => e.ApiaryId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .IsRequired(false);
+
         builder.HasMany(e => e.Items)
             .WithOne(i => i.Expense)
             .HasForeignKey(i => i.ExpenseId)
@@ -41,6 +47,7 @@ public class ExpenseConfiguration : IEntityTypeConfiguration<Expense>
 
         builder.HasIndex(e => e.OrganizationId);
         builder.HasIndex(e => e.PurchaseDate);
+        builder.HasIndex(e => e.ApiaryId);
 
         builder.ToTable("Expenses");
     }

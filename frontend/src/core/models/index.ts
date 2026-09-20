@@ -961,6 +961,9 @@ export interface Expense {
   id: number
   source: ExpenseSource
   sourceName: string
+  /** Apiary this expense is attributed to; absent = shared across the operation (SPEC-25). */
+  apiaryId?: number | null
+  apiaryName?: string
   purchaseDate: string
   totalAmount: number
   currency: string
@@ -991,6 +994,8 @@ export interface CreateExpenseItemPayload {
 
 export interface CreateExpensePayload {
   source: ExpenseSource
+  /** null = shared expense (SPEC-25 D1). */
+  apiaryId?: number | null
   purchaseDate: string
   totalAmount: number
   currency: string
@@ -999,12 +1004,124 @@ export interface CreateExpensePayload {
 }
 
 export interface UpdateExpensePayload {
+  /** null = shared expense (SPEC-25 D1). */
+  apiaryId?: number | null
   purchaseDate: string
   totalAmount: number
   currency: string
   notes?: string
   items: CreateExpenseItemPayload[]
 }
+
+// ── Season report (SPEC-25) ───────────────────────────────────────────────────
+
+export interface NamedKg { name: string; kg: number }
+export interface CurrencyAmount { currency: string; amount: number }
+
+export interface ReportHeader {
+  organizationName: string
+  /** yyyy-MM-dd, inclusive on both ends. */
+  from: string
+  to: string
+  generatedAt: string
+  apiaryNames: string[]
+}
+
+export interface ReportYield {
+  totalKg: number
+  /** Kg from harvests that carry a price — the only kg behind the revenue estimate. */
+  pricedKg: number
+  /** Kg with no price recorded; reported on its own so the estimate cannot lie by omission. */
+  unpricedKg: number
+  harvestCount: number
+  byApiary: NamedKg[]
+  byHoneyType: NamedKg[]
+  byBeehive: NamedKg[]
+  byPasture: NamedKg[]
+}
+
+export interface ApiaryExpense {
+  apiaryId: number
+  apiaryName: string
+  byCurrency: CurrencyAmount[]
+}
+
+export interface DietExpense {
+  dietId: number
+  dietName: string
+  byCurrency: CurrencyAmount[]
+}
+
+export interface ReportExpenses {
+  count: number
+  byCurrency: CurrencyAmount[]
+  byApiary: ApiaryExpense[]
+  /** Expenses with no apiary — bought for the whole operation, not "unknown". */
+  sharedByCurrency: CurrencyAmount[]
+  byDiet: DietExpense[]
+}
+
+export interface ApiaryBalance {
+  apiaryId: number
+  apiaryName: string
+  kg: number
+  estimatedRevenueBam: number
+  expenseBam: number
+  netBam: number
+}
+
+export interface ReportBalance {
+  estimatedRevenueBam: number
+  totalExpenseBam: number
+  netBam: number
+  byApiary: ApiaryBalance[]
+}
+
+export interface TreatmentProduct {
+  productName: string
+  activeSubstanceName: string
+  treatmentCount: number
+  hiveCount: number
+}
+
+export interface ReportTreatments {
+  count: number
+  hivesTreated: number
+  activeKarencaCount: number
+  byProduct: TreatmentProduct[]
+}
+
+export interface ReportNotes {
+  unpricedKg: number
+  unassignedExpenseCount: number
+  /** Currencies other than BAM in the period; their amounts stay out of the balance. */
+  nonBamCurrencies: string[]
+}
+
+export interface SeasonReport {
+  header: ReportHeader
+  yield: ReportYield
+  expenses: ReportExpenses
+  balance: ReportBalance
+  treatments: ReportTreatments
+  notes: ReportNotes
+}
+
+/** Which parts of the report the beekeeper wants in the document. Applies to the on-screen preview
+ *  and to both exports alike — what is on screen is what comes out of the file. `notes` is not
+ *  listed on purpose: it is what keeps a figure from reading as more certain than it is. */
+export interface ReportSections {
+  yield: boolean
+  yieldByApiary: boolean
+  yieldByHoneyType: boolean
+  yieldByBeehive: boolean
+  yieldByPasture: boolean
+  expenses: boolean
+  balance: boolean
+  treatments: boolean
+}
+
+export type ReportFormat = 'pdf' | 'xlsx'
 
 // ── Harvests (SPEC-02) ──────────────────────────────────────────────────────────
 

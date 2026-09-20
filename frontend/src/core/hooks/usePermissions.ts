@@ -38,6 +38,8 @@ export function usePermissions() {
     /** "Moja organizacija" (SPEC-22) — the org admin editing the org they own. */
     canEditOwnOrganization: isOrgAdmin,
     canSeePastures: isOrgAdmin || isSystemAdmin,
+    /** "Izvještaji" (SPEC-25) — managers only; a report carries the organization's finances. */
+    canSeeReports: isOrgAdmin || isAdmin,
 
     isSystemAdmin,
     isOrgAdmin,
