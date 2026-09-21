@@ -19,6 +19,8 @@ export interface NavRoleFlags {
   feedbackNewCount?: number
   /** Unseen announcements (SPEC-21 D8) — everyone, 0/undefined hides the badge. */
   announcementUnreadCount?: number
+  /** Proposed topics awaiting review (SPEC-26) — SystemAdmin only. */
+  learningPendingCount?: number
 }
 
 export interface NavItemDef {
@@ -56,6 +58,15 @@ export function getNavItems(flags: NavRoleFlags): NavItemDef[] {
     { to: '/calendar', icon: <CalendarDays className="w-4 h-4" />, label: 'Kalendar', visible: !flags.isSystemAdmin },
     { to: '/stats', icon: <BarChart2 className="w-4 h-4" />, label: 'Statistike', visible: !flags.isSystemAdmin },
     { to: '/reports', icon: <FileText className="w-4 h-4" />, label: 'Izvještaji', visible: flags.canSeeReports && !flags.isSystemAdmin },
+    // The admin's Edukacija is the authoring screen, not the reading list — and it is where a
+    // proposed topic is approved, so the pending badge belongs on it.
+    {
+      to: '/admin/learning-topics',
+      icon: <GraduationCap className="w-4 h-4" />,
+      label: 'Uredi edukaciju',
+      badge: flags.learningPendingCount,
+      visible: flags.isSystemAdmin,
+    },
     {
       to: '/admin/feedback',
       icon: <MessageSquareHeart className="w-4 h-4" />,

@@ -365,6 +365,16 @@ The PDF register is generated client-side (jsPDF) — no PDF endpoint.
 | GET | `/learning-topics/{id}` | `LearningTopicDetailDto` (published only, incl. `bodyMarkdown`) |
 | POST | `/learning-topics/{id}/read` | `204` — idempotent read marker for the current user |
 
+**Proposing a topic (SPEC-26, `/api/learning-topics/submissions`, all authenticated roles — own rows only):**
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/learning-topics/submissions` | `MyLearningSubmissionDto[]` — the caller's own proposals, newest first |
+| GET | `/learning-topics/submissions/{id}` | **404** (not 403) for someone else's row |
+| POST | `/learning-topics/submissions` | `201 + MyLearningSubmissionDto`; created `Pending` + unpublished. Rate-limited `learning-submit` (5/min per IP). Body required, min 200 chars → `400` |
+| PUT | `/learning-topics/submissions/{id}` | Rejected → back to `Pending` (clears the reason, re-notifies admins); approved → `422` |
+| DELETE | `/learning-topics/submissions/{id}` | `204` withdraw; approved → `422` |
+
 **Authoring (SystemAdmin only, `/api/admin/learning-topics`):**
 
 | Method | Path | Returns |
@@ -375,6 +385,9 @@ The PDF register is generated client-side (jsPDF) — no PDF endpoint.
 | PUT | `/admin/learning-topics/{id}` | `200 + AdminLearningTopicDto` |
 | DELETE | `/admin/learning-topics/{id}` | `204` (cascades read markers) |
 | PUT | `/admin/learning-topics/{id}/publish` | `{ isPublished }` → `200`; publish requires non-empty body; **first** publish broadcasts one in-app notification per user (`LearningTopicPublished`, no email) |
+| GET | `/admin/learning-topics/submissions/summary` | `{ pendingCount }` — nav badge |
+| PUT | `/admin/learning-topics/{id}/approve` | Approves **and** publishes; notifies the author (`LearningTopicReviewed`) and broadcasts to everyone else; non-`Pending` → `422` |
+| PUT | `/admin/learning-topics/{id}/reject` | `{ reason }` (10–500) → `200`; reason reaches the author verbatim; non-`Pending` → `422` |
 | POST | `/admin/learning-topics/generate-draft` | `{ title, outline? }` → `{ bodyMarkdown, summary }` (Groq; `ai-chat` rate limit; never publishes) |
 
 **Save body:** `{ title, category, months?: int[]|null, summary, bodyMarkdown }` — `months` 1–12,

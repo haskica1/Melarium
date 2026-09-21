@@ -65,4 +65,13 @@ public enum NotificationType
     // says what specifically stops opening, and it is only sent to organizations that actually lose
     // something. An organization inside its limits never sees it.
     PlanLockPending = 28,
+
+    // ── Topic submissions (SPEC-26) ──
+    // LearningTopicSubmitted is in-app only for SystemAdmins — the same reasoning as
+    // FeedbackSubmitted, minus the operator e-mail: a proposed topic is not an incident.
+    LearningTopicSubmitted = 29,
+
+    // Approval and rejection are one type: both are the platform's answer about the same topic,
+    // and the author wants the e-mail either way (the same call as FeedbackStatusUpdated).
+    LearningTopicReviewed  = 30,
 }

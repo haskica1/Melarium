@@ -8,6 +8,9 @@ export const learningQueryKeys = {
   detail: (id: number) => ['learning-topics', id] as const,
   adminAll: ['learning-topics', 'admin'] as const,
   adminDetail: (id: number) => ['learning-topics', 'admin', id] as const,
+  mine: ['learning-topics', 'submissions'] as const,
+  mineDetail: (id: number) => ['learning-topics', 'submissions', id] as const,
+  submissionSummary: ['learning-topics', 'admin', 'submission-summary'] as const,
 }
 
 export const useLearningTopics = (filters: LearningFilters = {}) =>
@@ -27,6 +30,45 @@ export const useMarkTopicRead = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => learningService.markRead(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: learningQueryKeys.all }),
+  })
+}
+
+// ── Proposing a topic (SPEC-26) ──
+
+export const useMySubmissions = () =>
+  useQuery({
+    queryKey: learningQueryKeys.mine,
+    queryFn: () => learningService.getMySubmissions(),
+  })
+
+export const useMySubmission = (id: number) =>
+  useQuery({
+    queryKey: learningQueryKeys.mineDetail(id),
+    queryFn: () => learningService.getMySubmission(id),
+    enabled: id > 0,
+  })
+
+export const useSubmitTopic = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: SaveLearningTopicPayload) => learningService.submit(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: learningQueryKeys.all }),
+  })
+}
+
+export const useUpdateMySubmission = (id: number) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: SaveLearningTopicPayload) => learningService.updateSubmission(id, payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: learningQueryKeys.all }),
+  })
+}
+
+export const useWithdrawMySubmission = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => learningService.withdrawSubmission(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: learningQueryKeys.all }),
   })
 }
@@ -75,6 +117,30 @@ export const useSetTopicPublished = () => {
   return useMutation({
     mutationFn: ({ id, isPublished }: { id: number; isPublished: boolean }) =>
       learningService.adminSetPublished(id, isPublished),
+    onSuccess: () => qc.invalidateQueries({ queryKey: learningQueryKeys.all }),
+  })
+}
+
+/** Badge count for the admin nav — SystemAdmin only, so the caller gates it with `enabled`. */
+export const useSubmissionSummary = (enabled: boolean) =>
+  useQuery({
+    queryKey: learningQueryKeys.submissionSummary,
+    queryFn: () => learningService.adminGetSubmissionSummary(),
+    enabled,
+  })
+
+export const useApproveTopic = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => learningService.adminApprove(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: learningQueryKeys.all }),
+  })
+}
+
+export const useRejectTopic = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason: string }) => learningService.adminReject(id, reason),
     onSuccess: () => qc.invalidateQueries({ queryKey: learningQueryKeys.all }),
   })
 }

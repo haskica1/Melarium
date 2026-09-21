@@ -7,6 +7,8 @@ import type {
   GenerateDraftPayload,
   LearningDraft,
   LearningCategory,
+  MyLearningSubmission,
+  LearningSubmissionSummary,
 } from '../models'
 
 export interface LearningFilters {
@@ -27,6 +29,32 @@ export const learningService = {
 
   async markRead(id: number): Promise<void> {
     await apiClient.post(`/learning-topics/${id}/read`)
+  },
+
+  // ── Proposing a topic (SPEC-26, any role) ──
+
+  async getMySubmissions(): Promise<MyLearningSubmission[]> {
+    const { data } = await apiClient.get<MyLearningSubmission[]>('/learning-topics/submissions')
+    return data
+  },
+
+  async getMySubmission(id: number): Promise<MyLearningSubmission> {
+    const { data } = await apiClient.get<MyLearningSubmission>(`/learning-topics/submissions/${id}`)
+    return data
+  },
+
+  async submit(payload: SaveLearningTopicPayload): Promise<MyLearningSubmission> {
+    const { data } = await apiClient.post<MyLearningSubmission>('/learning-topics/submissions', payload)
+    return data
+  },
+
+  async updateSubmission(id: number, payload: SaveLearningTopicPayload): Promise<MyLearningSubmission> {
+    const { data } = await apiClient.put<MyLearningSubmission>(`/learning-topics/submissions/${id}`, payload)
+    return data
+  },
+
+  async withdrawSubmission(id: number): Promise<void> {
+    await apiClient.delete(`/learning-topics/submissions/${id}`)
   },
 
   // ── Authoring (SystemAdmin) ──
@@ -57,6 +85,21 @@ export const learningService = {
 
   async adminSetPublished(id: number, isPublished: boolean): Promise<AdminLearningTopic> {
     const { data } = await apiClient.put<AdminLearningTopic>(`/admin/learning-topics/${id}/publish`, { isPublished })
+    return data
+  },
+
+  async adminGetSubmissionSummary(): Promise<LearningSubmissionSummary> {
+    const { data } = await apiClient.get<LearningSubmissionSummary>('/admin/learning-topics/submissions/summary')
+    return data
+  },
+
+  async adminApprove(id: number): Promise<AdminLearningTopic> {
+    const { data } = await apiClient.put<AdminLearningTopic>(`/admin/learning-topics/${id}/approve`)
+    return data
+  },
+
+  async adminReject(id: number, reason: string): Promise<AdminLearningTopic> {
+    const { data } = await apiClient.put<AdminLearningTopic>(`/admin/learning-topics/${id}/reject`, { reason })
     return data
   },
 

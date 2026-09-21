@@ -365,6 +365,18 @@
 - **Search by title** on `LearningPage` — client-side over the already-loaded list, diacritic-insensitive
   and word-order-free (`shared/utils/search.ts`); composes with the category chips and flattens the
   month/category sections into one results list while a query is present
+- **Users can propose a topic (SPEC-26)**: any authenticated role writes an article and sends it for
+  review — `/api/learning-topics/submissions` (own rows only; someone else's id is a 404), and
+  `PUT /api/admin/learning-topics/{id}/approve|reject` for the SystemAdmin. Approval publishes in one
+  step; rejection carries a mandatory reason and the author can edit and resubmit
+- Same table as SPEC-06 (`LearningTopic` + `AuthorId`, `ReviewStatus`, `SubmittedAt`, `ReviewedAt/By`,
+  `RejectionReason`). **`IsPublished` stays the only visibility filter**, so a pending proposal cannot
+  reach Edukacija (ADR-044). Existing topics are `ReviewStatus = None` with no backfill
+- Notifications: `LearningTopicSubmitted` (in-app, all SystemAdmins) and `LearningTopicReviewed`
+  (bell + email, the author). The first-publish broadcast skips the author
+- UI: "Predloži temu" / "Moje teme" on `LearningPage`, `TopicSubmissionFormPage` +
+  `MySubmissionsPage`, author byline on the topic page, "Čeka odobrenje" section + reject dialog on
+  the admin page, and a pending-count badge on the SystemAdmin's "Uredi edukaciju" nav item
 - Dev-only seed: 6 starter topics (`SeedLearningTopicsAsync`). Tests in `LearningTopicServiceTests`.
   See `docs/features/learning.md`.
 

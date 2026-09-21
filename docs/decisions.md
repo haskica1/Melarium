@@ -1196,3 +1196,53 @@ error in the document rather than as a definition.
 - **Both exports render from one DTO.** The server computes; jsPDF and `write-excel-file` only draw.
   Had each format aggregated for itself, two documents for the same period would eventually disagree
   on a number, and there would be no way to tell which one was handed in.
+
+---
+
+## ADR-044: A Proposed Topic Is the Same Row as a Published One, and `IsPublished` Stays the Only Visibility Filter (SPEC-26)
+
+**Context.** Users can now write a learning topic and send it for review (SPEC-26). The obvious
+shape is a second table — `TopicSubmission` — copied into a new `LearningTopic` on approval. The
+shape chosen instead is one table: `LearningTopic` gained `AuthorId`, `ReviewStatus`, `SubmittedAt`,
+`ReviewedAt`, `ReviewedById` and `RejectionReason`.
+
+**Decision.** Approval is a **state change on an existing row**, not an insert.
+
+The whole safety of this rests on one property, and it is the reason it is written down here:
+**`IsPublished` remains the only column any read path filters on.** A proposal is created with
+`IsPublished = false`, so `GetPublishedAsync` / `GetPublishedByIdAsync` — and therefore every
+consumption endpoint, the search, the month sections and `MarkReadAsync` — cannot return it even by
+mistake. `ReviewStatus` participates in **no** read query; it only records what the row went
+through. Had visibility been expressed as `ReviewStatus != Pending`, every future list would have had
+to remember two conditions instead of one, and the first one to forget would leak an unreviewed
+article to every organisation on the platform.
+
+The copy-on-approve alternative was rejected because it makes approval an insert: two rows for one
+text, and a later edit of the published article with no relationship to the proposal it came from.
+It would also duplicate the publish mechanics that already exist on `LearningTopic` — the non-empty
+body rule, `PublishedAt` as the notify-exactly-once guard, and the broadcast.
+
+**Consequences:**
+
+- **Existing content needed no backfill.** `ReviewStatus` defaults to `0` = `None`, which reads as
+  "authored by the SystemAdmin, never reviewed" — true of every topic that predates this feature.
+  `BsLabels.Label(TopicReviewStatus.None)` is deliberately the empty string: a label there would
+  claim a review happened.
+- **The admin's existing form is the review screen.** Reading the full article before deciding, and
+  fixing a typo before approving, happen in `LearningTopicFormPage` with no new code. The cost is
+  that the admin edit path can touch a pending proposal without changing its status — acceptable,
+  since that is exactly what "doradi pa odobri" means.
+- **`SetPublishedAsync` and `ApproveAsync` share `MarkPublished` + `BroadcastFirstPublishAsync`.**
+  The publish toggle was refactored into those two helpers rather than approval re-implementing
+  them, so "notify exactly once, on the first publish ever" keeps having one definition.
+- **The author is excluded from the first-publish broadcast.** They receive a personal
+  `LearningTopicReviewed` notification about the same topic a moment earlier; the broadcast would be
+  a second notification about one event.
+- **Rejection is a passing state, not a terminal one.** Editing a rejected proposal resubmits it and
+  clears the verdict (`RejectionReason`, `ReviewedAt`, `ReviewedById`). The row therefore has no
+  history of earlier rejections — deliberate: the review is about the text as it stands now, and a
+  rejection log is a feature nobody asked for.
+- **An approved topic is locked to its author** (`422` on edit and on withdraw). The row is platform
+  content from then on, readable and marked-as-read by everyone, and it must not be able to change
+  or vanish without review.
+

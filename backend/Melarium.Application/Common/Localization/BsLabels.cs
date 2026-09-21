@@ -234,6 +234,15 @@ public static class BsLabels
         _                                  => c.ToString(),
     };
 
+    public static string Label(TopicReviewStatus s) => s switch
+    {
+        TopicReviewStatus.Pending  => "Na čekanju",
+        TopicReviewStatus.Approved => "Odobrena",
+        TopicReviewStatus.Rejected => "Odbijena",
+        // None is "authored by the admin, never reviewed" — a label would imply a review happened.
+        _                          => string.Empty,
+    };
+
     public static string Label(AnnouncementType t) => t switch
     {
         AnnouncementType.New         => "Novo",

@@ -21,15 +21,18 @@ public class LearningTopicsAdminController : ControllerBase
     private readonly ILearningTopicService _service;
     private readonly IValidator<SaveLearningTopicDto> _saveValidator;
     private readonly IValidator<GenerateDraftDto> _draftValidator;
+    private readonly IValidator<RejectLearningTopicDto> _rejectValidator;
 
     public LearningTopicsAdminController(
         ILearningTopicService service,
         IValidator<SaveLearningTopicDto> saveValidator,
-        IValidator<GenerateDraftDto> draftValidator)
+        IValidator<GenerateDraftDto> draftValidator,
+        IValidator<RejectLearningTopicDto> rejectValidator)
     {
-        _service        = service;
-        _saveValidator  = saveValidator;
-        _draftValidator = draftValidator;
+        _service         = service;
+        _saveValidator   = saveValidator;
+        _draftValidator  = draftValidator;
+        _rejectValidator = rejectValidator;
     }
 
     /// <summary>All topics, including unpublished drafts.</summary>
@@ -95,6 +98,48 @@ public class LearningTopicsAdminController : ControllerBase
     {
         var updated = await _service.SetPublishedAsync(id, dto.IsPublished);
         return Ok(updated);
+    }
+
+    // ── Review of user submissions (SPEC-26) ──────────────────────────────────
+
+    /// <summary>Proposals waiting for review — the nav badge count.</summary>
+    [HttpGet("submissions/summary")]
+    [ProducesResponseType(typeof(LearningSubmissionSummaryDto), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetSubmissionSummary()
+    {
+        var summary = await _service.GetSubmissionSummaryAsync();
+        return Ok(summary);
+    }
+
+    /// <summary>
+    /// Approves a pending proposal and publishes it in one step — the author is notified, and the
+    /// first publish broadcasts to everyone else exactly as an admin-authored topic does.
+    /// </summary>
+    [HttpPut("{id:int}/approve")]
+    [ProducesResponseType(typeof(AdminLearningTopicDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> Approve(int id)
+    {
+        var approved = await _service.ApproveAsync(id);
+        return Ok(approved);
+    }
+
+    /// <summary>Rejects a pending proposal; the reason reaches the author verbatim.</summary>
+    [HttpPut("{id:int}/reject")]
+    [ProducesResponseType(typeof(AdminLearningTopicDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
+    public async Task<IActionResult> Reject(int id, [FromBody] RejectLearningTopicDto dto)
+    {
+        var validation = await _rejectValidator.ValidateAsync(dto);
+        if (!validation.IsValid)
+            return BadRequest(validation.ToDictionary());
+
+        var rejected = await _service.RejectAsync(id, dto.Reason);
+        return Ok(rejected);
     }
 
     /// <summary>AI draft assist — returns a markdown draft + summary for the form; never publishes.</summary>

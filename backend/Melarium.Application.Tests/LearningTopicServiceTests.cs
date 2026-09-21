@@ -2,9 +2,11 @@ using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Features.Ai;
 using Melarium.Application.Features.Learning;
+using Melarium.Application.Features.Learning.DTOs;
 using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 using Xunit;
@@ -12,7 +14,8 @@ using Xunit;
 namespace Melarium.Application.Tests;
 
 /// <summary>Learning topics (SPEC-06): published-only visibility, idempotent read tracking, the
-/// notify-exactly-once publish rule, and AI-draft parsing (AI never publishes).</summary>
+/// notify-exactly-once publish rule, and AI-draft parsing (AI never publishes). Plus user-proposed
+/// topics (SPEC-26): a proposal is never visible before approval, and the review is one-way.</summary>
 public class LearningTopicServiceTests
 {
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
@@ -20,7 +23,16 @@ public class LearningTopicServiceTests
     private readonly IProseAiClient _ai = Substitute.For<IProseAiClient>();
 
     private LearningTopicService Service(int? userId = 1) =>
-        new(_uow, new TestCurrentUser { UserId = userId, Role = UserRole.Beekeeper }, _notifications, _ai);
+        new(_uow, new TestCurrentUser { UserId = userId, Role = UserRole.Beekeeper }, _notifications, _ai,
+            NullLogger<LearningTopicService>.Instance);
+
+    private static SaveLearningTopicDto SubmitDto(string? body = null) => new()
+    {
+        Title        = "Priprema zajednica za zimu",
+        Category     = LearningCategory.SezonskiRadovi,
+        Summary      = "Kako pripremiti zajednice za zimu.",
+        BodyMarkdown = body ?? new string('a', 250),
+    };
 
     private static LearningTopic Topic(int id, bool published = true, DateTime? publishedAt = null, string body = "## Sadržaj") => new()
     {
@@ -126,6 +138,191 @@ public class LearningTopicServiceTests
 
         await Assert.ThrowsAsync<ValidationException>(() => Service().SetPublishedAsync(4, true));
         await _uow.DidNotReceive().SaveChangesAsync();
+    }
+
+    // ── User submissions (SPEC-26) ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task Submit_CreatesPendingUnpublishedTopicAndNotifiesAdmins()
+    {
+        LearningTopic? saved = null;
+        await _uow.LearningTopics.AddAsync(Arg.Do<LearningTopic>(t => saved = t));
+        _uow.Users.GetSystemAdminIdsAsync().Returns([7, 8]);
+
+        var dto = await Service(userId: 42).SubmitAsync(SubmitDto());
+
+        Assert.NotNull(saved);
+        Assert.Equal(42, saved!.AuthorId);
+        Assert.Equal(TopicReviewStatus.Pending, saved.ReviewStatus);
+        Assert.False(saved.IsPublished);          // invisible until a SystemAdmin approves it
+        Assert.Null(saved.PublishedAt);
+        Assert.Equal(TopicReviewStatus.Pending, dto.ReviewStatus);
+        Assert.True(dto.CanEdit);
+
+        await _notifications.Received(1).NotifyManyInAppAsync(
+            Arg.Is<IReadOnlyCollection<int>>(ids => ids.Count == 2),
+            Arg.Any<string>(), Arg.Any<string>(),
+            NotificationType.LearningTopicSubmitted, Arg.Any<int?>(), nameof(LearningTopic));
+    }
+
+    [Fact]
+    public async Task Submit_ShortBody_ThrowsValidationAndSavesNothing()
+    {
+        await Assert.ThrowsAsync<ValidationException>(
+            () => Service().SubmitAsync(SubmitDto(body: "Prekratko.")));
+
+        await _uow.DidNotReceive().SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Submit_NotificationFailure_DoesNotFailTheSubmission()
+    {
+        _uow.Users.GetSystemAdminIdsAsync().Returns([7]);
+        _notifications.NotifyManyInAppAsync(
+                Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<string>(), Arg.Any<string>(),
+                Arg.Any<NotificationType>(), Arg.Any<int?>(), Arg.Any<string?>())
+            .ThrowsAsync(new InvalidOperationException("bell down"));
+
+        var dto = await Service().SubmitAsync(SubmitDto());
+
+        Assert.Equal(TopicReviewStatus.Pending, dto.ReviewStatus);
+        await _uow.Received(1).SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task GetMine_SomeoneElsesId_ThrowsNotFoundNotForbidden()
+    {
+        _uow.LearningTopics.GetOwnSubmissionAsync(9, 1).Returns((LearningTopic?)null);
+
+        await Assert.ThrowsAsync<NotFoundException>(() => Service().GetMySubmissionAsync(9));
+    }
+
+    [Fact]
+    public async Task UpdateMine_AfterRejection_ResubmitsAndClearsTheVerdict()
+    {
+        var topic = Topic(9, published: false);
+        topic.AuthorId        = 1;
+        topic.ReviewStatus    = TopicReviewStatus.Rejected;
+        topic.RejectionReason = "Nedostaju izvori.";
+        topic.ReviewedAt      = DateTime.UtcNow.AddDays(-1);
+        topic.ReviewedById    = 5;
+        _uow.LearningTopics.GetOwnSubmissionAsync(9, 1).Returns(topic);
+        _uow.Users.GetSystemAdminIdsAsync().Returns([7]);
+
+        var dto = await Service().UpdateMySubmissionAsync(9, SubmitDto());
+
+        Assert.Equal(TopicReviewStatus.Pending, dto.ReviewStatus);
+        Assert.Null(topic.RejectionReason);
+        Assert.Null(topic.ReviewedAt);
+        Assert.Null(topic.ReviewedById);
+        await _notifications.Received(1).NotifyManyInAppAsync(
+            Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<string>(), Arg.Any<string>(),
+            NotificationType.LearningTopicSubmitted, Arg.Any<int?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task UpdateMine_WhilePending_StaysPendingWithoutRenotifying()
+    {
+        var topic = Topic(9, published: false);
+        topic.AuthorId     = 1;
+        topic.ReviewStatus = TopicReviewStatus.Pending;
+        _uow.LearningTopics.GetOwnSubmissionAsync(9, 1).Returns(topic);
+
+        var dto = await Service().UpdateMySubmissionAsync(9, SubmitDto());
+
+        Assert.Equal(TopicReviewStatus.Pending, dto.ReviewStatus);
+        await _notifications.DidNotReceive().NotifyManyInAppAsync(
+            Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<NotificationType>(), Arg.Any<int?>(), Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task UpdateMine_Approved_IsRefused()
+    {
+        var topic = Topic(9);
+        topic.AuthorId     = 1;
+        topic.ReviewStatus = TopicReviewStatus.Approved;
+        _uow.LearningTopics.GetOwnSubmissionAsync(9, 1).Returns(topic);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(
+            () => Service().UpdateMySubmissionAsync(9, SubmitDto()));
+        await _uow.DidNotReceive().SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Withdraw_Approved_IsRefused()
+    {
+        var topic = Topic(9);
+        topic.AuthorId     = 1;
+        topic.ReviewStatus = TopicReviewStatus.Approved;
+        _uow.LearningTopics.GetOwnSubmissionAsync(9, 1).Returns(topic);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => Service().WithdrawMySubmissionAsync(9));
+        await _uow.LearningTopics.DidNotReceive().DeleteAsync(Arg.Any<LearningTopic>());
+    }
+
+    // ── Review ───────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Approve_PublishesNotifiesAuthorAndBroadcastsToEveryoneElse()
+    {
+        var topic = Topic(9, published: false, publishedAt: null);
+        topic.AuthorId     = 11;
+        topic.ReviewStatus = TopicReviewStatus.Pending;
+        _uow.LearningTopics.GetByIdAsync(9).Returns(topic);
+        _uow.Users.GetAllIdsAsync().Returns([10, 11, 12]);
+
+        var dto = await Service(userId: 5).ApproveAsync(9);
+
+        Assert.True(dto.IsPublished);
+        Assert.NotNull(dto.PublishedAt);
+        Assert.Equal(TopicReviewStatus.Approved, dto.ReviewStatus);
+        Assert.Equal(5, topic.ReviewedById);
+
+        await _notifications.Received(1).NotifyAsync(
+            11, Arg.Any<string>(), Arg.Any<string>(),
+            NotificationType.LearningTopicReviewed, 9, nameof(LearningTopic));
+
+        // The author is left out of the broadcast — they just got the personal message.
+        await _notifications.Received(1).NotifyManyInAppAsync(
+            Arg.Is<IReadOnlyCollection<int>>(ids => ids.Count == 2 && !ids.Contains(11)),
+            Arg.Any<string>(), Arg.Any<string>(),
+            NotificationType.LearningTopicPublished, 9, nameof(LearningTopic));
+    }
+
+    [Fact]
+    public async Task Approve_NotPending_IsRefused()
+    {
+        var topic = Topic(9, published: false);
+        topic.ReviewStatus = TopicReviewStatus.Rejected;
+        _uow.LearningTopics.GetByIdAsync(9).Returns(topic);
+
+        await Assert.ThrowsAsync<BusinessRuleException>(() => Service().ApproveAsync(9));
+        await _uow.DidNotReceive().SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Reject_KeepsItUnpublishedAndTellsTheAuthorWhy()
+    {
+        var topic = Topic(9, published: false);
+        topic.AuthorId     = 11;
+        topic.ReviewStatus = TopicReviewStatus.Pending;
+        _uow.LearningTopics.GetByIdAsync(9).Returns(topic);
+
+        var dto = await Service(userId: 5).RejectAsync(9, "  Nedostaju izvori.  ");
+
+        Assert.Equal(TopicReviewStatus.Rejected, dto.ReviewStatus);
+        Assert.False(dto.IsPublished);
+        Assert.Equal("Nedostaju izvori.", topic.RejectionReason);
+
+        await _notifications.Received(1).NotifyAsync(
+            11,
+            Arg.Any<string>(),
+            Arg.Is<string>(m => m.Contains("Nedostaju izvori.")),
+            NotificationType.LearningTopicReviewed, 9, nameof(LearningTopic));
+        await _notifications.DidNotReceive().NotifyManyInAppAsync(
+            Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<string>(), Arg.Any<string>(),
+            NotificationType.LearningTopicPublished, Arg.Any<int?>(), Arg.Any<string?>());
     }
 
     // ── AI draft assist ──────────────────────────────────────────────────────────

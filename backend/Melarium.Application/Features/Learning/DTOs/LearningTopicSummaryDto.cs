@@ -15,5 +15,11 @@ public class LearningTopicSummaryDto
     public string? FileUrl { get; set; }
     public string? FileName { get; set; }
     public bool IsRead { get; set; }
+    /// <summary>
+    /// Full name of the user whose proposal this was (SPEC-26); null for platform content and for
+    /// topics whose author deleted their account.
+    /// </summary>
+    public string? AuthorName { get; set; }
+
     public DateTime? PublishedAt { get; set; }
 }

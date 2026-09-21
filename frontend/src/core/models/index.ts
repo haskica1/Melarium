@@ -1422,6 +1422,8 @@ export interface LearningTopicSummary {
   fileName?: string | null
   isRead: boolean
   publishedAt?: string
+  /** Set when the topic came from a user proposal (SPEC-26); null for platform content. */
+  authorName?: string | null
 }
 
 export interface LearningTopicDetail extends LearningTopicSummary {
@@ -1441,6 +1443,13 @@ export interface AdminLearningTopic {
   fileName?: string | null
   isPublished: boolean
   publishedAt?: string
+  reviewStatus: TopicReviewStatus
+  reviewStatusName: string
+  authorId?: number | null
+  authorName?: string | null
+  submittedAt?: string
+  reviewedAt?: string
+  rejectionReason?: string | null
   createdAt: string
   updatedAt?: string
 }
@@ -1454,6 +1463,49 @@ export interface SaveLearningTopicPayload {
   videoUrl?: string | null
   fileUrl?: string | null
   fileName?: string | null
+}
+
+/** Review state of a proposed topic (SPEC-26). `None` = written by the admin, never reviewed. */
+export enum TopicReviewStatus {
+  None     = 0,
+  Pending  = 1,
+  Approved = 2,
+  Rejected = 3,
+}
+
+export const TopicReviewStatusLabels: Record<TopicReviewStatus, string> = {
+  [TopicReviewStatus.None]:     '',
+  [TopicReviewStatus.Pending]:  'Na čekanju',
+  [TopicReviewStatus.Approved]: 'Odobrena',
+  [TopicReviewStatus.Rejected]: 'Odbijena',
+}
+
+/** The author's own view of a topic they proposed. */
+export interface MyLearningSubmission {
+  id: number
+  title: string
+  category: LearningCategory
+  categoryName: string
+  months?: number[] | null
+  summary: string
+  bodyMarkdown: string
+  videoUrl?: string | null
+  fileUrl?: string | null
+  fileName?: string | null
+  reviewStatus: TopicReviewStatus
+  reviewStatusName: string
+  submittedAt?: string
+  reviewedAt?: string
+  rejectionReason?: string | null
+  isPublished: boolean
+  /** False once approved — the topic is platform content from then on. */
+  canEdit: boolean
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface LearningSubmissionSummary {
+  pendingCount: number
 }
 
 export interface GenerateDraftPayload {

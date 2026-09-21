@@ -15,6 +15,20 @@ public interface ILearningTopicRepository : IRepository<LearningTopic>
     /// <summary>All topics including unpublished — admin listing, newest first.</summary>
     Task<IEnumerable<LearningTopic>> GetAllForAdminAsync();
 
+    // ── User submissions (SPEC-26) ──
+
+    /// <summary>Everything the user proposed, any review state; newest first.</summary>
+    Task<IEnumerable<LearningTopic>> GetByAuthorAsync(int authorId);
+
+    /// <summary>
+    /// One of the user's own proposals, tracked for editing. Null when it is missing or belongs to
+    /// someone else — the caller turns both into a 404, so the id cannot be probed.
+    /// </summary>
+    Task<LearningTopic?> GetOwnSubmissionAsync(int id, int authorId);
+
+    /// <summary>How many proposals await review — the admin badge count.</summary>
+    Task<int> CountPendingAsync();
+
     /// <summary>Topic ids the user has marked read — one query for the whole list (no N+1).</summary>
     Task<HashSet<int>> GetReadTopicIdsAsync(int userId);
 

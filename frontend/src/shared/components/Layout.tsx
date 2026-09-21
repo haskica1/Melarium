@@ -19,6 +19,7 @@ import AnnouncementBanner from './AnnouncementBanner'
 import ReadOnlyMemberBanner from './ReadOnlyMemberBanner'
 import { useAnnouncementBanner } from '../../core/services/announcementQueries'
 import { useFeedbackSummary } from '../../core/services/feedbackQueries'
+import { useSubmissionSummary } from '../../core/services/learningQueries'
 import { useHelp } from '../../core/help/useHelp'
 import { HelpProvider } from '../../core/help/HelpContext'
 import { CommandPalette } from './CommandPalette'
@@ -61,6 +62,9 @@ export default function Layout() {
   // Untriaged feedback count for the nav badge (SPEC-13) — only SystemAdmin has the endpoint.
   const { data: feedbackSummary } = useFeedbackSummary({ enabled: isSystemAdmin })
 
+  // Topics users proposed and nobody has reviewed yet (SPEC-26) — SystemAdmin-only endpoint.
+  const { data: submissionSummary } = useSubmissionSummary(isSystemAdmin)
+
   // Unseen announcements for the nav badge (SPEC-21 D8). Same query key as the banner, so this is
   // the cached result, not a second request — and it is what catches an announcement the banner
   // never showed because a newer one had already replaced it.
@@ -79,6 +83,7 @@ export default function Layout() {
     canSeeReports,
     feedbackNewCount: feedbackSummary?.newCount,
     announcementUnreadCount: announcementBanner?.unreadCount,
+    learningPendingCount: submissionSummary?.pendingCount,
   }
 
   // navigate(-1) mirrors real browser back — re-evaluated on every route change via useLocation().

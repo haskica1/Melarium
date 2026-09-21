@@ -298,6 +298,19 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
             }));
 
+    // Proposing a learning topic (SPEC-26). Every accepted request puts an article in the
+    // SystemAdmin's review queue — the same abuse bound as feedback, one step looser because a
+    // rejected topic is edited and resent rather than written from scratch.
+    options.AddPolicy("learning-submit", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+
     // Photo AI analysis sends multi-MB images to the paid Groq vision model — tighter cap (SPEC-05).
     options.AddPolicy("photo-analyze", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(

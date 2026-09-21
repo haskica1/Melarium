@@ -35,6 +35,8 @@ import TreatmentFormPage from './features/treatments/TreatmentFormPage'
 import TreatmentDetailPage from './features/treatments/TreatmentDetailPage'
 import LearningPage from './features/learning/LearningPage'
 import LearningTopicPage from './features/learning/LearningTopicPage'
+import MySubmissionsPage from './features/learning/MySubmissionsPage'
+import TopicSubmissionFormPage from './features/learning/TopicSubmissionFormPage'
 import OutboxPage from './features/offline/OutboxPage'
 import PasturesPage from './features/pastures/PasturesPage'
 import AnnouncementsPage from './features/announcements/AnnouncementsPage'
@@ -150,8 +152,12 @@ export default function App() {
               <Route path="assistant" element={<AssistantPage />} />
 
               {/* Learning (Edukacija) — all authenticated users */}
-              <Route path="learning"     element={<LearningPage />} />
-              <Route path="learning/:id" element={<LearningTopicPage />} />
+              <Route path="learning"                        element={<LearningPage />} />
+              {/* Static segments before :id — proposing a topic is open to every role (SPEC-26) */}
+              <Route path="learning/predlozi"               element={<TopicSubmissionFormPage />} />
+              <Route path="learning/moje-teme"              element={<MySubmissionsPage />} />
+              <Route path="learning/moje-teme/:id/uredi"    element={<TopicSubmissionFormPage />} />
+              <Route path="learning/:id"                    element={<LearningTopicPage />} />
 
               {/* Šta je novo (SPEC-21) — all authenticated users, SystemAdmin included */}
               <Route path="announcements" element={<AnnouncementsPage />} />

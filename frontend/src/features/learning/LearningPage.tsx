@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, GraduationCap, Paperclip, Search, Video, X } from 'lucide-react'
+import { CheckCircle2, GraduationCap, Paperclip, PenLine, Search, Video, X } from 'lucide-react'
 import { useLearningTopics } from '../../core/services/learningQueries'
 import { LearningCategory, LearningCategoryLabels, MonthLabels } from '../../core/models'
 import type { LearningTopicSummary } from '../../core/models'
@@ -69,6 +69,14 @@ export default function LearningPage() {
               </p>
             </div>
           </div>
+          <div className="shrink-0 flex items-center gap-2 flex-wrap">
+            <Link to="/learning/moje-teme" className="px-3 py-2 rounded-xl border border-honey-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800 text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-honey-50 dark:hover:bg-slate-700 transition-colors">
+              Moje teme
+            </Link>
+            <Link to="/learning/predlozi" className="btn-primary text-sm">
+              <PenLine className="w-4 h-4" /> Predloži temu
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -115,7 +123,12 @@ export default function LearningPage() {
       {!isLoading && !isError && topics.length === 0 && (
         <EmptyState
           title="Još nema objavljenih tema."
-          description="Edukativne teme objavljuje administrator platforme."
+          description="Teme objavljuje administrator platforme — a možete i vi predložiti svoju."
+          action={
+            <Link to="/learning/predlozi" className="btn-primary text-sm">
+              <PenLine className="w-4 h-4" /> Predloži temu
+            </Link>
+          }
         />
       )}
 
