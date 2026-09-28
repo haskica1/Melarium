@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { format } from 'date-fns'
-import { Building2, Check, Image as ImageIcon, Loader2, Trash2, Upload } from 'lucide-react'
+import { addDays, format, parseISO } from 'date-fns'
+import { Building2, Check, Image as ImageIcon, Loader2, Mountain, Trash2, Upload } from 'lucide-react'
 import clsx from 'clsx'
 import {
   useDeleteOrgLogo,
@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../../core/context/AuthContext'
 import { useToast } from '../../core/context/ToastContext'
 import { ConfirmDialog, ErrorState, LoadingSpinner } from '../../shared/components'
+import { SeasonPhaseLabels, type SeasonPhaseRange } from '../../core/models'
 import { prepareLogoForUpload } from '../../shared/utils/imageDownscale'
 
 /** Mirrors the server cap in OrgProfileService — the server stays the source of truth. */
@@ -22,7 +23,12 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 interface OrgForm {
   name: string
   description: string
+  seasonShiftDays: number
 }
+
+/** Mirrors SeasonCalendar.MinShiftDays / MaxShiftDays — the server validates the same range. */
+const MIN_SHIFT = -14
+const MAX_SHIFT = 30
 
 /**
  * "Moja organizacija" (SPEC-22) — the OrgAdmin's own organization. Everything on this page acts on
@@ -38,25 +44,29 @@ export default function MyOrganizationPage() {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors, isSubmitting, isDirty },
-  } = useForm<OrgForm>({ defaultValues: { name: '', description: '' } })
+  } = useForm<OrgForm>({ defaultValues: { name: '', description: '', seasonShiftDays: 0 } })
 
   // Seeded through `reset` rather than `setValue` so the loaded values become the form's defaults —
   // with setValue the page would open with "Spremi" already enabled and nothing actually changed.
   useEffect(() => {
-    if (org) reset({ name: org.name, description: org.description ?? '' })
+    if (org) reset({ name: org.name, description: org.description ?? '', seasonShiftDays: org.seasonShiftDays })
   }, [org, reset])
+
+  const enteredShift = watch('seasonShiftDays')
 
   async function onSubmit(data: OrgForm) {
     try {
       const saved = await updateOrg.mutateAsync({
         name: data.name.trim(),
         description: data.description.trim() || null,
+        seasonShiftDays: data.seasonShiftDays,
       })
       // The cached session carries the organisation name (it is the label under the profile avatar),
       // so a rename has to land there too or the old name survives until the next sign-in.
       updateUser({ organizationName: saved.name })
-      reset({ name: saved.name, description: saved.description ?? '' })
+      reset({ name: saved.name, description: saved.description ?? '', seasonShiftDays: saved.seasonShiftDays })
       toast.success('Podaci organizacije su spremljeni.')
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Greška pri spremanju organizacije.')
@@ -129,6 +139,44 @@ export default function MyOrganizationPage() {
               placeholder="Čime se bavi vaša organizacija (opcionalno)"
             />
             {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description.message}</p>}
+          </div>
+
+          {/* ── Season (SPEC-29) ── */}
+          <div className="pt-2 border-t border-honey-100 dark:border-slate-800">
+            <div className="flex items-center gap-2 mb-2 mt-2">
+              <Mountain className="w-4 h-4 text-honey-500" />
+              <h3 className="font-semibold text-gray-700 dark:text-slate-200">Sezona</h3>
+            </div>
+            <label htmlFor="season-shift" className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
+              Pomak sezone (dana)
+            </label>
+            <input
+              id="season-shift"
+              type="number"
+              inputMode="numeric"
+              step={1}
+              min={MIN_SHIFT}
+              max={MAX_SHIFT}
+              {...register('seasonShiftDays', {
+                valueAsNumber: true,
+                validate: v => (Number.isInteger(v) && v >= MIN_SHIFT && v <= MAX_SHIFT)
+                  || `Unesite cijeli broj od ${MIN_SHIFT} do +${MAX_SHIFT}.`,
+              })}
+              className={clsx('form-input w-32', errors.seasonShiftDays && 'border-red-400 focus:ring-red-300')}
+            />
+            {errors.seasonShiftDays
+              ? <p className="text-xs text-red-500 mt-1">{errors.seasonShiftDays.message}</p>
+              : <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Na većoj visini proljeće kasni, a zima dolazi ranije: +N pomjera proljeće kasnije i jesen
+                  ranije za N dana, negativan broj obratno. 1. august ostaje isti. Po ovome rade podsjetnici
+                  i početna stranica za sve članove.
+                </p>}
+
+            <SeasonPreview
+              phases={org.seasonPhases}
+              savedShift={org.seasonShiftDays}
+              shift={Number.isInteger(enteredShift) ? Math.min(Math.max(enteredShift, MIN_SHIFT), MAX_SHIFT) : org.seasonShiftDays}
+            />
           </div>
 
           <div className="flex justify-end pt-1">
@@ -275,6 +323,55 @@ function LogoSection({ hasLogo }: { hasLogo: boolean }) {
 }
 
 // ── Small building blocks ─────────────────────────────────────────────────────
+
+// ── Season preview ────────────────────────────────────────────────────────────
+
+/**
+ * The five phases under the entered shift, before saving. Derived from the phases the server sent for
+ * the *saved* shift, not from dates copied into the client: spring boundaries moved by +saved, autumn
+ * ones by −saved, so undoing that and applying the new value gives exactly what the server will
+ * compute from its own configuration.
+ */
+function SeasonPreview({ phases, savedShift, shift }: { phases: SeasonPhaseRange[]; savedShift: number; shift: number }) {
+  if (phases.length !== 5) return null
+
+  const delta = shift - savedShift
+  const move = (iso: string, days: number) => format(addDays(parseISO(iso), days), 'yyyy-MM-dd')
+  const [winter, spring, main, late, wintering] = phases
+
+  const starts = {
+    winter: move(winter.start, -delta),
+    spring: move(spring.start, delta),
+    main: move(main.start, delta),
+    late: late.start,
+    wintering: move(wintering.start, -delta),
+    nextWinter: move(addDaysIso(wintering.end, 1), -delta),
+  }
+  const preview: SeasonPhaseRange[] = [
+    { phase: winter.phase, start: starts.winter, end: move(starts.spring, -1) },
+    { phase: spring.phase, start: starts.spring, end: move(starts.main, -1) },
+    { phase: main.phase, start: starts.main, end: move(starts.late, -1) },
+    { phase: late.phase, start: starts.late, end: move(starts.wintering, -1) },
+    { phase: wintering.phase, start: starts.wintering, end: move(starts.nextWinter, -1) },
+  ]
+
+  return (
+    <ul className="mt-3 rounded-xl border border-honey-100 dark:border-slate-800 divide-y divide-honey-100 dark:divide-slate-800">
+      {preview.map(p => (
+        <li key={p.phase} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+          <span className="text-gray-700 dark:text-slate-300">{SeasonPhaseLabels[p.phase]}</span>
+          <span className="tabular-nums text-gray-500 dark:text-slate-400">
+            {format(parseISO(p.start), 'dd.MM.')} – {format(parseISO(p.end), 'dd.MM.')}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function addDaysIso(iso: string, days: number): string {
+  return format(addDays(parseISO(iso), days), 'yyyy-MM-dd')
+}
 
 function CountTile({ label, value }: { label: string; value: number }) {
   return (

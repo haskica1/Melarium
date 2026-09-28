@@ -76,8 +76,9 @@ export default function RegisterPage() {
         // rejecting the sign-up, so a stale link in a group chat still creates the account.
         referralCode: referralCode ?? undefined,
       })
-      // Fresh registrants are always Organization Admins → apiary workspace.
-      navigate('/apiaries', { replace: true })
+      // Fresh registrants are always Organization Admins → Početna, whose empty state leads to the
+      // first apiary (and where the first help tour opens, AUTO_OPEN_KEYS).
+      navigate('/', { replace: true })
     } catch (err) {
       // The only 422s the register endpoint returns are the two duplicate-identifier conflicts,
       // both worded by the backend. Attach it to whichever field it names.

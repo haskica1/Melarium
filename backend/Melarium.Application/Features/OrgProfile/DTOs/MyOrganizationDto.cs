@@ -1,3 +1,5 @@
+using Melarium.Application.Common.Seasons;
+
 namespace Melarium.Application.Features.OrgProfile.DTOs;
 
 /// <summary>
@@ -20,4 +22,10 @@ public class MyOrganizationDto
     public int UserCount { get; set; }
     public int ApiaryCount { get; set; }
     public int BeehiveCount { get; set; }
+
+    // ── Season (SPEC-29) ──
+    public int SeasonShiftDays { get; set; }
+
+    /// <summary>This year's five phases under the stored shift, so the page shows what the number means.</summary>
+    public IReadOnlyList<SeasonPhaseRange> SeasonPhases { get; set; } = [];
 }

@@ -1,4 +1,5 @@
 import apiClient from './apiClient'
+import type { NotificationPriority, NotificationSettings } from '../models'
 
 export interface Notification {
   id: number
@@ -9,6 +10,8 @@ export interface Notification {
   createdAt: string
   relatedEntityId: number | null
   relatedEntityType: string | null
+  /** SPEC-29. Stored per row — frost is Critical in April and Normal in August. */
+  priority?: NotificationPriority
 }
 
 export interface NotificationList {
@@ -28,5 +31,17 @@ export const notificationService = {
 
   async markRead(id: number): Promise<void> {
     await apiClient.patch(`/notifications/${id}/read`)
+  },
+
+  // ── Settings (SPEC-29) ──
+
+  async getSettings(): Promise<NotificationSettings> {
+    const { data } = await apiClient.get<NotificationSettings>('/notifications/settings')
+    return data
+  },
+
+  async updateSettings(payload: NotificationSettings): Promise<NotificationSettings> {
+    const { data } = await apiClient.put<NotificationSettings>('/notifications/settings', payload)
+    return data
   },
 }

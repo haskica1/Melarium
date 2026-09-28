@@ -1,10 +1,10 @@
+using Melarium.Application.Common.Email;
+
 namespace Melarium.Application.Common.Models;
 
 /// <summary>
-/// An email waiting to be delivered by the background email worker.
-/// <c>ActionUrl</c>/<c>ActionLabel</c> render a call-to-action button — used by password reset and
-/// email verification, which are useless without a link. Both are optional so plain notification
-/// emails are unaffected.
+/// An email waiting to be delivered by the background email worker. <see cref="Content"/> says what
+/// the mail contains; the worker renders it into the one Melarium template (ADR-048).
 /// </summary>
 /// <remarks>
 /// Two addressing modes. Notification mail targets a <see cref="UserId"/> and the worker resolves the
@@ -16,21 +16,14 @@ namespace Melarium.Application.Common.Models;
 /// </remarks>
 public sealed record QueuedEmail(
     int? UserId,
-    string Title,
-    string Message,
-    string? ActionUrl = null,
-    string? ActionLabel = null,
+    EmailContent Content,
     string? ToEmail = null,
     string? ToName = null)
 {
     /// <summary>Mail to a user account — the worker looks the address up when it dequeues.</summary>
-    public static QueuedEmail ForUser(
-        int userId, string title, string message, string? actionUrl = null, string? actionLabel = null) =>
-        new(userId, title, message, actionUrl, actionLabel);
+    public static QueuedEmail ForUser(int userId, EmailContent content) => new(userId, content);
 
     /// <summary>Mail to an explicit address that may not belong to any account.</summary>
-    public static QueuedEmail ForAddress(
-        string toEmail, string toName, string title, string message,
-        string? actionUrl = null, string? actionLabel = null) =>
-        new(null, title, message, actionUrl, actionLabel, toEmail, toName);
+    public static QueuedEmail ForAddress(string toEmail, string toName, EmailContent content) =>
+        new(null, content, toEmail, toName);
 }

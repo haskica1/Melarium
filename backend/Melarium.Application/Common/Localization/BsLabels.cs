@@ -1,3 +1,4 @@
+using System.Globalization;
 using Melarium.Domain.Enums;
 
 namespace Melarium.Application.Common.Localization;
@@ -306,10 +307,59 @@ public static class BsLabels
         _                             => k.ToString(),
     };
 
+    /// <summary>The five phases of the beekeeping year (SPEC-29).</summary>
+    public static string Label(SeasonPhase p) => p switch
+    {
+        SeasonPhase.Winter        => "Zimsko mirovanje",
+        SeasonPhase.SpringBuildUp => "Proljetni razvoj",
+        SeasonPhase.MainSeason    => "Glavna sezona",
+        SeasonPhase.LateSummer    => "Ljetno-jesenja priprema",
+        SeasonPhase.Wintering     => "Zazimljavanje",
+        _                         => p.ToString(),
+    };
+
+    /// <summary>
+    /// Bosnian count + noun: 1 košnica, 2–4 košnice, 5+ košnica, with 11–14 taking the "many" form
+    /// (11 košnica, 21 košnica, 22 košnice).
+    /// </summary>
+    public static string Count(int count, string one, string few, string many) =>
+        $"{count} {Word(count, one, few, many)}";
+
+    /// <summary>
+    /// The form alone, for words that agree with a count without printing it — the verb in "čeka
+    /// 1 obaveza" / "čekaju 4 obaveze" / "čeka 5 obaveza".
+    /// </summary>
+    public static string Word(int count, string one, string few, string many)
+    {
+        var lastTwo = count % 100;
+        var last = count % 10;
+        return lastTwo is >= 11 and <= 14 ? many
+            : last == 1 ? one
+            : last is >= 2 and <= 4 ? few
+            : many;
+    }
+
     private static readonly string[] MonthsShort =
         { "jan", "feb", "mar", "apr", "maj", "jun", "jul", "avg", "sep", "okt", "nov", "dec" };
 
     /// <summary>Short Bosnian month label with 2-digit year, e.g. "maj 25".</summary>
     public static string MonthShort(int year, int month) =>
         $"{MonthsShort[month - 1]} {year % 100:00}";
+
+    // Same names as the frontend's MonthLabels; spelled out here rather than taken from a culture,
+    // so a container without ICU data still writes Bosnian.
+    private static readonly string[] Months =
+        { "januar", "februar", "mart", "april", "maj", "juni", "juli", "august", "septembar", "oktobar", "novembar", "decembar" };
+
+    private static readonly string[] Weekdays =
+        { "nedjelja", "ponedjeljak", "utorak", "srijeda", "četvrtak", "petak", "subota" };
+
+    /// <summary>"ponedjeljak, 20. april".</summary>
+    public static string LongDate(DateOnly date) =>
+        $"{Weekdays[(int)date.DayOfWeek]}, {date.Day}. {Months[date.Month - 1]}";
+
+    /// <summary>"ponedjeljak, 20.04.2026. u 09:42".</summary>
+    public static string LongDateTime(DateTime local) =>
+        $"{Weekdays[(int)local.DayOfWeek]}, {local.ToString("dd.MM.yyyy.", CultureInfo.InvariantCulture)} u "
+        + local.ToString("HH':'mm", CultureInfo.InvariantCulture);
 }

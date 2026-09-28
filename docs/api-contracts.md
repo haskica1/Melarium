@@ -182,7 +182,7 @@ SystemAdmin gets **403** (not 404) — the row exists for everyone else, they ar
 | Method | Path | Returns |
 |---|---|---|
 | GET | `/organizations/my` | `MyOrganizationDto` |
-| PUT | `/organizations/my` | `200 + MyOrganizationDto` — body `{ name, description? }`; OrgAdmin only |
+| PUT | `/organizations/my` | `200 + MyOrganizationDto` — body `{ name, description?, seasonShiftDays? }` (SPEC-29: −14…+30, null = unchanged); OrgAdmin only |
 | POST | `/organizations/my/logo` | `200 + MyOrganizationDto` — multipart `file`, ≤ 2 MB, JPEG/PNG/WebP by header bytes; OrgAdmin only |
 | GET | `/organizations/my/logo` | image stream, `Cache-Control: private, no-cache` — auth-checked, storage never public |
 | DELETE | `/organizations/my/logo` | `200 + MyOrganizationDto` — clears both columns, deletes the blob (best-effort); OrgAdmin only |
@@ -237,7 +237,7 @@ Refusals are all `BusinessRuleException` → **422**, not 409: wrong password, a
 has members, a mistyped organization name, and the last SystemAdmin trying to delete themselves.
 
 **What deletion removes:** the user row, and by cascade their sessions, notifications, read markers,
-AI history, calendar settings and hive assignments. **What survives, anonymised** (`SetNull`, already
+AI history, calendar and notification settings and hive assignments. **What survives, anonymised** (`SetNull`, already
 the schema's design before this feature existed): feedback, invitations, and the `CreatedBy` of
 apiaries, hives, harvests, treatments, expenses, diets, moves and merges. Beekeeping records have no
 foreign key to a user at all — they hang off the organization.
@@ -634,6 +634,20 @@ SystemAdmin only — `/api/admin/feedback`:
 e-mail per admin. A status change or reply notifies the submitter with bell **and** e-mail. Saving never
 depends on either succeeding. Unset `Feedback:NotifyEmail` → e-mail silently skipped and logged.
 
+### Notifications & dashboard (SPEC-29)
+
+| Method | Path | Response |
+|---|---|---|
+| GET | `/notifications` | `{ notifications: NotificationDto[], unreadCount }` — each item now carries `priority` (`"Critical" \| "Normal" \| "Info"`, stored per row) |
+| GET | `/notifications/settings` | `{ emailMode, normalAlertsInApp, infoAlertsInApp }` — the caller's own; defaults `1, true, true` until first saved |
+| PUT | `/notifications/settings` | same shape → `200`; `emailMode` must be `1` Sva, `2` Samo kritična, `3` Isključeno (else `400`) |
+| GET | `/dashboard` | `DashboardDto` — season (phase, start, end, next phase + start, the five phases), counts, attention, obligations (today + 7), hive status, programmes, yield by month, open todos, topic. Org-less SystemAdmin → **403** |
+| GET | `/dashboard/weather` | `ApiaryWeatherDto[]` — 3 days per apiary with coordinates, `frostPriority` when the season's frost rule would warn |
+
+All are scoped to the caller: no id in any path. Read-only members (SPEC-24) can still change their
+notification settings — `/api/notifications` is one of the prefixes the middleware leaves open.
+Dates in the dashboard are local calendar days (`yyyy-MM-dd`).
+
 ## Reports (SPEC-25)
 
 | Method | Path | Ko | Returns |
@@ -688,6 +702,10 @@ BeehiveMaterial: Wood | Plastic | Polystyrene
 HoneyType:       Acacia | Linden | Chestnut | Sunflower | Meadow | Forest | Rapeseed | Other  (BsLabels: Bagrem, Lipa, …)
 NotificationType: … | InspectionOverdue=10 | HoneyLevelDrop=11 | FrostWarning=12 | OldQueen=13 | WeeklySummary=14
                   | FeedbackSubmitted=21 (in-app only) | FeedbackStatusUpdated=22
+                  | SeasonPhaseStarted=32 (SPEC-29; 31 is reserved for SPEC-27)
+NotificationPriority: Normal=0 | Critical=1 | Info=2   (sent as its name on NotificationDto.priority)
+EmailNotificationMode: All=1 | CriticalOnly=2 | Off=3
+SeasonPhase:     Winter=1 | SpringBuildUp=2 | MainSeason=3 | LateSummer=4 | Wintering=5  (BsLabels: Zimsko mirovanje, Proljetni razvoj, Glavna sezona, Ljetno-jesenja priprema, Zazimljavanje)
 FeedbackType:     Bug | Complaint | Compliment | FeatureRequest | Question | Other  (BsLabels: Prijava problema, Žalba, Pohvala, Prijedlog, Pitanje, Ostalo)
 FeedbackSeverity: Low | Medium | High | Critical
 FeedbackStatus:   New | InReview | Resolved | Dismissed  (BsLabels: Novo, U razmatranju, Riješeno, Odbijeno)

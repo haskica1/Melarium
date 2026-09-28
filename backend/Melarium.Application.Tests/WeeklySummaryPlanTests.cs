@@ -12,11 +12,15 @@ namespace Melarium.Application.Tests;
 
 /// <summary>
 /// The weekly AI summary worker skips organizations whose effective plan lacks the feature
-/// (SPEC-09): a Free org is dropped before any data gathering or Groq call.
+/// (SPEC-09): a Free org is dropped before any data gathering or Groq call. Since SPEC-29 it also
+/// goes quiet in winter except on the first Monday of the month.
 /// </summary>
 public class WeeklySummaryPlanTests
 {
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
+
+    // Monday, main season.
+    private FakeTime _time = TestSeasons.At(2026, 5, 18);
 
     private WeeklySummaryService Service()
     {
@@ -30,7 +34,10 @@ public class WeeklySummaryPlanTests
             Substitute.For<INotificationService>(),
             Substitute.For<IWeatherService>(),
             config,
-            TestPlanLock.Unlocked());
+            TestPlanLock.Unlocked(),
+            TestSeasons.Calendar(config),
+            TestSeasons.Policy(config),
+            _time);
     }
 
     [Fact]
@@ -57,12 +64,27 @@ public class WeeklySummaryPlanTests
             Id = 3,
             Name = "Expired trial",
             Plan = PlanType.Pro,
-            PlanValidUntil = DateTime.UtcNow.AddDays(-1), // effectively Free now
+            PlanValidUntil = new DateTime(2026, 5, 17, 0, 0, 0, DateTimeKind.Utc), // effectively Free now
         };
         _uow.Organizations.GetAllAsync().Returns(new[] { expired });
 
         await Service().RunAsync();
 
         await _uow.Apiaries.DidNotReceive().GetAllByOrganizationAsync(3);
+    }
+
+    [Theory]
+    [InlineData(7, true)]    // first Monday of December
+    [InlineData(14, false)]  // any other winter Monday
+    public async Task Winter_OnlyTheFirstMondayOfTheMonth(int day, bool runs)
+    {
+        _time = TestSeasons.At(2026, 12, day);
+        var paidOrg = new Organization { Id = 1, Name = "Paid", Plan = PlanType.Standard };
+        _uow.Organizations.GetAllAsync().Returns(new[] { paidOrg });
+        _uow.Apiaries.GetAllByOrganizationAsync(Arg.Any<int>()).Returns(new List<Apiary>());
+
+        await Service().RunAsync();
+
+        await _uow.Apiaries.Received(runs ? 1 : 0).GetAllByOrganizationAsync(1);
     }
 }

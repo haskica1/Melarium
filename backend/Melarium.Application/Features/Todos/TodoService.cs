@@ -230,14 +230,12 @@ public class TodoService : ITodoService
     {
         // Resolve the apiary for context label
         int? apiaryId = todo.ApiaryId;
-        if (!apiaryId.HasValue && todo.BeehiveId.HasValue)
-        {
-            var beehive = await _uow.Beehives.GetByIdAsync(todo.BeehiveId.Value);
-            apiaryId = beehive?.ApiaryId;
-        }
+        var beehive = todo.BeehiveId.HasValue ? await _uow.Beehives.GetByIdAsync(todo.BeehiveId.Value) : null;
+        apiaryId ??= beehive?.ApiaryId;
 
         var apiary = apiaryId.HasValue ? await _uow.Apiaries.GetByIdAsync(apiaryId.Value) : null;
         var context = apiary != null ? $" u pčelinjaku '{apiary.Name}'" : string.Empty;
+        var creatorName = $"{creator.FirstName} {creator.LastName}";
 
         // Notify creator's superior (same cascading rule as beehive creation)
         if (creator.Role == UserRole.ApiaryAdmin)
@@ -251,9 +249,10 @@ public class TodoService : ITodoService
                 await _notifications.NotifyAsync(
                     orgAdmin.Id,
                     "Novi zadatak",
-                    $"Admin {creator.FirstName} {creator.LastName} je kreirao/la zadatak '{todo.Title}'{context}.",
+                    $"Admin {creatorName} je kreirao/la zadatak '{todo.Title}'{context}.",
                     NotificationType.TodoCreated,
-                    todo.Id, nameof(Todo));
+                    todo.Id, nameof(Todo),
+                    email: TodoEmails.Created("Novi zadatak", $"Admin {creatorName} je kreirao/la zadatak{context}.", todo, beehive, apiary));
             }
         }
         else if (creator.Role == UserRole.OrganizationAdmin && apiaryId.HasValue)
@@ -267,9 +266,11 @@ public class TodoService : ITodoService
                 await _notifications.NotifyAsync(
                     admin.Id,
                     "Novi zadatak",
-                    $"Administrator organizacije {creator.FirstName} {creator.LastName} je kreirao/la zadatak '{todo.Title}'{context}.",
+                    $"Administrator organizacije {creatorName} je kreirao/la zadatak '{todo.Title}'{context}.",
                     NotificationType.TodoCreated,
-                    todo.Id, nameof(Todo));
+                    todo.Id, nameof(Todo),
+                    email: TodoEmails.Created("Novi zadatak",
+                        $"Administrator organizacije {creatorName} je kreirao/la zadatak{context}.", todo, beehive, apiary));
             }
         }
 
@@ -281,7 +282,10 @@ public class TodoService : ITodoService
                 "Zadatak vam je dodijeljen",
                 $"Zadatak '{todo.Title}' vam je dodijeljen{context}.",
                 NotificationType.TodoCreated,
-                todo.Id, nameof(Todo));
+                todo.Id, nameof(Todo),
+                email: TodoEmails.Created("Zadatak vam je dodijeljen", $"{creatorName} vam je dodijelio/la zadatak{context}.",
+                    todo, beehive, apiary) with { Subject = $"Novi zadatak za vas: {todo.Title}" });
         }
     }
+
 }

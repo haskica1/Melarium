@@ -1,5 +1,7 @@
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Localization;
+using Melarium.Application.Common.Seasons;
+using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Common;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
@@ -10,19 +12,30 @@ namespace Melarium.Application.Features.Calendar;
 /// <summary>
 /// Builds the flattened obligation list (feedings, todos, derived treatment + inspection deadlines)
 /// for a resolved calendar user over a date window. Derived-deadline rules reuse the same thresholds
-/// as the SPEC-04 alert scan (<c>Alerts:StripRemovalDays</c>, <c>Alerts:StaleInspectionDays</c>).
+/// as the SPEC-04 alert scan (<c>Alerts:StripRemovalDays</c>), and the recommended inspection asks the
+/// same <see cref="INotificationPolicy"/> the alerts do (SPEC-29) — so the agenda cannot suggest
+/// opening a hive in the same winter the alerts are silent about.
 /// </summary>
 public class CalendarObligationService : ICalendarObligationService
 {
     private readonly IUnitOfWork _uow;
     private readonly ICalendarAccessResolver _resolver;
     private readonly IConfiguration _config;
+    private readonly INotificationPolicy _policy;
+    private readonly ISeasonCalendar _seasons;
 
-    public CalendarObligationService(IUnitOfWork uow, ICalendarAccessResolver resolver, IConfiguration config)
+    public CalendarObligationService(
+        IUnitOfWork uow,
+        ICalendarAccessResolver resolver,
+        IConfiguration config,
+        INotificationPolicy policy,
+        ISeasonCalendar seasons)
     {
         _uow      = uow;
         _resolver = resolver;
         _config   = config;
+        _policy   = policy;
+        _seasons  = seasons;
     }
 
     public async Task<IReadOnlyList<CalendarObligation>> GatherAsync(
@@ -78,7 +91,7 @@ public class CalendarObligationService : ICalendarObligationService
                     result.Add(new CalendarObligation(
                         ObligationKind.Feeding, $"feeding-{e.Id}", date,
                         $"🍯 Prehrana — {apiaryName} ({hiveCount} {HiveWord(hiveCount)})",
-                        desc, apiaryName, null, d.ApiaryId, false));
+                        desc, apiaryName, null, d.ApiaryId, false, $"/feedings/{d.Id}"));
                 }
             }
         }
@@ -111,7 +124,8 @@ public class CalendarObligationService : ICalendarObligationService
                 if (link != null) desc = string.IsNullOrWhiteSpace(desc) ? $"Otvori: {link}" : $"{desc}\nOtvori: {link}";
 
                 result.Add(new CalendarObligation(
-                    ObligationKind.Todo, $"todo-{t.Id}", date, title, desc, scopeName, t.BeehiveId, t.ApiaryId, false));
+                    ObligationKind.Todo, $"todo-{t.Id}", date, title, desc, scopeName, t.BeehiveId, t.ApiaryId, false,
+                    t.BeehiveId is int hive ? $"/beehives/{hive}" : t.ApiaryId is int apiary ? $"/apiaries/{apiary}" : null));
             }
         }
 
@@ -146,7 +160,7 @@ public class CalendarObligationService : ICalendarObligationService
                     result.Add(new CalendarObligation(
                         ObligationKind.TreatmentRound, $"treatment-round-{round.Id}", date,
                         $"💊 Tretman — {apiaryName} (runda {i + 1}/{orderedRounds.Count})",
-                        desc, apiaryName, null, t.ApiaryId, false));
+                        desc, apiaryName, null, t.ApiaryId, false, $"/treatments/{t.Id}"));
                 }
 
                 if (t.Method == ApplicationMethod.Strips && t.EndDate is null)
@@ -158,7 +172,7 @@ public class CalendarObligationService : ICalendarObligationService
                         if (link != null) desc += $"\nOtvori: {link}";
                         result.Add(new CalendarObligation(
                             ObligationKind.StripRemoval, $"strips-{t.Id}", date,
-                            $"💊 Izvadi trake — {apiaryName}", desc, apiaryName, null, t.ApiaryId, false));
+                            $"💊 Izvadi trake — {apiaryName}", desc, apiaryName, null, t.ApiaryId, false, $"/treatments/{t.Id}"));
                     }
                 }
 
@@ -172,16 +186,20 @@ public class CalendarObligationService : ICalendarObligationService
                         if (link != null) desc += $"\nOtvori: {link}";
                         result.Add(new CalendarObligation(
                             ObligationKind.KarencaEnd, $"karenca-{t.Id}", date,
-                            $"💊 Istekla karenca — {apiaryName}", desc, apiaryName, null, t.ApiaryId, false));
+                            $"💊 Istekla karenca — {apiaryName}", desc, apiaryName, null, t.ApiaryId, false, $"/treatments/{t.Id}"));
                     }
                 }
             }
         }
 
         // ── Derived recommended inspection (soft, recomputed each run) ────────────
+        // The day the hive becomes overdue by the season policy: never in winter, and the clock
+        // restarts with the spring. One per hive per window — the ICS UID is derived from the key.
         if (categories.Inspections && scope.BeehiveIds.Count > 0)
         {
-            var staleDays = GetInt("Alerts:StaleInspectionDays", 21);
+            var shiftDays = ctx.OrganizationId is int orgId
+                ? (await _uow.Organizations.GetByIdAsync(orgId))?.SeasonShiftDays ?? 0
+                : 0;
             var hiveIds = scope.BeehiveIds;
 
             var lastByHive = (await _uow.Inspections.FindAsync(i => hiveIds.Contains(i.BeehiveId)))
@@ -192,8 +210,8 @@ public class CalendarObligationService : ICalendarObligationService
             foreach (var hive in hives)
             {
                 var last = lastByHive.TryGetValue(hive.Id, out var d) ? d : hive.CreatedAt;
-                var date = DateOnly.FromDateTime(last.AddDays(staleDays));
-                if (!InRange(date)) continue;
+                if (_policy.InspectionBecomesDue(_seasons.LocalDate(last), from, to, shiftDays) is not DateOnly date)
+                    continue;
 
                 var hiveName = scope.BeehiveNames.TryGetValue(hive.Id, out var hn) ? hn : hive.Name;
                 var link = Link(hive.Id, null);
@@ -202,7 +220,7 @@ public class CalendarObligationService : ICalendarObligationService
 
                 result.Add(new CalendarObligation(
                     ObligationKind.InspectionDue, $"inspection-{hive.Id}", date,
-                    $"🔍 Preporučeni pregled — {hiveName}", desc, hiveName, hive.Id, null, true));
+                    $"🔍 Preporučeni pregled — {hiveName}", desc, hiveName, hive.Id, null, true, $"/beehives/{hive.Id}"));
             }
         }
 

@@ -47,6 +47,7 @@ public class MelariumDbContext : DbContext
     public DbSet<AdvisorConversation> AdvisorConversations => Set<AdvisorConversation>();
     public DbSet<AdvisorMessage> AdvisorMessages => Set<AdvisorMessage>();
     public DbSet<CalendarSettings> CalendarSettings => Set<CalendarSettings>();
+    public DbSet<NotificationSettings> NotificationSettings => Set<NotificationSettings>();
     public DbSet<Feedback> Feedbacks => Set<Feedback>();
     public DbSet<Invitation> Invitations => Set<Invitation>();
     public DbSet<AiAssistantSession> AiAssistantSessions => Set<AiAssistantSession>();

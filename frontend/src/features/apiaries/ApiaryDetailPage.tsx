@@ -36,39 +36,7 @@ import type { Beehive, DailyWeather } from '../../core/models'
 import { usePermissions } from '../../core/hooks/usePermissions'
 import { useDialogBehavior } from '../../shared/hooks/useDialogBehavior'
 
-// ── WMO weather code → emoji + label ─────────────────────────────────────────
-
-function wmoToIcon(code?: number): string {
-  if (code == null) return '🌡️'
-  if (code === 0)                   return '☀️'
-  if (code === 1)                   return '🌤️'
-  if (code === 2)                   return '⛅'
-  if (code === 3)                   return '☁️'
-  if (code === 45 || code === 48)   return '🌫️'
-  if (code >= 51 && code <= 55)     return '🌦️'
-  if (code >= 61 && code <= 65)     return '🌧️'
-  if (code >= 71 && code <= 77)     return '🌨️'
-  if (code >= 80 && code <= 82)     return '🌧️'
-  if (code >= 85 && code <= 86)     return '🌨️'
-  if (code >= 95 && code <= 99)     return '⛈️'
-  return '🌡️'
-}
-
-function wmoToLabel(code?: number): string {
-  if (code == null) return 'Nepoznato'
-  if (code === 0)                   return 'Vedro nebo'
-  if (code === 1)                   return 'Uglavnom vedro'
-  if (code === 2)                   return 'Djelimično oblačno'
-  if (code === 3)                   return 'Oblačno'
-  if (code === 45 || code === 48)   return 'Magla'
-  if (code >= 51 && code <= 55)     return 'Rosulja'
-  if (code >= 61 && code <= 65)     return 'Kiša'
-  if (code >= 71 && code <= 77)     return 'Snijeg'
-  if (code >= 80 && code <= 82)     return 'Pljuskovi kiše'
-  if (code >= 85 && code <= 86)     return 'Pljuskovi snijega'
-  if (code >= 95 && code <= 99)     return 'Grmljavina'
-  return 'Nepoznato'
-}
+import { wmoToIcon, wmoToLabel } from '../../shared/utils/weather'
 
 // ── Weather card for a single day ─────────────────────────────────────────────
 

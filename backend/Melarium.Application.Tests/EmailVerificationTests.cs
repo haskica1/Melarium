@@ -158,6 +158,6 @@ public class EmailVerificationTests
         await _service.ResendVerificationEmailAsync(1);
 
         Assert.NotNull(sent);
-        Assert.StartsWith("https://melarium.app/verify-email?token=", sent!.ActionUrl);
+        Assert.StartsWith("https://melarium.app/verify-email?token=", sent!.Content.Button!.Url);
     }
 }

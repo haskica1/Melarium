@@ -1,6 +1,7 @@
 import { format } from 'date-fns'
 import { MessageSquarePlus } from 'lucide-react'
 import { useMyFeedback } from '../../core/services/feedbackQueries'
+import { useScrollIntoViewOnHash } from '../../core/hooks/useScrollIntoViewOnHash'
 import { FeedbackStatus, FeedbackTypeEmojis } from '../../core/models'
 import { ErrorMessage, Skeleton } from '../../shared/components'
 
@@ -19,9 +20,11 @@ export default function MyFeedbackSection({ onNew }: { onNew: () => void }) {
   // isPending/isSuccess, not isLoading — see the note in FeedbackAdminPage: between retries
   // isLoading and isError are both false, which would show "još niste poslali ništa" on a failure.
   const { data: items = [], isPending, isError, isSuccess } = useMyFeedback()
+  useScrollIntoViewOnHash('povratne-informacije', !isPending)
 
   return (
-    <div className="card space-y-4">
+    // The feedback-reply e-mail's button lands here (ADR-048).
+    <div id="povratne-informacije" className="card space-y-4 scroll-mt-20">
       <div className="flex items-center gap-2">
         <MessageSquarePlus className="w-4 h-4 text-honey-500" />
         <h3 className="font-semibold text-gray-700 dark:text-slate-200">Moje povratne informacije</h3>

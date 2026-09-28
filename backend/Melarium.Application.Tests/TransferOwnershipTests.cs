@@ -1,3 +1,4 @@
+using Melarium.Application.Common.Email;
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
@@ -112,7 +113,9 @@ public class TransferOwnershipTests
             Arg.Is<string>(m => m.Contains("Zlatna košnica")),
             NotificationType.OrganizationOwnershipTransferred,
             Arg.Any<int?>(),
-            Arg.Any<string?>());
+            Arg.Any<string?>(),
+            Arg.Any<NotificationPriority?>(),
+            Arg.Is<EmailContent?>(e => e != null && e.Button!.Url == "/organization"));
     }
 
     [Fact]
@@ -169,7 +172,7 @@ public class TransferOwnershipTests
             _notifications.NotifyAsync(
                 SuccessorId, Arg.Any<string>(), Arg.Any<string>(),
                 NotificationType.OrganizationOwnershipTransferred,
-                Arg.Any<int?>(), Arg.Any<string?>());
+                Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<NotificationPriority?>(), Arg.Any<EmailContent?>());
         });
     }
 }

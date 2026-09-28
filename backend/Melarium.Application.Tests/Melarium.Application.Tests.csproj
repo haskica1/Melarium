@@ -16,5 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Melarium.Application\Melarium.Application.csproj" />
+    <!-- EmailTemplateTests: the renderer is the one piece of Infrastructure with logic worth locking. -->
+    <ProjectReference Include="..\Melarium.Infrastructure\Melarium.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

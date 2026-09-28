@@ -133,6 +133,12 @@ public class UserRepository : Repository<User>, IUserRepository
             .Select(u => u.Id)
             .ToListAsync();
 
+    public async Task<List<int>> GetIdsByOrganizationAsync(int organizationId) =>
+        await _context.Users
+            .Where(u => u.OrganizationId == organizationId)
+            .Select(u => u.Id)
+            .ToListAsync();
+
     public async Task<List<int>> GetSystemAdminIdsAsync() =>
         await _context.Users
             .Where(u => u.Role == UserRole.SystemAdmin)

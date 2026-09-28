@@ -28,6 +28,7 @@ public interface IUnitOfWork : IDisposable
     IRefreshTokenRepository RefreshTokens { get; }
     IUserTokenRepository UserTokens { get; }
     ICalendarSettingsRepository CalendarSettings { get; }
+    INotificationSettingsRepository NotificationSettings { get; }
     IFeedbackRepository Feedbacks { get; }
     IInvitationRepository Invitations { get; }
     IAiAssistantSessionRepository AiAssistantSessions { get; }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Search, CornerDownLeft, Home, LayoutDashboard, Users,
+  Search, CornerDownLeft, Hexagon, Home, LayoutDashboard, Users,
   ReceiptText, CalendarDays, BarChart2, Settings, ClipboardList,
 } from 'lucide-react'
 import { useApiaries, useAllBeehives, useAllOpenTodos } from '../../core/services/queries'
@@ -33,7 +33,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const go = (to: string) => () => { onClose(); navigate(to) }
     const nav: CommandItem[] = []
     if (isSystemAdmin) nav.push({ id: 'admin', label: 'Kontrolna ploča', icon: <LayoutDashboard className="w-4 h-4" />, group: 'Navigacija', run: go('/admin') })
-    else nav.push({ id: 'apiaries', label: 'Pčelinjaci', icon: <Home className="w-4 h-4" />, group: 'Navigacija', run: go('/apiaries') })
+    else {
+      nav.push({ id: 'home', label: 'Početna', icon: <Home className="w-4 h-4" />, group: 'Navigacija', run: go('/') })
+      nav.push({ id: 'apiaries', label: 'Pčelinjaci', icon: <Hexagon className="w-4 h-4" />, group: 'Navigacija', run: go('/apiaries') })
+    }
     if (canSeeMembers) nav.push({ id: 'members', label: 'Korisnici', icon: <Users className="w-4 h-4" />, group: 'Navigacija', run: go('/members') })
     if (canSeeExpenses) nav.push({ id: 'expenses', label: 'Troškovi', icon: <ReceiptText className="w-4 h-4" />, group: 'Navigacija', run: go('/expenses') })
     nav.push({ id: 'calendar', label: 'Kalendar', icon: <CalendarDays className="w-4 h-4" />, group: 'Navigacija', run: go('/calendar') })

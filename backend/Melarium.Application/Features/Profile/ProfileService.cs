@@ -2,6 +2,7 @@ using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
 using Melarium.Application.Common.Validation;
+using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Notifications;
 using Melarium.Application.Features.Profile.DTOs;
 using Melarium.Domain.Entities;
@@ -103,7 +104,8 @@ public class ProfileService : IProfileService
                 "Lozinka je promijenjena",
                 "Lozinka na vašem računu je upravo promijenjena i odjavljeni ste sa svih uređaja. "
                 + "Ako to niste bili vi, odmah zatražite promjenu lozinke putem 'Zaboravili ste lozinku?'.",
-                NotificationType.PasswordChanged);
+                NotificationType.PasswordChanged,
+                email: AuthEmails.PasswordChanged());
 
         return new ProfileResponseDto(user.FirstName, user.LastName, user.Email, user.Phone, user.EmailVerifiedAt);
     }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Bell } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { notificationService, type Notification } from '../../core/services/notificationService'
@@ -34,12 +35,23 @@ const TYPE_ICONS: Record<string, string> = {
   FeedingOverdue:          '🍯',
   // Treatment application rounds — parity with FeedingOverdue
   TreatmentRoundOverdue:   '💊',
+  // Seasonal notifications (SPEC-29) — the work that opens a season phase
+  SeasonPhaseStarted:      '🌱',
+}
+
+/**
+ * Where a click takes you, for the few notifications that point somewhere. The phase notice lists
+ * topics from Edukacija, so it opens the seasonal-work category there (SPEC-29).
+ */
+const TYPE_LINKS: Record<string, string> = {
+  SeasonPhaseStarted: '/learning?category=2',
 }
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const { data } = useQuery({
     queryKey: ['notifications'],
@@ -128,7 +140,11 @@ export default function NotificationBell() {
                 <NotificationItem
                   key={n.id}
                   notification={n}
-                  onRead={() => !n.isRead && markRead.mutate(n.id)}
+                  onRead={() => {
+                    if (!n.isRead) markRead.mutate(n.id)
+                    const link = TYPE_LINKS[n.type]
+                    if (link) { setOpen(false); navigate(link) }
+                  }}
                 />
               ))
             )}
@@ -148,23 +164,29 @@ function NotificationItem({
 }) {
   const icon = TYPE_ICONS[n.type] ?? '🔔'
   const time = formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })
-  // The weekly summary is a multi-line bullet list — render it in full, not clamped to two lines.
-  const isMultiline = n.type === 'WeeklySummary'
+  // Several lines means a list — the weekly summary, a phase's work, alerts grouped per apiary
+  // (SPEC-29). Render those in full; a one-line message is clamped to two lines.
+  const isMultiline = n.message.includes('\n')
+  const critical = n.priority === 'Critical'
 
   return (
     <div
       onClick={onRead}
       className={clsx(
         'flex gap-3 px-4 py-3 cursor-pointer transition-colors',
+        critical && 'border-l-4 border-red-500 pl-3',
         n.isRead
           ? 'bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800'
-          : 'bg-honey-50 dark:bg-honey-500/10 hover:bg-honey-100 dark:hover:bg-honey-500/20'
+          : critical
+            ? 'bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20'
+            : 'bg-honey-50 dark:bg-honey-500/10 hover:bg-honey-100 dark:hover:bg-honey-500/20'
       )}
     >
       <span className="text-lg shrink-0 mt-0.5">{icon}</span>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-1">
           <p className={clsx('text-sm font-medium truncate', n.isRead ? 'text-gray-700 dark:text-slate-300' : 'text-gray-900 dark:text-slate-100')}>
+            {critical && <span className="mr-1.5 px-1 py-px rounded text-[9px] font-bold uppercase tracking-wide bg-red-600 text-white align-middle">Kritično</span>}
             {n.title}
           </p>
           {!n.isRead && (

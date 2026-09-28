@@ -1,4 +1,5 @@
 using Melarium.Application.Common.Interfaces;
+using Melarium.Domain.Common;
 using Melarium.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,4 +22,29 @@ public class InspectionRepository : Repository<Inspection>, IInspectionRepositor
             .GroupBy(i => i.BeehiveId)
             .Select(g => new { BeehiveId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.BeehiveId, x => x.Count);
+
+    public async Task<Dictionary<int, DateTime>> GetLastDatesAsync(IReadOnlyCollection<int> beehiveIds)
+    {
+        if (beehiveIds.Count == 0) return [];
+        var ids = beehiveIds.ToList();
+
+        return await _context.Inspections
+            .Where(i => ids.Contains(i.BeehiveId))
+            .GroupBy(i => i.BeehiveId)
+            .Select(g => new { BeehiveId = g.Key, Last = g.Max(i => i.Date) })
+            .ToDictionaryAsync(x => x.BeehiveId, x => x.Last);
+    }
+
+    public async Task<List<InspectionLevelInfo>> GetLevelsSinceAsync(IReadOnlyCollection<int> beehiveIds, DateTime since)
+    {
+        if (beehiveIds.Count == 0) return [];
+        var ids = beehiveIds.ToList();
+
+        return await _context.Inspections
+            .AsNoTracking()
+            .Where(i => ids.Contains(i.BeehiveId) && i.Date >= since)
+            .OrderByDescending(i => i.Date)
+            .Select(i => new InspectionLevelInfo(i.BeehiveId, i.Date, i.HoneyLevel))
+            .ToListAsync();
+    }
 }

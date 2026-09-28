@@ -39,11 +39,32 @@ export interface HelpEntry {
  * `learningCategory` links there rather than duplicating it.
  */
 export const HELP_CONTENT: Record<HelpKey, HelpEntry> = {
+  // ── Start page (SPEC-29) ────────────────────────────────────────────────────
+  '/': {
+    title: 'Početna',
+    summary:
+      'Pregled vašeg pčelarenja na jednom mjestu: u kojoj ste fazi sezone, šta traži pažnju, šta je danas na redu i kakvo vrijeme dolazi.',
+    steps: [
+      'Pogledajte „Traži pažnju“ — to su stvari koje kasne ili ne čekaju, grupisane po pčelinjaku.',
+      'U „Obaveze“ su hranjenja, tretmani i zadaci za danas i narednih 7 dana.',
+      'Klik na bilo koju stavku vodi na pčelinjak, košnicu ili program na koji se odnosi.',
+    ],
+    tips: [
+      'Faza sezone određuje i obavještenja: zimi nema podsjetnika za pregled, a proljetni mraz stiže kao kritično upozorenje.',
+      'Ako pčelarite na većoj nadmorskoj visini, administrator organizacije može pomjeriti sezonu na stranici „Moja organizacija“.',
+      'Zimi grafikon „Stanje košnica“ miruje — pregledi se ne prate dok ne počne proljeće.',
+    ],
+    notesByRole: {
+      Beekeeper: 'Vidite samo košnice koje su vam dodijeljene, i sve brojke se odnose samo na njih.',
+    },
+    learningCategory: LearningCategory.SezonskiRadovi,
+  },
+
   // ── Apiaries ────────────────────────────────────────────────────────────────
   '/apiaries': {
     title: 'Pčelinjaci',
     summary:
-      'Ovo je vaša početna stranica. Pčelinjak je lokacija na kojoj držite košnice — svaka košnica pripada tačno jednom pčelinjaku.',
+      'Pčelinjak je lokacija na kojoj držite košnice — svaka košnica pripada tačno jednom pčelinjaku.',
     steps: [
       'Otvorite pčelinjak klikom na njegovu karticu.',
       'Unutra vidite sve košnice tog pčelinjaka, vremensku prognozu i obaveze.',
@@ -398,6 +419,7 @@ export const HELP_CONTENT: Record<HelpKey, HelpEntry> = {
       'Promjena naziva odmah važi za sve članove — niko se ne mora ponovo prijavljivati.',
       'Prozirni PNG ostaje prozirni PNG. Fotografija s telefona se automatski smanji prije slanja.',
       'Paket i naplata nisu ovdje — njih vidite na stranici „Paketi“.',
+      'Pomak sezone: na većoj visini proljeće kasni, a zima dolazi ranije. Pozitivan broj pomjera proljeće kasnije i jesen ranije, negativan obratno; 1. august ostaje. Po tome rade podsjetnici i početna stranica za sve članove.',
     ],
   },
 
@@ -564,8 +586,9 @@ export const HELP_CONTENT: Record<HelpKey, HelpEntry> = {
 
   '/profile': {
     title: 'Moj profil',
-    summary: 'Vaše ime, e-pošta, lozinka i pregled poslanih povratnih informacija.',
+    summary: 'Vaše ime, e-pošta, lozinka, obavještenja i pregled poslanih povratnih informacija.',
     tips: [
+      'U „Obavještenja“ birate šta stiže e-mailom: sve (kritična odmah, ostala u jednom jutarnjem e-mailu), samo kritična, ili ništa. Promjena lozinke i sigurnosna obavještenja stižu uvijek.',
       'Promjena lozinke vas odjavljuje sa svih uređaja — tako je namjerno, da promjena lozinke stvarno izbaci nekog nepoželjnog.',
       'Potvrdite e-poštu. Bez potvrde ne možete vratiti pristup računu ako zaboravite lozinku.',
     ],

@@ -34,6 +34,11 @@ Notes:
 - **Feed token:** opaque 256-bit, stored plaintext (must be re-shown — "secret address" model),
   unique-indexed, rotatable. Feed is anonymous; the token is the only credential.
 - `NotificationType.DailyAgenda = 19`. Dedup per calendar day via `ExistsRecentAsync` (dedupId = `yyyyMMdd`).
+- **Since SPEC-29:** the recommended inspection follows the season policy — none in winter, the clock
+  restarts in spring, and the threshold is the phase's (`INotificationPolicy.InspectionBecomesDue`),
+  so the agenda and the ICS feed never recommend what the alerts are silent about. The agenda no
+  longer mails by itself: its e-mail is part of the one 08:00 morning e-mail together with the
+  scan's Normal alerts, sent only to users on the "Sva" e-mail mode (see `seasonal-notifications.md`).
 - Config: `Reminders:DailyAgenda:{Enabled,LocalHour}`, `CalendarFeed:{Enabled,PastDays,FutureDays}`,
   `App:{TimeZone,PublicBaseUrl}`.
 

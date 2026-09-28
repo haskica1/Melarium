@@ -1,3 +1,4 @@
+using Melarium.Application.Common.Email;
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Localization;
@@ -248,10 +249,8 @@ public class LearningTopicService : ILearningTopicService
         await _uow.LearningTopics.UpdateAsync(topic);
         await _uow.SaveChangesAsync();
 
-        await NotifyAuthorAsync(
-            topic,
-            "Vaša tema je objavljena",
-            $"Tema \"{topic.Title}\" je odobrena i objavljena u Edukaciji.");
+        var published = $"Tema \"{topic.Title}\" je odobrena i objavljena u Edukaciji.";
+        await NotifyAuthorAsync(topic, "Vaša tema je objavljena", published, TopicEmails.Published(topic, published));
 
         if (isFirstPublish) await BroadcastFirstPublishAsync(topic);
 
@@ -275,7 +274,8 @@ public class LearningTopicService : ILearningTopicService
             topic,
             "Vaša tema nije objavljena",
             $"Tema \"{topic.Title}\" nije odobrena. Razlog: {topic.RejectionReason} " +
-            "Možete je doraditi i poslati ponovo.");
+            "Možete je doraditi i poslati ponovo.",
+            TopicEmails.Rejected(topic));
 
         return ToAdminDto(topic);
     }
@@ -363,7 +363,7 @@ public class LearningTopicService : ILearningTopicService
     /// Bell *and* e-mail to the author — here the coupling inside <c>NotifyAsync</c> is what is
     /// wanted: a verdict on something they wrote is worth an inbox. Never fails the review.
     /// </summary>
-    private async Task NotifyAuthorAsync(LearningTopic topic, string title, string message)
+    private async Task NotifyAuthorAsync(LearningTopic topic, string title, string message, EmailContent email)
     {
         if (topic.AuthorId is not int authorId) return;
 
@@ -373,7 +373,8 @@ public class LearningTopicService : ILearningTopicService
                 authorId, title, message,
                 NotificationType.LearningTopicReviewed,
                 topic.Id,
-                nameof(LearningTopic));
+                nameof(LearningTopic),
+                email: email);
         }
         catch (Exception ex)
         {

@@ -50,6 +50,8 @@ export const HELP_ROUTES = [
   '/admin/feedback',
   '/admin/learning-topics',
   '/admin',
+  // Last: matchPath matches "/" exactly, but it is the least specific key by any reading.
+  '/',
 ] as const
 
 export type HelpKey = (typeof HELP_ROUTES)[number]
@@ -66,4 +68,4 @@ export function resolveHelpKey(pathname: string): HelpKey | null {
  * Pages where a brand-new user is auto-shown the help once. Kept to the three that make up the
  * core loop — auto-opening on twenty pages in one session is nagging, not onboarding.
  */
-export const AUTO_OPEN_KEYS: HelpKey[] = ['/apiaries', '/beehives/:id', '/inspections/new']
+export const AUTO_OPEN_KEYS: HelpKey[] = ['/', '/beehives/:id', '/inspections/new']

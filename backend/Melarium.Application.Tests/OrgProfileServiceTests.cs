@@ -27,7 +27,8 @@ public class OrgProfileServiceTests
         [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0];
 
     private OrgProfileService Service(ICurrentUser user) =>
-        new(_uow, user, _storage, NullLogger<OrgProfileService>.Instance);
+        new(_uow, user, _storage, NullLogger<OrgProfileService>.Instance,
+            TestSeasons.Calendar(), TestSeasons.At(2026, 9, 26));
 
     private static TestCurrentUser OrgAdmin => new()
     {

@@ -72,6 +72,11 @@ worker always resolved the address from the account:
 All three pre-existing call sites (password reset, e-mail verification, notifications) were moved to
 `ForUser` and are unchanged in behaviour.
 
+Since ADR-048 a `QueuedEmail` carries structured `EmailContent` instead of a title and a message; the
+operator's copy is `FeedbackEmails.Operator` (report subject as the title, type/severity/sender/page
+as rows, the text in a box, a button to `/admin/feedback`) and the answer to the submitter is
+`FeedbackEmails.Reply`, which links to `/profile#povratne-informacije`.
+
 ## Configuration
 
 ```

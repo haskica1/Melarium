@@ -120,6 +120,22 @@
   `organizationName`, so the label under the profile avatar updates without re-login
 - **Contact/official org fields (e-pošta, telefon, adresa, JIB) were declined for v1** — basic fields
   only. See `docs/features/organization-profile.md`
+- **"Pomak sezone" (SPEC-29)** — `Organization.SeasonShiftDays`, −14…+30: spring later and autumn
+  earlier by N days, for altitude; 1 August fixed. The one field added past SPEC-22 D1 (ADR-046). The
+  page previews the five phases live; `null` on PUT leaves it unchanged
+
+### Početna — dashboard (SPEC-29)
+- `/` is the start page for every role except SystemAdmin (who keeps `/admin`); "Pčelinjaci" is its own
+  menu item now. `GET /api/dashboard` + `GET /api/dashboard/weather` (separate so a slow forecast
+  never holds up the page); org-less SystemAdmin → **403**
+- Blocks: greeting + the five season steps (phase and next date only), numbers, **Traži pažnju**
+  (computed live by the same season policy as the alerts, grouped per apiary), obligations today + 7
+  days (agenda/ICS source), weather (frost marked Critical in spring), open todos, hive status donut,
+  programmes as rings, yield by month, plan (owner only), quick actions, one Edukacija topic
+- Scope from `IAccessGuard.GetAccessible*` — role-scoped and lock-free by construction (ADR-043
+  pattern). Forecasts cached 60 min server-side (`WeatherForecastCache`, `Weather:CacheMinutes`)
+- Round charts with the number in the middle (`shared/components/ProgressRing`). See
+  `docs/features/dashboard.md`
 
 ### Organization Members (`/api/org/*`)
 - OrganizationAdmin/ApiaryAdmin manage members: create ApiaryAdmin/Beekeeper accounts,
@@ -414,6 +430,18 @@
 - 9 `NotificationType`s fired on account/org/apiary/beehive assignment changes, hive creation, todo creation
 - Email: `NotificationService` enqueues → `EmailNotificationWorker` (BackgroundService, Channel)
   resolves the recipient and sends via MailKit — **SMTP never blocks a request**
+- **Since SPEC-29 not every notification is mailed.** `Notification.Priority` is stored (Critical /
+  Normal / Info) and `NotifyAsync` picks the channel from `INotificationPolicy` + the user's
+  `NotificationSettings` (e-mail Sva / Samo kritična / Isključeno; in-app switches for Normal and Info
+  alerts). Critical mails at once; Normal scan alerts and the agenda go in **one 08:00 morning e-mail**;
+  what a person triggered (todo, assignment) still mails at once under "Sva"; security notices
+  (password changed, new account, organization handed over) always. ADR-047
+- **E-mails are structured content (ADR-048).** Features build an `EmailContent` (title, blocks —
+  text, facts, callout, stats, sections, cards, checklist — one button, footer flags) with pure
+  builders (`AuthEmails`, `TodoEmails`, `AlertEmails`, `MorningEmail`, …); `NotifyAsync` takes it as an
+  optional `email` argument and `NotificationEmail.Compose` fills the type's icon, category, colour,
+  button and the policy's footer. `EmailTemplate` (Infrastructure) is the one renderer, HTML plus a
+  text/plain part; no web fonts. Subjects carry no "Melarium —" prefix. See `docs/features/email.md`
 - Email silently skipped unless `Smtp:Host` + `Smtp:Password` are configured
 - `POST /api/notifications/test-email` (SystemAdmin) — direct SMTP test
 - All notification texts are in Bosnian
@@ -424,6 +452,14 @@
 - **Weekly AI summary:** on Mondays, a deterministic per-org digest (`WeeklyDigestBuilder`) → one Groq
   call (`llama-3.3-70b-versatile`) → Bosnian bullet report delivered as `WeeklySummary` to OrgAdmins +
   ApiaryAdmins; AI failure skips silently. New config block `Alerts:*`. See `docs/features/smart-alerts.md`.
+- **Seasonal policy (SPEC-29):** five phases derived from the local date + the org's shift
+  (`ISeasonCalendar`, never stored). Winter: no inspection reminders, frost only below −15 °C, the AI
+  summary becomes monthly (first Monday). Spring/main-season frost is Critical; wintering sends the
+  first frost only. Work the beekeeper started (strips, karenca, feeding/treatment rounds) and plan
+  notices are never silenced. Winter days don't count toward "days without inspection". Hive rules
+  are **one notification per recipient per apiary**. `SeasonPhaseStarted` (32) tells every member the
+  phase's work once, in its first 14 days. The agenda/ICS recommended inspection uses the same policy.
+  See `docs/features/seasonal-notifications.md`
 
 ### Feedback (Povratne informacije, SPEC-13)
 - Any signed-in user submits bug/žalba/pohvala/prijedlog/pitanje/ostalo via a header-reachable modal;
@@ -491,6 +527,7 @@
 ### Profile
 - `GET/PUT /api/profile` — name/email + password change
 - "Moje povratne informacije" (SPEC-13) + help preference toggle (SPEC-14) sections
+- "Obavještenja" (SPEC-29) — e-mail mode and in-app alert switches, `GET|PUT /api/notifications/settings`
 
 ---
 

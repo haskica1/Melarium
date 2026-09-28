@@ -1,3 +1,4 @@
+using Melarium.Application.Common.Seasons;
 using Melarium.Application.Features.OrgProfile.DTOs;
 using FluentValidation;
 
@@ -15,5 +16,10 @@ public class UpdateMyOrganizationValidator : AbstractValidator<UpdateMyOrganizat
 
         RuleFor(x => x.Description)
             .MaximumLength(1000).WithMessage("Opis ne smije biti duži od 1000 znakova.");
+
+        RuleFor(x => x.SeasonShiftDays)
+            .InclusiveBetween(SeasonCalendar.MinShiftDays, SeasonCalendar.MaxShiftDays)
+            .When(x => x.SeasonShiftDays.HasValue)
+            .WithMessage($"Pomak sezone mora biti između {SeasonCalendar.MinShiftDays} i +{SeasonCalendar.MaxShiftDays} dana.");
     }
 }

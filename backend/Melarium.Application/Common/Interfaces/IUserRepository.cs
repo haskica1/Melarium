@@ -67,6 +67,9 @@ public interface IUserRepository : IRepository<User>
     /// <summary>Ids of every user on the platform — no entities loaded (SPEC-06 publish broadcast).</summary>
     Task<List<int>> GetAllIdsAsync();
 
+    /// <summary>Every member of an organization, whatever the role — the audience of an organization-wide notice.</summary>
+    Task<List<int>> GetIdsByOrganizationAsync(int organizationId);
+
     /// <summary>User ids of every SystemAdmin — in-app recipients for new feedback (SPEC-13).</summary>
     Task<List<int>> GetSystemAdminIdsAsync();
 

@@ -554,11 +554,13 @@ public class BeehiveMergeService : IBeehiveMergeService
                 _ => [],
             };
 
+            var email = MergeEmails.Merged(source, target, apiary, actor);
+
             foreach (var recipient in recipients.Where(r => r.Id != actorId))
             {
                 await _notifications.NotifyAsync(
                     recipient.Id, title, message,
-                    NotificationType.BeehiveMerged, target.Id, nameof(Beehive));
+                    NotificationType.BeehiveMerged, target.Id, nameof(Beehive), email: email);
             }
         }
         catch (Exception ex)

@@ -341,6 +341,54 @@ rather than with this change.
 > `app.Environment.IsDevelopment()`, alongside the demo accounts — a production container never
 > calls it.
 
+### Seasonal notifications, Početna, new e-mails (SPEC-29, ADR-048) — nothing one-time
+
+No new environment variable, secret or npm dependency. The deploy carries one migration,
+`20260925223735_AddSeasonalNotifications` — `Organizations.SeasonShiftDays` and
+`Notifications.Priority` (both `int`, default `0`) plus the new `NotificationSettings` table. Additive,
+applied by `MigrateAsync()` on start, together with any earlier migration production still lacks.
+
+**Timing.** The alert scan runs at `Alerts:ScanHourUtc` (05:00 UTC) and the morning e-mail at 08:00
+local. A restart at either moment skips that day's run (SPEC-28 F-10), so deploy outside
+**06:45–08:15** local time.
+
+#### Deploy
+
+```bash
+cd /opt/melarium
+# What production already has — anything newer in backend/Melarium.Entity/Migrations is applied on start
+docker compose exec -T postgres psql -U melarium -d MelariumDB -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId" DESC LIMIT 8;'
+docker compose exec -T postgres pg_dump -U melarium MelariumDB | gzip > /opt/backups/pre-spec29-$(date +%F).sql.gz
+./deploy/deploy.sh
+```
+
+#### Verify
+
+```bash
+# 1. Expected first row: 20260925223735_AddSeasonalNotifications
+docker compose exec -T postgres psql -U melarium -d MelariumDB -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId" DESC LIMIT 3;'
+# 2. No startup errors
+docker compose logs --tail=80 api | grep -iE "fail|exception|error" || echo "no errors"
+curl -s https://melarium.app/health
+```
+
+In the browser: signing in lands on **Početna** (the dashboard), not the apiary list; Profil →
+**Obavještenja** saves; Moja organizacija → **Pomak sezone** previews the five phases; the bell opens.
+
+The e-mails are the one part that could not be verified locally (no SMTP in dev). Send yourself one:
+**"Zaboravili ste lozinku?"** on your own address → the new reset mail must arrive with the logo and a
+working button (open it on the phone too). Ignoring it changes nothing. The first **morning e-mail**
+of note is on **1 October at 08:00** — "Počinje zazimljavanje" for organizations with no season shift.
+
+Expect the first morning after the deploy to list more overdue hives than usual: the old per-hive
+reminders do not count toward the new per-apiary dedup, so every overdue apiary is reported once.
+
+#### Rollback
+
+`git revert` the commit, push, re-run `./deploy/deploy.sh` — `deploy.sh` starts with `git pull`, which
+fails on a detached HEAD, so checking out an older commit on the server does not work. The migration
+stays: an older API never reads the two columns (both have database defaults) or the new table.
+
 ### One-time: uploads volume ownership (non-root container)
 
 The API container now runs as the unprivileged user `1654` instead of root. A **newly created**

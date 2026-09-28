@@ -1246,3 +1246,147 @@ body rule, `PublishedAt` as the notify-exactly-once guard, and the broadcast.
   content from then on, readable and marked-as-read by everyone, and it must not be able to change
   or vanish without review.
 
+---
+
+## ADR-046: The Season Is Derived From the Date, and the Organization Gets One Field for Altitude (SPEC-29, exception to SPEC-22 D1)
+
+*ADR-045 belongs to SPEC-27 (achievements), which was still in a stash when this was written.*
+
+**Context.** The alert scan and the daily agenda behaved the same all year: in winter every hive
+produced a weekly "Košnica bez pregleda", frost warned every three days, and the agenda suggested
+opening hives. Fixing that needs the phase of the beekeeping year — and the phase depends on where
+the apiaries are: a mountain apiary has a later spring and an earlier winter than the valley below
+it. SPEC-22 D1 had deliberately kept the organization to its basic fields (name, description, logo).
+
+**Decision.**
+
+- **The phase is computed, never stored.** `ISeasonCalendar` derives it from the local date
+  (`App:TimeZone`) and the organization's shift. Same precedent as `PlanHelper.Effective`,
+  `karencaUntil` and ADR-042: nothing has to flip a flag on the first day of spring, and a changed
+  shift takes effect on the next request.
+- **`Organization.SeasonShiftDays` — one integer, −14…+30 — is the one field SPEC-22 D1 now allows.**
+  It is not contact or registry data (what D1 declined); it is a parameter every member's
+  notifications depend on, and only the OrganizationAdmin can know it.
+- **The shift squeezes the season instead of sliding it.** Spring boundaries move +N, autumn
+  boundaries −N, and 1 August stays. Sliding every boundary the same way — the literal reading of the
+  request — would give a mountain apiary a *later* winter than the valley, which is backwards.
+- **Boundaries are local calendar days.** 23:30 UTC on 14 November is already winter in Sarajevo; a
+  UTC comparison would send that night one more round of inspection reminders.
+- **Defaults live in `Alerts:Seasons`, and a configuration that runs backwards at either end of the
+  shift range is replaced by the defaults as a whole.** Mixing configured and default boundaries could
+  make a phase disappear, which would silently switch a rule off for a year.
+
+**Consequences.**
+
+- **Winter days never count toward "days without inspection."** The clock restarts on the first day
+  of spring. Without that, 16 February would flag every hive at once as "120 days without inspection" —
+  exactly the noise this exists to remove, in a month when nobody should open a hive.
+- One migration column; no job, no stored phase, nothing to backfill.
+- **The policy that reads the phase is one table** (`INotificationPolicy`), and the alert scan, the
+  weekly summary, the agenda, the ICS feed and the dashboard all ask it. A second copy of "is it
+  winter" in any of them is the regression to watch for: the agenda would then recommend an
+  inspection the alerts are silent about.
+
+**Alternatives considered.** A stored phase flipped by a job (rejected — the ADR-028 "forgot to flip
+the flag" class of bug); a per-apiary altitude or shift (rejected for v1 — one organization rarely
+spans climates, and a field on every apiary is a field nobody fills); two numbers for spring and
+autumn (rejected for v1 — offered, not chosen).
+
+---
+
+## ADR-047: A Notification's Priority Is Stored, and Normal Alerts Travel in One Morning E-mail (SPEC-29)
+
+**Context.** Until now `NotificationService.NotifyAsync` mailed every notification it created. A
+daily scan over a few apiaries could send a dozen e-mails before breakfast, then the 08:00 agenda
+sent another — on a Resend plan with 100 messages a day that a password reset also has to fit into.
+
+**Decision.**
+
+- **`Notification.Priority` is a column, not a function of the type.** The same `FrostWarning` is
+  Critical in April and Normal in August; the morning e-mail runs hours after the scan and has to know
+  which one each row was. `Normal = 0`, so every pre-existing row reads as Normal without a backfill,
+  and a path that never sets a priority can never produce a Critical e-mail.
+- **`NotifyAsync` decides the channel from the policy and the recipient's `NotificationSettings`.**
+  Callers pass at most a priority. Critical mails at once; Normal scan output and the agenda wait for
+  the morning; what a person triggered (a todo, an assignment) still mails at once under "Sva"; Info
+  never mails. A switchable alert the user has hidden in the app is not created at all.
+- **Security notifications bypass the settings entirely** — password changed, new account,
+  organization handed over. Someone who takes over an account could otherwise switch e-mail off first
+  and change the password second.
+- **One morning e-mail per user, composed at 08:00 local** from `GetNormalSinceAsync(now − 24 h)`
+  plus today's obligations. The window covers exactly one scan, because the scan runs at
+  `Alerts:ScanHourUtc` (05:00 UTC), before 08:00 local in both CET and CEST.
+
+**Consequences.**
+
+- A user on "Samo kritična" no longer gets the agenda by e-mail; it still lands in the bell.
+- **Alerts are grouped per apiary and deduplicated on the apiary.** A hive that becomes overdue after
+  the reminder is picked up by the next one rather than producing a second message the same week.
+- If a scan is missed (F-10 in SPEC-28: a deploy at the scheduled hour), that day's Normal alerts
+  simply are not in the next morning's e-mail — they are still in the bell. Same trade-off ADR-021
+  accepted for e-mail generally.
+- Message length is now capped in `NotificationService.Fit` (the column is `varchar(1000)`); before,
+  an over-long AI summary would have failed the save for the whole weekly run.
+
+**Alternatives considered.** Deriving priority from the type (rejected — frost is both); an
+`EmailedAt` column and a digest of "everything not yet mailed" (rejected — it would also hold back a
+todo assignment until the next morning, which Asim chose against); two morning e-mails, alerts after
+the scan and the agenda at 08:00 (rejected by Asim).
+
+## ADR-048: An E-mail Is Structured Content, Drawn by One Template (e-mail redesign)
+
+**Context.** Every mail went through one HTML shell, `EmailTemplate.Render(name, title, message,
+actionUrl?, actionLabel?)`, with a plain-text message it split into paragraphs and "- " bullets. That
+was enough for a one-line notification and nothing else: notifications carried **no button at all**
+(the queue got only a title and a message), a Critical frost looked exactly like "Košnica
+dodijeljena", and the SPEC-29 morning e-mail — alerts, agenda, the phase notice, the AI summary — came
+out as one wall of text with a raw URL in it. Asim asked for mails that look "moćnije i modernije,
+s više prostora i boljom organizacijom sadržaja", saw a before/after of all 24 and chose the full
+version.
+
+**Decision.**
+
+- **`EmailContent` (Application) says what a mail contains; `EmailTemplate` (Infrastructure) draws it.**
+  The content is a title plus blocks — text, label/value facts, a boxed callout, big numbers, section
+  headings, cards, a checklist — one button, and flags for the footer. Application code builds content
+  without HTML and without `FrontendUrl`: links are paths ("/beehives/7"), resolved against the app
+  URL at render time. Every string is escaped by the renderer.
+- **Each feature owns its mail as a pure builder** — `AuthEmails`, `TodoEmails`, `FeedbackEmails`,
+  `TopicEmails`, `InvitationEmails`, `AlertEmails`, `OrgEmails`, `MergeEmails`, `MorningEmail` — so a
+  service stays readable and the copy is testable without the worker.
+- **`NotifyAsync` takes an optional `EmailContent`.** The bell keeps its one sentence; the e-mail gets
+  the richer version when the sender has one (a task's due date, a frost's temperature). Without it,
+  `NotificationEmail.Compose` renders the message with the type's icon, category, colour and a button
+  to what the notification is about. Either way **the footer is the policy's**: why this mail came
+  (security / Critical / "Sva") and a link to the settings, never set by the sender.
+- **Colour means weight:** honey for everyday, red for Critical and account security, green for good
+  news, grey for removals, orange for the morning e-mail's "needs attention" cards.
+- **The subject is the content's, with no "Melarium —" prefix** — the sender name already says it —
+  and it carries the specifics ("Jutarnji pregled: 4 obaveze, 3 upozorenja", "❄️ Najavljen mraz —
+  Visoko, −2 °C").
+- **No web fonts.** The old `@import` of Google Fonts disclosed the reader's IP to Google on every
+  open, and Gmail strips it anyway; system font stacks are what clients were really using. (The same
+  change is in the i18n stash, SPEC-26 §8.2.)
+- **Every mail also has a text/plain part** (`EmailTemplate.RenderText`, sent as multipart/alternative).
+
+**Consequences.**
+
+- `QueuedEmail` is `(UserId?, EmailContent, ToEmail?, ToName?)`; `IEmailService.SendAsync` takes an
+  optional text body. The worker resolves the recipient's first name for the greeting and the send
+  time in the app zone (`EmailFact.SentAt`, the "when" of the password-changed notice).
+- The logo is the PWA icon hosted by the frontend (`/pwa-192x192.png`); with images blocked the
+  wordmark still reads, the image has an empty alt.
+- `CalendarObligation` gained `Path`, the page that handles it, so each line of the morning checklist
+  links to its feeding programme, treatment or hive.
+- The profile's notification and feedback sections have anchors (`#obavjestenja`,
+  `#povratne-informacije`) that the mails link to.
+- The i18n stash (stash@{2}) localizes the texts that moved into the builders — its hunks in
+  `AuthService`, `FeedbackService` and `EmailTemplate` will conflict and have to be re-applied to the
+  builders.
+
+**Alternatives considered.** Only a new shell over the old plain-text message (Asim's "Samo izgled",
+not chosen — it leaves notifications without buttons and the morning e-mail unstructured); a
+mini-markup inside the message text ("## " headings, "> " callouts) parsed by the template (rejected —
+the same text shows in the bell, and the structure would be guessed from punctuation); Razor or
+MJML templates (rejected — a build step and a second language for what is a dozen blocks).
+

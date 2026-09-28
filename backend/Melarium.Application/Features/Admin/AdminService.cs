@@ -3,6 +3,7 @@ using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
 using Melarium.Application.Common.Validation;
 using Melarium.Application.Features.Admin.DTOs;
+using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Notifications;
 using Melarium.Domain.Entities;
 using Melarium.Domain.Enums;
@@ -236,7 +237,8 @@ public class AdminService : IAdminService
             user.Id,
             "Dobrodošli u Melarium!",
             $"Vaš račun je kreiran. Možete se prijaviti s e-poštom: {user.Email}.",
-            NotificationType.AccountCreated);
+            NotificationType.AccountCreated,
+            email: AuthEmails.WelcomeMember(user.Email));
 
         // 1) OrgAdmin assigned to an organisation
         if (role == UserRole.OrganizationAdmin && dto.OrganizationId.HasValue)

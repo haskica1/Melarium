@@ -1,4 +1,4 @@
-using Melarium.Application.Common;
+using Melarium.Application.Common.Email;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Models;
 using Microsoft.Extensions.Configuration;
@@ -72,7 +72,7 @@ public sealed class EmailNotificationWorker : BackgroundService
         if (item.ToEmail is { Length: > 0 } toEmail)
         {
             var toName = item.ToName is { Length: > 0 } n ? n : toEmail;
-            await _email.SendAsync(toEmail, toName, $"Melarium — {item.Title}", RenderHtml(toName, item));
+            await DeliverAsync(toEmail, toName, item.Content, firstName: null);
             return;
         }
 
@@ -92,12 +92,13 @@ public sealed class EmailNotificationWorker : BackgroundService
             return;
         }
 
-        var fullName = $"{user.FirstName} {user.LastName}";
-        await _email.SendAsync(user.Email, fullName, $"Melarium — {item.Title}", RenderHtml(fullName, item));
+        await DeliverAsync(user.Email, $"{user.FirstName} {user.LastName}", item.Content, user.FirstName);
     }
 
-    private string RenderHtml(string name, QueuedEmail item) =>
-        EmailTemplate.Render(
-            name, item.Title, item.Message, item.ActionUrl, item.ActionLabel,
-            appUrl: FrontendUrl.Build(_config, "/"));
+    private Task DeliverAsync(string toEmail, string toName, EmailContent content, string? firstName)
+    {
+        var ctx = EmailContext.Create(_config, firstName, DateTime.UtcNow);
+        var subject = content.Subject is { Length: > 0 } s ? s : content.Title;
+        return _email.SendAsync(toEmail, toName, subject, EmailTemplate.Render(content, ctx), EmailTemplate.RenderText(content, ctx));
+    }
 }

@@ -3,11 +3,11 @@ import { useAuth } from '../../core/context/AuthContext'
 
 interface RoleRouteProps {
   allowedRoles: string[]
-  /** Where to redirect if the role check fails. Defaults to /apiaries */
+  /** Where to redirect if the role check fails. Defaults to Početna (/) */
   redirectTo?: string
 }
 
-export default function RoleRoute({ allowedRoles, redirectTo = '/apiaries' }: RoleRouteProps) {
+export default function RoleRoute({ allowedRoles, redirectTo = '/' }: RoleRouteProps) {
   const { user } = useAuth()
   if (!user || !allowedRoles.includes(user.role)) {
     return <Navigate to={redirectTo} replace />

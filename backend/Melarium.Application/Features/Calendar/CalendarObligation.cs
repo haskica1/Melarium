@@ -15,7 +15,8 @@ public enum ObligationKind
 /// inspection deadlines. One shared shape consumed by the ICS feed, the daily 08:00 agenda, and
 /// (Faza B) native calendar sync. <see cref="IsSoft"/> marks a recomputed / moving deadline (e.g. a
 /// recommended inspection) rather than a fixed appointment. <see cref="StableKey"/> is deterministic
-/// per source item so it maps to a stable calendar UID.
+/// per source item so it maps to a stable calendar UID. <see cref="Path"/> is the app page that
+/// handles it ("/feedings/3") — the morning e-mail links each row there.
 /// </summary>
 public sealed record CalendarObligation(
     ObligationKind Kind,
@@ -26,4 +27,5 @@ public sealed record CalendarObligation(
     string? Location,
     int? BeehiveId,
     int? ApiaryId,
-    bool IsSoft);
+    bool IsSoft,
+    string? Path = null);

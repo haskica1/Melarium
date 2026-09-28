@@ -36,6 +36,7 @@ public class UnitOfWork : IUnitOfWork
     private IRefreshTokenRepository? _refreshTokens;
     private IUserTokenRepository? _userTokens;
     private ICalendarSettingsRepository? _calendarSettings;
+    private INotificationSettingsRepository? _notificationSettings;
     private IFeedbackRepository? _feedbacks;
     private IInvitationRepository? _invitations;
     private IAiAssistantSessionRepository? _aiAssistantSessions;
@@ -113,6 +114,9 @@ public class UnitOfWork : IUnitOfWork
 
     public ICalendarSettingsRepository CalendarSettings =>
         _calendarSettings ??= new CalendarSettingsRepository(_context);
+
+    public INotificationSettingsRepository NotificationSettings =>
+        _notificationSettings ??= new NotificationSettingsRepository(_context);
 
     public IFeedbackRepository Feedbacks =>
         _feedbacks ??= new FeedbackRepository(_context);

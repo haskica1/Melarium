@@ -153,7 +153,8 @@ public class AuthService : IAuthService
             user.Id,
             "Dobrodošli u Melarium!",
             $"Vaša organizacija '{organization.Name}' je spremna. Vi ste njen administrator — počnite dodavanjem prvog pčelinjaka.",
-            NotificationType.AccountCreated);
+            NotificationType.AccountCreated,
+            email: AuthEmails.WelcomeOwner(organization.Name));
 
         // Confirm the address is real. Delivery is best-effort and sign-in is not blocked on it —
         // a failed email must never leave someone unable to use the account they just created.
@@ -228,17 +229,11 @@ public class AuthService : IAuthService
         // would turn this endpoint into a free account-enumeration oracle.
         if (user is null) return;
 
-        var raw = await IssueUserTokenAsync(
-            user.Id, UserTokenPurpose.PasswordReset, GetHours("Auth:PasswordResetTokenHours", 2));
+        var hours = GetHours("Auth:PasswordResetTokenHours", 2);
+        var raw = await IssueUserTokenAsync(user.Id, UserTokenPurpose.PasswordReset, hours);
 
         _emailQueue.Enqueue(QueuedEmail.ForUser(
-            user.Id,
-            "Zahtjev za promjenu lozinke",
-            "Primili smo zahtjev za promjenu lozinke na vašem računu. Link vrijedi ograničeno vrijeme i "
-            + "može se iskoristiti samo jednom. Ako niste vi tražili promjenu, slobodno zanemarite ovu poruku — "
-            + "vaša lozinka ostaje nepromijenjena.",
-            BuildFrontendUrl($"/reset-password?token={raw}"),
-            "Postavi novu lozinku"));
+            user.Id, AuthEmails.PasswordReset(BuildFrontendUrl($"/reset-password?token={raw}"), hours)));
     }
 
     public async Task ResetPasswordAsync(ResetPasswordDto dto)
@@ -271,7 +266,8 @@ public class AuthService : IAuthService
             "Lozinka je promijenjena",
             "Vaša lozinka je uspješno promijenjena i odjavljeni ste sa svih uređaja. "
             + "Ako to niste bili vi, odmah zatražite novu promjenu lozinke i kontaktirajte podršku.",
-            NotificationType.PasswordChanged);
+            NotificationType.PasswordChanged,
+            email: AuthEmails.PasswordChanged());
     }
 
     // ── Email verification ─────────────────────────────────────────────────────
@@ -328,16 +324,11 @@ public class AuthService : IAuthService
     /// </summary>
     private async Task SendVerificationEmailAsync(User user)
     {
-        var raw = await IssueUserTokenAsync(
-            user.Id, UserTokenPurpose.EmailVerification, GetHours("Auth:EmailVerificationTokenHours", 48));
+        var hours = GetHours("Auth:EmailVerificationTokenHours", 48);
+        var raw = await IssueUserTokenAsync(user.Id, UserTokenPurpose.EmailVerification, hours);
 
         _emailQueue.Enqueue(QueuedEmail.ForUser(
-            user.Id,
-            "Potvrdite vašu e-poštu",
-            "Da biste primali obavijesti i mogli vratiti pristup računu ako zaboravite lozinku, "
-            + "potvrdite da je ova adresa vaša.",
-            BuildFrontendUrl($"/verify-email?token={raw}"),
-            "Potvrdi e-poštu"));
+            user.Id, AuthEmails.VerifyEmail(BuildFrontendUrl($"/verify-email?token={raw}"), hours)));
     }
 
     /// <summary>

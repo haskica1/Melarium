@@ -46,7 +46,8 @@ export default function LoginPage() {
     setServerError(null)
     try {
       const response = await login(data.identifier, data.password) as LoginResponse
-      const destination = returnUrl ?? (response.role === 'SystemAdmin' ? '/admin' : '/apiaries')
+      // Početna (SPEC-29 dashboard) for everyone but the SystemAdmin, who has no organization to show.
+      const destination = returnUrl ?? (response.role === 'SystemAdmin' ? '/admin' : '/')
       navigate(destination, { replace: true })
     } catch (err) {
       // authApi has no interceptors, so this is the raw AxiosError — `err.message` alone would

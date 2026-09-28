@@ -10,7 +10,7 @@ export default function NotFoundPage() {
   const { pathname } = useLocation()
   const { isAuthenticated, user } = useAuth()
 
-  const homePath = !isAuthenticated ? '/login' : user?.role === 'SystemAdmin' ? '/admin' : '/apiaries'
+  const homePath = !isAuthenticated ? '/login' : user?.role === 'SystemAdmin' ? '/admin' : '/'
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-honey-50 dark:bg-slate-950 px-6 py-12">

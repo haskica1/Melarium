@@ -28,6 +28,14 @@ public class Organization : BaseEntity
     /// <summary>Content type of the stored logo, sniffed from the file header bytes on upload.</summary>
     public string? LogoContentType { get; set; }
 
+    // ── Season (SPEC-29, ADR-046) ──
+
+    /// <summary>
+    /// How many days spring comes later — and autumn earlier — than the default calendar, for
+    /// altitude. −14…+30; 0 is the continental-Bosnia default. The phase itself is never stored.
+    /// </summary>
+    public int SeasonShiftDays { get; set; }
+
     public int? CreatedById { get; set; }
     public User? CreatedBy { get; set; }
 

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
-  BarChart2, Building2, CalendarDays, ChevronsLeft, ChevronsRight, Droplets, GraduationCap, Home,
+  BarChart2, Building2, CalendarDays, ChevronsLeft, ChevronsRight, Droplets, GraduationCap, Hexagon, Home,
   FileText, LayoutDashboard, Leaf, Megaphone, MessageSquareHeart, Pill, ReceiptText, Sparkles, Tent,
   Users,
 } from 'lucide-react'
@@ -36,7 +36,8 @@ export function getNavItems(flags: NavRoleFlags): NavItemDef[] {
   const items: Array<NavItemDef & { visible: boolean }> = [
     flags.isSystemAdmin
       ? { to: '/admin', icon: <LayoutDashboard className="w-4 h-4" />, label: 'Kontrolna ploča', visible: true }
-      : { to: '/apiaries', icon: <Home className="w-4 h-4" />, label: 'Pčelinjaci', visible: true },
+      : { to: '/', icon: <Home className="w-4 h-4" />, label: 'Početna', visible: true },
+    { to: '/apiaries', icon: <Hexagon className="w-4 h-4" />, label: 'Pčelinjaci', visible: !flags.isSystemAdmin },
     { to: '/organization', icon: <Building2 className="w-4 h-4" />, label: 'Moja organizacija', visible: flags.canEditOwnOrganization },
     { to: '/members', icon: <Users className="w-4 h-4" />, label: 'Članovi', visible: flags.canManageMembers },
     // Pčelinjak/organizacija-vezane stavke — SystemAdmin nema svoju organizaciju, pa mu ove stranice ne služe.
@@ -103,7 +104,7 @@ export function Sidebar({ flags }: SidebarProps) {
       )}
     >
       <NavLink
-        to={flags.isSystemAdmin ? '/admin' : '/apiaries'}
+        to={flags.isSystemAdmin ? '/admin' : '/'}
         className={clsx('h-14 flex items-center border-b border-honey-100 dark:border-slate-800 shrink-0', expanded ? 'px-4 gap-2' : 'justify-center')}
       >
         <span className="text-2xl leading-none">🐝</span>
@@ -117,6 +118,8 @@ export function Sidebar({ flags }: SidebarProps) {
           <NavLink
             key={item.to}
             to={item.to}
+            // "/" would otherwise match every route and stay highlighted everywhere.
+            end={item.to === '/'}
             title={expanded ? undefined : item.label}
             className={({ isActive }) => clsx(
               'relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',

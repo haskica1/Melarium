@@ -1,5 +1,11 @@
 # Feature: Smart Alerts & Weekly Summary (Pametna upozorenja)
 
+> **Since SPEC-29 (2026-09-26) every rule below runs through the season policy** — winter silences
+> inspection reminders and ordinary frost, spring frost is Critical, hive rules are grouped per
+> apiary, and Normal alerts travel in one 08:00 morning e-mail instead of one e-mail each. The table
+> below is the SPEC-04 baseline; thresholds, dedup windows and priorities per phase are in
+> [`seasonal-notifications.md`](seasonal-notifications.md).
+
 ## Overview
 
 Makes notifications **proactive**: a daily background scan watches the data beekeepers already enter
@@ -33,7 +39,8 @@ the scan produces **no duplicates** (no new dedup table). Delivery reuses `INoti
 | 6 | `KarencaEnded` (16) | treatment karenca (`karencaUntil`) expired within the last 3 days (SPEC-08) | same as #5 | 7 days |
 | 8 | `FeedingOverdue` (23) | apiary-scoped feeding programme, `InProgress`, with ≥ 1 active hive, whose earliest `Pending` round is ≥ `FeedingOverdueDays` (2) days late (SPEC-12 Phase D) — fires once per **programme**, not per round | same as #5 | 3 days |
 
-`relatedEntityId` = hive id (rules 1/2/4, type `Beehive`), apiary id (rule 3, type `Apiary`),
+`relatedEntityId` = apiary id for rules 1/2/4 since SPEC-29 (grouped: one notification per recipient
+per apiary — before, hive id with type `Beehive`), apiary id (rule 3, type `Apiary`),
 treatment id (rules 5/6, type `Treatment`), or diet id (rule 8, type `Diet`).
 Apiary without coordinates → frost skipped silently. Weather API unreachable → frost skipped for that
 apiary, other rules unaffected.

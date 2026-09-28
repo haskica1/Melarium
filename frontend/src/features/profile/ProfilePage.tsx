@@ -9,6 +9,7 @@ import type { UpdateProfilePayload } from '../../core/services/profileService'
 import FeedbackFormModal from '../../shared/components/FeedbackFormModal'
 import MyFeedbackSection from './MyFeedbackSection'
 import HelpPreferenceSection from './HelpPreferenceSection'
+import NotificationSettingsSection from './NotificationSettingsSection'
 import DeleteAccountSection from './DeleteAccountSection'
 import clsx from 'clsx'
 
@@ -360,9 +361,10 @@ export default function ProfilePage() {
         </div>
       </form>
 
-      {/* ── Help preference (SPEC-14) + my feedback (SPEC-13) ────────────────────
-           Both sit outside the profile form — neither submits it. */}
+      {/* ── Notifications (SPEC-29), help preference (SPEC-14), my feedback (SPEC-13) ──
+           All sit outside the profile form — none of them submits it. */}
       <div className="mt-6 space-y-6">
+        <NotificationSettingsSection />
         <HelpPreferenceSection />
         <MyFeedbackSection onNew={() => setFeedbackOpen(true)} />
         {/* Last on the page on purpose — nobody should meet the delete button on their way to

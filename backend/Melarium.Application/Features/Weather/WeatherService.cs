@@ -7,10 +7,18 @@ namespace Melarium.Application.Features.Weather;
 public class WeatherService : IWeatherService
 {
     private readonly HttpClient _http;
+    private readonly WeatherForecastCache _cache;
 
-    public WeatherService(HttpClient http) => _http = http;
+    public WeatherService(HttpClient http, WeatherForecastCache cache)
+    {
+        _http = http;
+        _cache = cache;
+    }
 
-    public async Task<WeatherForecastDto> GetForecastAsync(double latitude, double longitude)
+    public Task<WeatherForecastDto> GetForecastAsync(double latitude, double longitude) =>
+        _cache.GetOrFetchAsync(latitude, longitude, () => FetchForecastAsync(latitude, longitude));
+
+    private async Task<WeatherForecastDto> FetchForecastAsync(double latitude, double longitude)
     {
         var lat = latitude.ToString(System.Globalization.CultureInfo.InvariantCulture);
         var lon = longitude.ToString(System.Globalization.CultureInfo.InvariantCulture);

@@ -2,6 +2,7 @@ using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Security;
 using Melarium.Application.Common.Validation;
+using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Notifications;
 using Melarium.Application.Features.OrgManagement.DTOs;
 using Melarium.Domain.Entities;
@@ -289,7 +290,8 @@ public class OrgManagementService : IOrgManagementService
             user.Id,
             "Dobrodošli u Melarium!",
             $"Vaš račun je kreiran. Možete se prijaviti s e-poštom: {user.Email}.",
-            NotificationType.AccountCreated);
+            NotificationType.AccountCreated,
+            email: AuthEmails.WelcomeMember(user.Email));
 
         if (role == UserRole.ApiaryAdmin && apiary != null)
         {
@@ -371,13 +373,16 @@ public class OrgManagementService : IOrgManagementService
 
         // After the commit, because NotifyAsync runs its own SaveChanges on the shared DbContext —
         // notifying first would push the role change out early and on failure take it down with it.
+        var handover = $"{outgoing.FirstName} {outgoing.LastName} vam je prenio/la vlasništvo nad organizacijom "
+            + $"'{organization.Name}'. Od sada vi upravljate njenim članovima, pčelinjacima i paketom.";
+        const string signInAgain = "Prijavite se ponovo da biste vidjeli nove mogućnosti.";
+
         await _notifications.NotifyAsync(
             successor.Id,
             "Postali ste administrator organizacije",
-            $"{outgoing.FirstName} {outgoing.LastName} vam je prenio/la vlasništvo nad organizacijom "
-            + $"'{organization.Name}'. Od sada vi upravljate njenim članovima, pčelinjacima i paketom. "
-            + "Prijavite se ponovo da biste vidjeli nove mogućnosti.",
-            NotificationType.OrganizationOwnershipTransferred);
+            $"{handover} {signInAgain}",
+            NotificationType.OrganizationOwnershipTransferred,
+            email: OrgEmails.OwnershipTransferred(handover, signInAgain));
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

@@ -164,14 +164,16 @@ public class InvitationService : IInvitationService
             if (invitation.InviterUserId is int inviterId)
             {
                 var invitee = await _uow.Users.GetByIdAsync(newUserId);
+                // First name only — if they registered with a different address than the one
+                // invited, echoing it back would leak their private address to the inviter.
+                var joined = $"{invitee?.FirstName ?? "Novi korisnik"} se pridružio/la Melariumu preko vaše pozivnice.";
                 await _notifications.NotifyAsync(
                     inviterId,
                     "Vaša pozivnica je prihvaćena",
-                    // First name only — if they registered with a different address than the one
-                    // invited, echoing it back would leak their private address to the inviter.
-                    $"{invitee?.FirstName ?? "Novi korisnik"} se pridružio Melariumu preko vaše pozivnice.",
+                    joined,
                     NotificationType.InvitationAccepted,
-                    invitation.Id, nameof(Invitation));
+                    invitation.Id, nameof(Invitation),
+                    email: InvitationEmails.Joined(joined));
             }
         }
         catch (Exception ex)
@@ -203,17 +205,21 @@ public class InvitationService : IInvitationService
             if (result.DaysGranted > 0 && invitation.InviterUserId is int inviterId)
             {
                 var invitee = await _uow.Users.GetByIdAsync(userId);
+                var name = invitee?.FirstName ?? "Pozvana osoba";
+                var granted = BsLabels.Count(result.DaysGranted, "dan", "dana", "dana");
+                // Worded from what actually happened: "Pro" only when the organization was
+                // genuinely raised to Pro. A Max or Partner customer being told they received
+                // "Pro" would read as a downgrade.
+                var reward = result.WasUpgrade
+                    ? $"{name} je potvrdio/la e-poštu — dobili ste {granted} Pro paketa."
+                    : $"{name} je potvrdio/la e-poštu — vaš paket je produžen za {granted}.";
                 await _notifications.NotifyAsync(
                     inviterId,
                     "Nagrada za pozivnicu",
-                    // Worded from what actually happened: "Pro" only when the organization was
-                    // genuinely raised to Pro. A Max or Partner customer being told they received
-                    // "Pro" would read as a downgrade.
-                    result.WasUpgrade
-                        ? $"{invitee?.FirstName ?? "Pozvana osoba"} je potvrdio e-poštu — dobili ste {result.DaysGranted} dana Pro paketa."
-                        : $"{invitee?.FirstName ?? "Pozvana osoba"} je potvrdio e-poštu — vaš paket je produžen za {result.DaysGranted} dana.",
+                    reward,
                     NotificationType.InvitationAccepted,
-                    invitation.Id, nameof(Invitation));
+                    invitation.Id, nameof(Invitation),
+                    email: InvitationEmails.Reward(reward, result.DaysGranted, result.WasUpgrade));
             }
         }
         catch (Exception ex)

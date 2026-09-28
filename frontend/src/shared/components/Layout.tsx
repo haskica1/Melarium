@@ -28,9 +28,10 @@ import FabDock, { type FabAction } from './FabDock'
 import AssistantSheet from '../../features/assistant/AssistantSheet'
 import { ErrorBoundary } from './ErrorBoundary'
 import { canGoBack as hasHistoryBehind } from '../utils/historyStack'
+import { onLayoutRequests } from '../utils/layoutEvents'
 
 // Root/landing pages never show a back arrow, even if browser history technically allows it.
-const ROOT_PATHS = ['/apiaries', '/admin']
+const ROOT_PATHS = ['/', '/apiaries', '/admin']
 
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -160,6 +161,12 @@ export default function Layout() {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
+  // The dashboard's quick actions (SPEC-29) open the scanner and the assistant that live here.
+  useEffect(() => onLayoutRequests({
+    qrScanner: () => setScannerOpen(true),
+    assistant: () => setAssistantOpen(true),
+  }), [])
+
   // Close the assistant sheet on navigation (its context is the page it was opened from, and
   // carrying that to the next page would make it a lie) and when the assistant stops being
   // available mid-session — dropping offline used to unmount the whole thing.
@@ -190,7 +197,7 @@ export default function Layout() {
                 </button>
               )}
               <Link
-                to={isSystemAdmin ? '/admin' : '/apiaries'}
+                to={isSystemAdmin ? '/admin' : '/'}
                 className="sm:hidden flex items-center gap-2 group shrink-0"
               >
                 <span className="text-2xl leading-none">🐝</span>
@@ -570,6 +577,7 @@ function MobileNavItem({ to, icon, label, badge, onClick }: {
   return (
     <NavLink
       to={to}
+      end={to === '/'}
       onClick={onClick}
       className={({ isActive }) =>
         clsx(

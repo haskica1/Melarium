@@ -16,6 +16,18 @@ public class NotificationRepository : Repository<Notification>, INotificationRep
             n.RelatedEntityId == relatedEntityId &&
             n.CreatedAt >= since);
 
+    public async Task<List<Notification>> GetNormalSinceAsync(DateTime since, IReadOnlyCollection<NotificationType> types)
+    {
+        var typeList = types.ToList();
+        return await _context.Notifications
+            .AsNoTracking()
+            .Where(n => n.CreatedAt >= since
+                        && n.Priority == NotificationPriority.Normal
+                        && typeList.Contains(n.Type))
+            .OrderBy(n => n.CreatedAt)
+            .ToListAsync();
+    }
+
     public async Task<IEnumerable<Notification>> GetByUserIdAsync(int userId) =>
         await _context.Notifications
             .AsNoTracking()

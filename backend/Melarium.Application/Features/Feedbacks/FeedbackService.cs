@@ -247,15 +247,7 @@ public class FeedbackService : IFeedbackService
             return;
         }
 
-        var severity = feedback.Severity is FeedbackSeverity s ? $" · ozbiljnost: {BsLabels.Label(s)}" : string.Empty;
-        var from     = feedback.UserId is int uid ? $"korisnik #{uid}" : "nepoznat korisnik";
-        var page     = feedback.PageContext is { Length: > 0 } p ? $"\nStranica: {p}" : string.Empty;
-
-        _emailQueue.Enqueue(QueuedEmail.ForAddress(
-            notifyEmail.Trim(),
-            "Melarium admin",
-            title,
-            $"{feedback.Subject}{severity}\nPoslao: {from}{page}\n\n{feedback.Message}"));
+        _emailQueue.Enqueue(QueuedEmail.ForAddress(notifyEmail.Trim(), "Melarium admin", FeedbackEmails.Operator(feedback, typeLabel)));
     }
 
     private async Task NotifySubmitterAsync(Feedback feedback, int submitterId)
@@ -274,7 +266,8 @@ public class FeedbackService : IFeedbackService
                 message,
                 NotificationType.FeedbackStatusUpdated,
                 feedback.Id,
-                "Feedback");
+                "Feedback",
+                email: FeedbackEmails.Reply(feedback));
         }
         catch (Exception ex)
         {

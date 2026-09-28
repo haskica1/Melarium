@@ -74,4 +74,10 @@ public enum NotificationType
     // Approval and rejection are one type: both are the platform's answer about the same topic,
     // and the author wants the e-mail either way (the same call as FeedbackStatusUpdated).
     LearningTopicReviewed  = 30,
+
+    // 31 is taken by AchievementExpiring (SPEC-27), which is not on main yet — skipped so the two
+    // branches can meet without renumbering a value that may already be stored.
+
+    // ── Seasonal notifications (SPEC-29) — once per season phase per user, with the phase's work ──
+    SeasonPhaseStarted     = 32,
 }

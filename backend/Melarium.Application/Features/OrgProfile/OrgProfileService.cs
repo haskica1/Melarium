@@ -1,5 +1,6 @@
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
+using Melarium.Application.Common.Seasons;
 using Melarium.Application.Common.Validation;
 using Melarium.Application.Features.OrgProfile.DTOs;
 using Melarium.Domain.Entities;
@@ -24,17 +25,23 @@ public class OrgProfileService : IOrgProfileService
     private readonly ICurrentUser _currentUser;
     private readonly IFileStorage _storage;
     private readonly ILogger<OrgProfileService> _logger;
+    private readonly ISeasonCalendar _seasons;
+    private readonly TimeProvider _time;
 
     public OrgProfileService(
         IUnitOfWork uow,
         ICurrentUser currentUser,
         IFileStorage storage,
-        ILogger<OrgProfileService> logger)
+        ILogger<OrgProfileService> logger,
+        ISeasonCalendar seasons,
+        TimeProvider time)
     {
         _uow         = uow;
         _currentUser = currentUser;
         _storage     = storage;
         _logger      = logger;
+        _seasons     = seasons;
+        _time        = time;
     }
 
     public async Task<MyOrganizationDto> GetMyOrganizationAsync()
@@ -49,6 +56,7 @@ public class OrgProfileService : IOrgProfileService
 
         org.Name = dto.Name.Trim();
         org.Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim();
+        if (dto.SeasonShiftDays is int shift) org.SeasonShiftDays = shift;
 
         await _uow.Organizations.UpdateAsync(org);
         await _uow.SaveChangesAsync();
@@ -161,6 +169,8 @@ public class OrgProfileService : IOrgProfileService
             UserCount = org.Users.Count,
             ApiaryCount = org.Apiaries.Count,
             BeehiveCount = beehiveCounts.GetValueOrDefault(org.Id),
+            SeasonShiftDays = org.SeasonShiftDays,
+            SeasonPhases = _seasons.CycleFor(_seasons.LocalDate(_time.GetUtcNow().UtcDateTime), org.SeasonShiftDays),
         };
     }
 

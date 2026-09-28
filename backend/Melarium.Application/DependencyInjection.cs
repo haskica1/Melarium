@@ -1,3 +1,4 @@
+using Melarium.Application.Common.Seasons;
 using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Apiaries.Validators;
 using Melarium.Application.Common.Services;
@@ -11,6 +12,7 @@ using Melarium.Application.Features.OrgManagement;
 using Melarium.Application.Features.OrgProfile;
 using Melarium.Application.Features.Auth;
 using Melarium.Application.Features.Calendar;
+using Melarium.Application.Features.Dashboard;
 using Melarium.Application.Features.Notifications;
 using Melarium.Application.Features.Profile;
 using Melarium.Application.Features.Reports;
@@ -28,8 +30,10 @@ using Melarium.Application.Features.Queens;
 using Melarium.Application.Features.Reminders;
 using Melarium.Application.Features.Todos;
 using Melarium.Application.Features.Treatments;
+using Melarium.Application.Features.Weather;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Melarium.Application;
 
@@ -102,6 +106,14 @@ public static class DependencyInjection
         services.AddScoped<IAiActionExecutor, AiActionExecutor>();
 
         services.AddScoped<IAlertRuleService, AlertRuleService>();
+
+        // Seasonal notifications (SPEC-29). The calendar and the policy only read configuration, so
+        // one instance serves the workers and the requests alike; the clock is injectable for tests.
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<ISeasonCalendar, SeasonCalendar>();
+        services.AddSingleton<INotificationPolicy, NotificationPolicy>();
+        services.AddSingleton<WeatherForecastCache>();
+        services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IInvitationService, InvitationService>();
         services.AddSingleton<IQrCodeService, QrCodeService>();

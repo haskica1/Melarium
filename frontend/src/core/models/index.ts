@@ -880,11 +880,17 @@ export interface MyOrganization {
   userCount: number
   apiaryCount: number
   beehiveCount: number
+  /** SPEC-29: spring later / autumn earlier by this many days, −14…+30. */
+  seasonShiftDays: number
+  /** This year's five phases under the stored shift. */
+  seasonPhases: SeasonPhaseRange[]
 }
 
 export interface UpdateMyOrganizationPayload {
   name: string
   description?: string | null
+  /** Omitted leaves the stored shift unchanged. */
+  seasonShiftDays?: number | null
 }
 
 // ── Org Management ────────────────────────────────────────────────────────────
@@ -1972,4 +1978,167 @@ export interface SaveAnnouncementPayload {
   title: string
   type: AnnouncementType
   bodyMarkdown: string
+}
+
+// ── Seasonal notifications & dashboard (SPEC-29) ──────────────────────────────
+
+export enum SeasonPhase {
+  Winter        = 1,
+  SpringBuildUp = 2,
+  MainSeason    = 3,
+  LateSummer    = 4,
+  Wintering     = 5,
+}
+
+export const SeasonPhaseLabels: Record<SeasonPhase, string> = {
+  [SeasonPhase.Winter]:        'Zimsko mirovanje',
+  [SeasonPhase.SpringBuildUp]: 'Proljetni razvoj',
+  [SeasonPhase.MainSeason]:    'Glavna sezona',
+  [SeasonPhase.LateSummer]:    'Ljetno-jesenja priprema',
+  [SeasonPhase.Wintering]:     'Zazimljavanje',
+}
+
+/** Under the steps of the season bar, where five full names do not fit on a phone. */
+export const SeasonPhaseShortLabels: Record<SeasonPhase, string> = {
+  [SeasonPhase.Winter]:        'Zima',
+  [SeasonPhase.SpringBuildUp]: 'Proljeće',
+  [SeasonPhase.MainSeason]:    'Sezona',
+  [SeasonPhase.LateSummer]:    'Ljeto–jesen',
+  [SeasonPhase.Wintering]:     'Zazimljavanje',
+}
+
+export interface SeasonPhaseRange {
+  phase: SeasonPhase
+  /** ISO date (yyyy-MM-dd), local calendar day. */
+  start: string
+  /** Inclusive. */
+  end: string
+}
+
+export enum EmailNotificationMode {
+  All          = 1,
+  CriticalOnly = 2,
+  Off          = 3,
+}
+
+export interface NotificationSettings {
+  emailMode: EmailNotificationMode
+  normalAlertsInApp: boolean
+  infoAlertsInApp: boolean
+}
+
+export type NotificationPriority = 'Critical' | 'Normal' | 'Info'
+
+export interface DashboardSeason {
+  phase: SeasonPhase
+  start: string
+  end: string
+  nextPhase: SeasonPhase
+  nextStart: string
+  shiftDays: number
+  phases: SeasonPhaseRange[]
+}
+
+export interface DashboardCounts {
+  apiaries: number
+  beehives: number
+  inspectionsThisMonth: number
+  yieldThisYearKg: number
+  /** Last year up to the same day — a fair comparison mid-season. */
+  yieldLastYearToDateKg: number
+  openTodos: number
+  overdueTodos: number
+}
+
+export interface AttentionItem {
+  /** NotificationType name of the rule that found it. */
+  kind: string
+  priority: NotificationPriority
+  apiaryId: number
+  apiaryName: string
+  text: string
+  items: string[]
+  linkPath: string
+}
+
+export interface DashboardObligation {
+  date: string
+  /** ObligationKind name. */
+  kind: string
+  title: string
+  linkPath: string
+}
+
+export interface HiveStatus {
+  apiaryId: number
+  apiaryName: string
+  inTime: number
+  late: number
+  never: number
+}
+
+export interface Programme {
+  kind: 'Feeding' | 'TreatmentRounds' | 'Strips' | 'Karenca'
+  id: number
+  apiaryName: string
+  title: string
+  done?: number | null
+  total?: number | null
+  /** Next round, remove-by date for strips, or when honey may be harvested again. */
+  date?: string | null
+  linkPath: string
+}
+
+export interface MonthYield {
+  month: number
+  thisYearKg: number
+  lastYearKg: number
+}
+
+export interface DashboardTodo {
+  id: number
+  title: string
+  dueDate?: string | null
+  priority: TodoPriority
+  isOverdue: boolean
+  scopeName?: string | null
+  linkPath: string
+}
+
+export interface DashboardTopic {
+  id: number
+  title: string
+  summary: string
+  category: LearningCategory
+}
+
+export interface Dashboard {
+  season: DashboardSeason
+  counts: DashboardCounts
+  attention: AttentionItem[]
+  obligations: DashboardObligation[]
+  /** Winter: inspections are not tracked, so the hive-status chart has nothing to say. */
+  hivesResting: boolean
+  hiveStatus: HiveStatus[]
+  programmes: Programme[]
+  yieldByMonth: MonthYield[]
+  openTodos: DashboardTodo[]
+  topic?: DashboardTopic | null
+}
+
+export interface WeatherDay {
+  date: string
+  minTemp?: number | null
+  maxTemp?: number | null
+  precipitationProbability?: number | null
+  weatherCode?: number | null
+}
+
+export interface ApiaryWeather {
+  apiaryId: number
+  apiaryName: string
+  days: WeatherDay[]
+  /** Set when the season's frost rule would warn — Critical in spring, nothing for ordinary winter frost. */
+  frostPriority?: NotificationPriority | null
+  frostMinTemp?: number | null
 }

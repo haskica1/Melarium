@@ -11,6 +11,15 @@ could only be fixed by the SystemAdmin through `/admin`.
 
 The same change fills in the SystemAdmin's own tables, which were carrying data they never showed.
 
+## Season shift (SPEC-29)
+
+`/organization` also carries **"Pomak sezone"** — `Organization.SeasonShiftDays`, −14…+30, the one
+field SPEC-22 D1's "basic fields only" now makes room for (ADR-046). Positive moves spring later and
+autumn earlier, for altitude; 1 August stays. Every member's notifications and the dashboard follow
+it. `MyOrganizationDto` carries `seasonShiftDays` and this year's `seasonPhases`; the page previews the
+five phases live while the number is edited. `UpdateMyOrganizationDto.SeasonShiftDays` is nullable —
+an older client that omits it leaves the stored shift alone instead of resetting it to 0.
+
 ## The org is read from the token, never from a route
 
 There is no `/api/organizations/{id}`. Every method on `IOrgProfileService` resolves the organization

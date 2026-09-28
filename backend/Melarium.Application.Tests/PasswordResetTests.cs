@@ -81,10 +81,10 @@ public class PasswordResetTests
         Assert.Null(persisted.UsedAt);
 
         Assert.NotNull(sent);
-        Assert.StartsWith("https://melarium.app/reset-password?token=", sent!.ActionUrl);
+        Assert.StartsWith("https://melarium.app/reset-password?token=", sent!.Content.Button!.Url);
 
         // The raw token travels in the email only; the database keeps its hash.
-        var rawToken = sent.ActionUrl!.Split("token=")[1];
+        var rawToken = sent.Content.Button!.Url.Split("token=")[1];
         Assert.DoesNotContain(rawToken, persisted.TokenHash);
     }
 

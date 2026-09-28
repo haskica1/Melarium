@@ -5,6 +5,7 @@ import clsx from 'clsx'
 import { useCalendarFeedUrl, useCalendarSettings, useRotateCalendarFeed, useUpdateCalendarSettings } from '../../core/services/queries'
 import type { CalendarSettings } from '../../core/models'
 import { ErrorMessage, PageSkeleton } from '../../shared/components'
+import Toggle from '../../shared/components/Toggle'
 
 export default function CalendarSettingsPage() {
   const { data: feed } = useCalendarFeedUrl()
@@ -133,7 +134,7 @@ export default function CalendarSettingsPage() {
           </div>
         </div>
         <div className="mt-2 divide-y divide-gray-100 dark:divide-slate-800">
-          <Toggle label="Jutarnji podsjetnik u 8h" hint="Zvono + email sa svim današnjim obavezama" checked={form.dailyAgendaEnabled} onChange={v => set('dailyAgendaEnabled', v)} />
+          <Toggle label="Jutarnji podsjetnik u 8h" hint="Zvono sa svim današnjim obavezama; e-mailom u jutarnjem pregledu, ako ga niste isključili u Obavještenjima na profilu" checked={form.dailyAgendaEnabled} onChange={v => set('dailyAgendaEnabled', v)} />
           <Toggle label="Pretplata na kalendar aktivna" hint="Isključi da privremeno zaustaviš feed bez mijenjanja adrese" checked={form.feedEnabled} onChange={v => set('feedEnabled', v)} />
         </div>
       </section>
@@ -146,24 +147,6 @@ export default function CalendarSettingsPage() {
         </button>
       </div>
     </div>
-  )
-}
-
-function Toggle({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
-  return (
-    <button type="button" onClick={() => onChange(!checked)} className="w-full flex items-start justify-between gap-4 py-3 text-left">
-      <span>
-        <span className="block text-sm font-medium text-gray-800 dark:text-slate-100">{label}</span>
-        {hint && <span className="block text-xs text-gray-500 dark:text-slate-400 mt-0.5">{hint}</span>}
-      </span>
-      <span
-        role="switch"
-        aria-checked={checked}
-        className={clsx('mt-0.5 relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors', checked ? 'bg-honey-500' : 'bg-gray-300 dark:bg-slate-600')}
-      >
-        <span className={clsx('absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform', checked ? 'translate-x-[22px]' : 'translate-x-0.5')} />
-      </span>
-    </button>
   )
 }
 

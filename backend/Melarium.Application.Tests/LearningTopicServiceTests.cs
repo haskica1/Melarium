@@ -1,3 +1,4 @@
+using Melarium.Application.Common.Email;
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Features.Ai;
@@ -114,7 +115,7 @@ public class LearningTopicServiceTests
             nameof(LearningTopic));
         await _notifications.DidNotReceive().NotifyAsync(
             Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<NotificationType>(),
-            Arg.Any<int?>(), Arg.Any<string?>()); // no per-user email path
+            Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<NotificationPriority?>(), Arg.Any<EmailContent?>()); // no per-user email path
     }
 
     [Fact]
@@ -281,7 +282,8 @@ public class LearningTopicServiceTests
 
         await _notifications.Received(1).NotifyAsync(
             11, Arg.Any<string>(), Arg.Any<string>(),
-            NotificationType.LearningTopicReviewed, 9, nameof(LearningTopic));
+            NotificationType.LearningTopicReviewed, 9, nameof(LearningTopic), Arg.Any<NotificationPriority?>(),
+            Arg.Is<EmailContent?>(e => e != null && e.Button!.Url == "/learning/9"));
 
         // The author is left out of the broadcast — they just got the personal message.
         await _notifications.Received(1).NotifyManyInAppAsync(
@@ -319,7 +321,9 @@ public class LearningTopicServiceTests
             11,
             Arg.Any<string>(),
             Arg.Is<string>(m => m.Contains("Nedostaju izvori.")),
-            NotificationType.LearningTopicReviewed, 9, nameof(LearningTopic));
+            NotificationType.LearningTopicReviewed, 9, nameof(LearningTopic), Arg.Any<NotificationPriority?>(),
+            Arg.Is<EmailContent?>(e => e != null && e.Button!.Url == "/learning/moje-teme/9/uredi"
+                && e.Blocks.OfType<EmailCallout>().Any(c => c.Text == "Razlog: Nedostaju izvori.")));
         await _notifications.DidNotReceive().NotifyManyInAppAsync(
             Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<string>(), Arg.Any<string>(),
             NotificationType.LearningTopicPublished, Arg.Any<int?>(), Arg.Any<string?>());

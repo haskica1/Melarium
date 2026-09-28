@@ -73,8 +73,8 @@ so there is no dismissal state either. The third step needs a count the apiary l
 
 - **Coverage:** every authenticated page in the route table has an entry. No entry for the auth pages
   or the public QR scan — they are outside `Layout`, so there is no header to host the icon.
-- **Auto-open:** the first visit to one of the three core pages (`/apiaries`, `/beehives/:id`,
-  `/inspections/new`) opens help by itself, at most once per page. An icon nobody clicks helps nobody.
+- **Auto-open:** the first visit to one of the three core pages (`/` Početna — `/apiaries` until
+  SPEC-29 — `/beehives/:id`, `/inspections/new`) opens help by itself, at most once per page. An icon nobody clicks helps nobody.
 - **Welcome flow** is shown once per (user, browser) and doubles as the announcement of this feature for
   people who were already using Melarium. Its open state lives in `useHelp` so it can **hold back** the
   page auto-open — otherwise a new user's first screen stacked two dialogs and two focus traps.

@@ -1,3 +1,4 @@
+using Melarium.Application.Common.Email;
 using Melarium.Application.Common.Exceptions;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Models;
@@ -66,7 +67,7 @@ public class FeedbackServiceTests
         // NotifyAsync would have mailed each admin individually — that is the rejected option.
         await _notifications.DidNotReceive().NotifyAsync(
             Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<NotificationType>(),
-            Arg.Any<int?>(), Arg.Any<string?>());
+            Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<NotificationPriority?>(), Arg.Any<EmailContent?>());
 
         // E-mail: exactly one, to the configured address, regardless of admin count.
         _emailQueue.Received(1).Enqueue(Arg.Is<QueuedEmail>(e =>
@@ -229,7 +230,9 @@ public class FeedbackServiceTests
         // NotifyAsync here on purpose: someone whose report was answered should get the mail.
         await _notifications.Received(1).NotifyAsync(
             7, Arg.Any<string>(), Arg.Any<string>(),
-            NotificationType.FeedbackStatusUpdated, 5, "Feedback");
+            NotificationType.FeedbackStatusUpdated, 5, "Feedback", Arg.Any<NotificationPriority?>(),
+            Arg.Is<EmailContent?>(e => e != null && e.Tone == EmailTone.Success
+                && e.Blocks.OfType<EmailCallout>().Any(c => c.Text == "Popravljeno.")));
     }
 
     [Fact]
@@ -243,7 +246,7 @@ public class FeedbackServiceTests
 
         await _notifications.DidNotReceive().NotifyAsync(
             Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<NotificationType>(),
-            Arg.Any<int?>(), Arg.Any<string?>());
+            Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<NotificationPriority?>(), Arg.Any<EmailContent?>());
     }
 
     [Fact]
@@ -258,6 +261,6 @@ public class FeedbackServiceTests
         await _uow.Received().SaveChangesAsync();
         await _notifications.DidNotReceive().NotifyAsync(
             Arg.Any<int>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<NotificationType>(),
-            Arg.Any<int?>(), Arg.Any<string?>());
+            Arg.Any<int?>(), Arg.Any<string?>(), Arg.Any<NotificationPriority?>(), Arg.Any<EmailContent?>());
     }
 }

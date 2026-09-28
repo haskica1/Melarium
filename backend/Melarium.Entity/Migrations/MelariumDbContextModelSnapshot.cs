@@ -1396,6 +1396,9 @@ namespace Melarium.Entity.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("RelatedEntityId")
                         .HasColumnType("integer");
 
@@ -1424,6 +1427,40 @@ namespace Melarium.Entity.Migrations
                     b.HasIndex("UserId", "IsRead");
 
                     b.ToTable("Notifications", (string)null);
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.NotificationSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EmailMode")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("InfoAlertsInApp")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NormalAlertsInApp")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("NotificationSettings", (string)null);
                 });
 
             modelBuilder.Entity("Melarium.Domain.Entities.Organization", b =>
@@ -1469,6 +1506,9 @@ namespace Melarium.Entity.Migrations
                     b.Property<DateTime?>("PlanValidUntil")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("SeasonShiftDays")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1485,7 +1525,8 @@ namespace Melarium.Entity.Migrations
                             CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "A family-run beekeeping operation in the lowlands, specialising in wildflower honey.",
                             Name = "Golden Hive Co",
-                            Plan = 1
+                            Plan = 1,
+                            SeasonShiftDays = 0
                         },
                         new
                         {
@@ -1493,7 +1534,8 @@ namespace Melarium.Entity.Migrations
                             CreatedAt = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "High-altitude apiculture collective producing premium acacia and linden honey.",
                             Name = "Mountain Bees",
-                            Plan = 1
+                            Plan = 1,
+                            SeasonShiftDays = 0
                         });
                 });
 
@@ -2486,6 +2528,17 @@ namespace Melarium.Entity.Migrations
                     b.HasOne("Melarium.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Melarium.Domain.Entities.NotificationSettings", b =>
+                {
+                    b.HasOne("Melarium.Domain.Entities.User", "User")
+                        .WithOne()
+                        .HasForeignKey("Melarium.Domain.Entities.NotificationSettings", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

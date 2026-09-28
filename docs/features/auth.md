@@ -67,8 +67,10 @@ number contains one.
 
 ## Frontend Routes
 
-- `/login` — public, redirects to `/apiaries` (or `/admin`) if already authenticated
-- `/` — `SmartRedirect` redirects based on `user.role`
+- `/login` — public; after sign-in goes to `returnUrl` if there is one, else Početna `/` (SystemAdmin: `/admin`)
+- `/register` — after sign-up goes to Početna `/`, whose empty state leads to the first apiary
+- `/` — `SmartRedirect`: Početna (the SPEC-29 dashboard) for every role except SystemAdmin → `/admin`.
+  `RoleRoute`, `AdminRoute` and the 404 page's "Nazad na početnu" also send users here
 - All other routes wrapped in `ProtectedRoute`
 - `/admin/*` wrapped in `AdminRoute` (requires `SystemAdmin`)
 

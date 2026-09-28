@@ -3,7 +3,10 @@ using System.Text;
 
 namespace Melarium.Application.Features.Alerts;
 
-/// <summary>Deterministic facts gathered for one organization over the past 7 days.</summary>
+/// <summary>
+/// Deterministic facts gathered for one organization over the summary period — the past 7 days, or the
+/// past month in winter (SPEC-29). <see cref="PeriodLabel"/> is how the digest names that period.
+/// </summary>
 public record WeeklyDigestInput(
     string OrganizationName,
     int InspectionCount,
@@ -15,7 +18,8 @@ public record WeeklyDigestInput(
     int TodosOverdue,
     decimal HarvestKg,
     IReadOnlyList<string> HoneyTrendLines,
-    IReadOnlyList<string> WeatherOutlook)
+    IReadOnlyList<string> WeatherOutlook,
+    string PeriodLabel = "zadnjih 7 dana")
 {
     /// <summary>Whether anything happened worth reporting — orgs with no activity get no summary.</summary>
     public bool HasActivity =>
@@ -36,7 +40,7 @@ public static class WeeklyDigestBuilder
         var sb = new StringBuilder();
         sb.AppendLine($"Organizacija: {d.OrganizationName}");
         sb.AppendLine(
-            $"Brojke (zadnjih 7 dana): pregledi={d.InspectionCount}, obavljena hranjenja={d.FeedingsDone}, " +
+            $"Brojke ({d.PeriodLabel}): pregledi={d.InspectionCount}, obavljena hranjenja={d.FeedingsDone}, " +
             $"obavljene primjene tretmana={d.TreatmentRoundsDone}, " +
             $"novi zadaci={d.TodosCreated}, završeni zadaci={d.TodosCompleted}, zakašnjeli zadaci={d.TodosOverdue}, " +
             $"prinos meda={kg} kg");

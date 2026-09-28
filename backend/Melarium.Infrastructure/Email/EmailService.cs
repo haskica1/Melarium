@@ -18,7 +18,7 @@ public class EmailService : IEmailService
         _logger = logger;
     }
 
-    public async Task SendAsync(string toEmail, string toName, string subject, string htmlBody)
+    public async Task SendAsync(string toEmail, string toName, string subject, string htmlBody, string? textBody = null)
     {
         if (!IsConfigured())
         {
@@ -26,24 +26,26 @@ public class EmailService : IEmailService
             return;
         }
 
-        await SendCoreAsync(toEmail, toName, subject, htmlBody, suppressErrors: true);
+        await SendCoreAsync(toEmail, toName, subject, htmlBody, textBody, suppressErrors: true);
     }
 
     /// <summary>Sends email and optionally re-throws on failure (used by the test endpoint).</summary>
-    public async Task SendAsync(string toEmail, string toName, string subject, string htmlBody, bool suppressErrors)
+    public async Task SendAsync(
+        string toEmail, string toName, string subject, string htmlBody, bool suppressErrors, string? textBody = null)
     {
         if (!IsConfigured())
             throw new InvalidOperationException(
                 "SMTP is not configured. Set Smtp:Host and Smtp:Password (environment variables in production).");
 
-        await SendCoreAsync(toEmail, toName, subject, htmlBody, suppressErrors);
+        await SendCoreAsync(toEmail, toName, subject, htmlBody, textBody, suppressErrors);
     }
 
     private bool IsConfigured() =>
         !string.IsNullOrWhiteSpace(_config["Smtp:Host"]) &&
         !string.IsNullOrWhiteSpace(_config["Smtp:Password"]);
 
-    private async Task SendCoreAsync(string toEmail, string toName, string subject, string htmlBody, bool suppressErrors)
+    private async Task SendCoreAsync(
+        string toEmail, string toName, string subject, string htmlBody, string? textBody, bool suppressErrors)
     {
         var host      = _config["Smtp:Host"]!;
         var port      = int.Parse(_config["Smtp:Port"] ?? "587");
@@ -58,7 +60,8 @@ public class EmailService : IEmailService
             message.From.Add(new MailboxAddress(fromName, fromEmail));
             message.To.Add(new MailboxAddress(toName, toEmail));
             message.Subject = subject;
-            message.Body = new TextPart("html") { Text = htmlBody };
+            // multipart/alternative when there is a text part: HTML-only mail scores worse with spam filters.
+            message.Body = new BodyBuilder { HtmlBody = htmlBody, TextBody = textBody }.ToMessageBody();
 
             using var client = new SmtpClient();
             await client.ConnectAsync(host, port, SecureSocketOptions.StartTls);
