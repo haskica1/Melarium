@@ -66,10 +66,12 @@ public static class ReportDataSeeder
         Apiary? mountain, List<int> mountainHives,
         int thisYear, int lastYear)
     {
-        Harvest H(int apiaryId, DateTime date, HoneyType type, decimal? pricePerKg, string? notes,
+        Harvest H(Apiary apiary, DateTime date, HoneyType type, decimal? pricePerKg, string? notes,
                   IEnumerable<(int HiveId, decimal Kg)> entries) => new()
         {
-            ApiaryId = apiaryId,
+            OrganizationId = apiary.OrganizationId,
+            ApiaryId = apiary.Id,
+            ProductType = HiveProductType.Honey,
             Date = date,
             HoneyType = type,
             PricePerKg = pricePerKg,
@@ -85,31 +87,31 @@ public static class ReportDataSeeder
 
         context.Harvests.AddRange(
             // Current season — priced, so it carries the revenue estimate.
-            H(golden.Id, Utc(thisYear, 5, 28), HoneyType.Acacia, 14.00m, "Bagremova paša, prvo vrcanje.",
+            H(golden, Utc(thisYear, 5, 28), HoneyType.Acacia, 14.00m, "Bagremova paša, prvo vrcanje.",
                 [(a, 26.5m), (b, 21.0m)]),
 
-            H(golden.Id, Utc(thisYear, 6, 24), HoneyType.Linden, 12.50m, "Lipa, dobra paša.",
+            H(golden, Utc(thisYear, 6, 24), HoneyType.Linden, 12.50m, "Lipa, dobra paša.",
                 [(a, 18.0m), (b, 15.5m)]),
 
             // ── No price recorded. Proves the "Procijenjeni prihod" note (SPEC-25 D6): these kg are
             // in TotalKg and in unpricedKg, and contribute nothing to revenue. Without a row like
             // this the note never renders and the omission is never visible on screen.
-            H(golden.Id, Utc(thisYear, 7, 19), HoneyType.Meadow, null, "Livadski — cijena još nije dogovorena.",
+            H(golden, Utc(thisYear, 7, 19), HoneyType.Meadow, null, "Livadski — cijena još nije dogovorena.",
                 [(a, 12.0m), (b, 9.5m)]),
 
             // ── 23:30 local on the last day of September. Stored as 21:30Z, which is the same
             // calendar day in Sarajevo and the *next* one in UTC. Proves ReportPeriod (D4): pick
             // "Septembar" and this must be inside it; a UTC-only comparison would push it to October
             // and quietly shrink the month.
-            H(golden.Id,
+            H(golden,
                 new DateTime(thisYear, 9, 30, 23 - SarajevoSummerOffsetHours, 30, 0, DateTimeKind.Utc),
                 HoneyType.Forest, 16.00m, "Kasno vrcanje — namjerno na granici mjeseca (test lokalne zone).",
                 [(a, 7.5m)]),
 
             // Previous season — makes the "2025" and year-over-year presets non-empty.
-            H(golden.Id, Utc(lastYear, 6, 2), HoneyType.Acacia, 13.00m, "Prošlogodišnji bagrem.",
+            H(golden, Utc(lastYear, 6, 2), HoneyType.Acacia, 13.00m, "Prošlogodišnji bagrem.",
                 [(a, 22.0m), (b, 19.0m)]),
-            H(golden.Id, Utc(lastYear, 7, 15), HoneyType.Meadow, 11.00m, null,
+            H(golden, Utc(lastYear, 7, 15), HoneyType.Meadow, 11.00m, null,
                 [(a, 14.0m), (b, 11.0m)])
         );
 
@@ -118,7 +120,7 @@ public static class ReportDataSeeder
         if (mountain is not null && mountainHives.Count > 0)
         {
             context.Harvests.Add(
-                H(mountain.Id, Utc(thisYear, 6, 10), HoneyType.Chestnut, 18.00m, "Kesten — druga organizacija.",
+                H(mountain, Utc(thisYear, 6, 10), HoneyType.Chestnut, 18.00m, "Kesten — druga organizacija.",
                     [(mountainHives[0], 31.0m)]));
         }
     }

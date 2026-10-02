@@ -11,7 +11,7 @@ export default function YieldCard({ months, year }: { months: MonthYield[]; year
   const max = Math.max(1, ...months.flatMap(m => [m.thisYearKg, m.lastYearKg]))
 
   return (
-    <DashboardCard icon={<Droplets className="w-4 h-4" />} title="Prinos po mjesecima" action={{ to: '/harvests', label: 'Vrcanja' }}>
+    <DashboardCard icon={<Droplets className="w-4 h-4" />} title="Prinos meda po mjesecima" action={{ to: '/harvests', label: 'Prinosi' }}>
       {months.length === 0 ? (
         <CardEmpty icon="🍯">Još nema vrcanja ove ni prošle godine.</CardEmpty>
       ) : (

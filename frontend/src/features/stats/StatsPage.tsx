@@ -9,6 +9,7 @@ import { CheckSquare, Leaf } from 'lucide-react'
 import { useStats } from '../../core/services/queries'
 import { ErrorMessage, VitalCard, PageSkeleton } from '../../shared/components'
 import type { NameValue, MonthTemp, PriorityStats } from '../../core/services/statsService'
+import { HarvestOverview, ProductBreakdowns, SubHeading } from './HarvestStats'
 
 // ── Colour palettes ───────────────────────────────────────────────────────────
 
@@ -96,7 +97,8 @@ export default function StatsPage() {
   const hasApiaryData       = stats.apiariesByBeehiveCount.length > 0
   const hasTodoData         = stats.todosByPriority.length > 0
   const hasTopBeehivesData  = stats.topBeehivesByInspections.some(b => b.value > 0)
-  const hasHarvestData      = stats.seasonTotalKg > 0 || stats.kgByHoneyType.length > 0 || stats.yearlyYield.some(y => y.value > 0)
+  const hasHoneyData        = stats.seasonTotalKg > 0 || stats.kgByHoneyType.length > 0 || stats.yearlyYield.some(y => y.value > 0)
+  const hasHarvestData      = hasHoneyData || stats.harvestsByProduct.length > 0
 
   return (
     <div className="animate-fade-in">
@@ -313,91 +315,89 @@ export default function StatsPage() {
         </Section>
       )}
 
-      {/* ── Harvests (SPEC-02) ───────────────────────────────────────────────── */}
+      {/* ── Prinosi — honey and every other product (SPEC-02, SPEC-30) ───────── */}
       {hasHarvestData && (
-        <Section title={`Prinosi meda — sezona ${new Date().getFullYear()}.`} icon="🍯">
-          {/* Headline numbers */}
-          <div className="flex flex-wrap gap-3 mb-5">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium bg-honey-100 text-honey-800 dark:bg-honey-500/15 dark:text-honey-300">
-              🍯 Ukupno: {stats.seasonTotalKg.toFixed(1).replace(/\.0$/, '')} kg
-            </div>
-            {stats.estimatedRevenue > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">
-                💰 Procij. prihod: {stats.estimatedRevenue.toFixed(0)} KM
+        <Section title={`Prinosi — sezona ${new Date().getFullYear()}.`} icon="🍯">
+          {/* Every product side by side, honey first; then honey in detail; then the other products. */}
+          <HarvestOverview byProduct={stats.harvestsByProduct} />
+
+          {hasHoneyData && (
+            <>
+              <SubHeading>Med</SubHeading>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {/* Kg by honey type */}
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3">Med po vrsti (kg)</p>
+                  {stats.kgByHoneyType.length === 0 ? <EmptyChart /> : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={stats.kgByHoneyType as NameValue[]}
+                          dataKey="value" nameKey="name" cx="50%" cy="50%"
+                          innerRadius={45} outerRadius={80} paddingAngle={3}
+                          labelLine={false} label={PieLabel}
+                        >
+                          {stats.kgByHoneyType.map((_, i) => <Cell key={i} fill={HONEY[i % HONEY.length]} />)}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => [`${v} kg`, 'Med']} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+
+                {/* Top hives by yield */}
+                <div>
+                  <p className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3">Najproduktivnije košnice (kg)</p>
+                  {stats.topHivesByYield.length === 0 ? <EmptyChart /> : (
+                    <ResponsiveContainer width="100%" height={Math.max(160, stats.topHivesByYield.length * 44)}>
+                      <BarChart data={stats.topHivesByYield as NameValue[]} layout="vertical" margin={{ top: 0, right: 24, left: 10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={110} />
+                        <Tooltip formatter={(v: number) => [`${v} kg`, 'Med']} />
+                        <Bar dataKey="value" name="Med" fill="#f59e0b" radius={[0, 6, 6, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {/* Kg by honey type */}
-            <div>
-              <p className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3">Med po vrsti (kg)</p>
-              {stats.kgByHoneyType.length === 0 ? <EmptyChart /> : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={stats.kgByHoneyType as NameValue[]}
-                      dataKey="value" nameKey="name" cx="50%" cy="50%"
-                      innerRadius={45} outerRadius={80} paddingAngle={3}
-                      labelLine={false} label={PieLabel}
-                    >
-                      {stats.kgByHoneyType.map((_, i) => <Cell key={i} fill={HONEY[i % HONEY.length]} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => [`${v} kg`, 'Med']} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                  </PieChart>
-                </ResponsiveContainer>
+              {/* Yearly yield trend */}
+              {stats.yearlyYield.some(y => y.value > 0) && (
+                <div className="mt-6">
+                  <p className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3">Med po godinama (kg)</p>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={stats.yearlyYield as NameValue[]} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(v: number) => [`${v} kg`, 'Med']} />
+                      <Bar dataKey="value" name="Med" fill="#10b981" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               )}
-            </div>
 
-            {/* Top hives by yield */}
-            <div>
-              <p className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3">Najproduktivnije košnice (kg)</p>
-              {stats.topHivesByYield.length === 0 ? <EmptyChart /> : (
-                <ResponsiveContainer width="100%" height={Math.max(160, stats.topHivesByYield.length * 44)}>
-                  <BarChart data={stats.topHivesByYield as NameValue[]} layout="vertical" margin={{ top: 0, right: 24, left: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={110} />
-                    <Tooltip formatter={(v: number) => [`${v} kg`, 'Prinos']} />
-                    <Bar dataKey="value" name="Prinos" fill="#f59e0b" radius={[0, 6, 6, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+              {/* Yield per pasture (SPEC-10) — only for organizations that record moves */}
+              {stats.kgByPasture.length > 0 && (
+                <div className="mt-6">
+                  <p className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3">Med po pašnjaku (kg)</p>
+                  <ResponsiveContainer width="100%" height={Math.max(160, stats.kgByPasture.length * 44)}>
+                    <BarChart data={stats.kgByPasture as NameValue[]} layout="vertical" margin={{ top: 0, right: 24, left: 10, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={130} />
+                      <Tooltip formatter={(v: number) => [`${v} kg`, 'Med']} />
+                      <Bar dataKey="value" name="Med" fill="#8b5cf6" radius={[0, 6, 6, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               )}
-            </div>
-          </div>
-
-          {/* Yearly yield trend */}
-          {stats.yearlyYield.some(y => y.value > 0) && (
-            <div className="mt-6">
-              <p className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3">Prinos po godinama (kg)</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={stats.yearlyYield as NameValue[]} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(v: number) => [`${v} kg`, 'Med']} />
-                  <Bar dataKey="value" name="Med" fill="#10b981" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            </>
           )}
 
-          {/* Yield per pasture (SPEC-10) — only for organizations that record moves */}
-          {stats.kgByPasture.length > 0 && (
-            <div className="mt-6">
-              <p className="text-sm font-medium text-gray-500 dark:text-slate-400 mb-3">Prinos po pašnjaku (kg)</p>
-              <ResponsiveContainer width="100%" height={Math.max(160, stats.kgByPasture.length * 44)}>
-                <BarChart data={stats.kgByPasture as NameValue[]} layout="vertical" margin={{ top: 0, right: 24, left: 10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} width={130} />
-                  <Tooltip formatter={(v: number) => [`${v} kg`, 'Prinos']} />
-                  <Bar dataKey="value" name="Prinos" fill="#8b5cf6" radius={[0, 6, 6, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
+          <ProductBreakdowns stats={stats} />
         </Section>
       )}
 

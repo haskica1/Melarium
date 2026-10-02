@@ -43,7 +43,8 @@ export function getNavItems(flags: NavRoleFlags): NavItemDef[] {
     // Pčelinjak/organizacija-vezane stavke — SystemAdmin nema svoju organizaciju, pa mu ove stranice ne služe.
     { to: '/pastures', icon: <Tent className="w-4 h-4" />, label: 'Pašnjaci', visible: flags.canSeePastures && !flags.isSystemAdmin },
     { to: '/expenses', icon: <ReceiptText className="w-4 h-4" />, label: 'Troškovi', visible: flags.canSeeExpenses && !flags.isSystemAdmin },
-    { to: '/harvests', icon: <Droplets className="w-4 h-4" />, label: 'Vrcanja', visible: !flags.isSystemAdmin },
+    // Honey and every other bee product (SPEC-30) — "Vrcanja" until the merge.
+    { to: '/harvests', icon: <Droplets className="w-4 h-4" />, label: 'Prinosi', visible: !flags.isSystemAdmin },
     { to: '/feedings', icon: <Leaf className="w-4 h-4" />, label: 'Prehrana', visible: !flags.isSystemAdmin },
     { to: '/treatments', icon: <Pill className="w-4 h-4" />, label: 'Tretmani', visible: !flags.isSystemAdmin },
     { to: '/assistant', icon: <Sparkles className="w-4 h-4" />, label: 'AI Asistent', visible: !flags.isSystemAdmin },

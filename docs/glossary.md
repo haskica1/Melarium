@@ -17,9 +17,17 @@ Domain terms used in Melarium. Use these names exactly — in code, docs, and UI
 | Organization | `Organization` | The top-level tenant. Each organization has its own users and apiaries. |
 | User | `User` | A person with access to one Organization. Has role Admin or SystemAdmin. |
 | Queen | `Queen` | The queen bee of a colony. Called *matica* in Bosnian. A Beehive has at most one Active queen; older records form the replacement history. |
-| Harvest | `Harvest` | A honey extraction event (*vrcanje*), apiary-scoped, dated, with one line per hive. |
-| Harvest Entry | `HarvestEntry` | The per-hive line of a Harvest: kg extracted (and optional frames) from one Beehive. |
-| Yield | `TotalKg` / *prinos* | Honey extracted, in kg — per harvest, per hive/season, or aggregated on the Stats page. |
+| Harvest | `Harvest` | One dated collection of one bee product (*prinos*): honey (*vrcanje*) or, since SPEC-30, any other `HiveProductType`. Recorded at exactly one level — per hive (entries), one figure for an apiary, or one figure for the whole organization (no apiary, *zajednički*). |
+| Harvest Entry | `HarvestEntry` | The per-hive line of a Harvest: kg of the product (and, for honey, optional frames) from one Beehive. |
+| Harvest Kind | `HarvestKind` | Which side of the honey line an aggregate reads: `Honey`, `OtherProducts`, or `All` (lists only, never sums). A required argument, so no total of honey can pick up wax. |
+| Med u saću | `HiveProductType.CombHoney` | Comb honey, sold in the comb. Its own product — never counted as honey. |
+| Vosak | `HiveProductType.Wax` | Beeswax, rendered from cappings (*poklopci*) or old combs (*saće*); often exchanged for foundation (*satne osnove*) rather than sold. |
+| Propolis | `HiveProductType.Propolis` | Bee glue, scraped or collected from propolis nets; entered in grams, priced per kg. |
+| Polen | `HiveProductType.Pollen` | Pollen from pollen traps (*hvatači polena*). |
+| Matična mliječ | `HiveProductType.RoyalJelly` | Royal jelly; entered in grams and priced per gram. |
+| Perga | `HiveProductType.BeeBread` | Bee bread — pollen packed and fermented in the comb. |
+| Apitoksin | `HiveProductType.BeeVenom` | Bee venom, collected on glass plates; weighed to the milligram, priced per gram. |
+| Yield | `TotalKg` / *prinos* | The kg of one harvest (`BulkKg` or the sum of its entries). As a figure on the Stats page, report or hive card, *prinos meda* is honey only — other products are reported per product, never added to it. |
 | Honey Type | `HoneyType` | Botanical honey variety of a harvest. English enum (`Acacia`…), Bosnian labels via `BsLabels` (Bagrem, Lipa, Kesten, Suncokret, Livadski, Šumski, Uljana repica, Ostalo). |
 | Assistant Session | `AiAssistantSession` | A personal AI Asistent conversation thread (SPEC-17/18), optionally bound to a hive. Owned by one user; never org-shared. Replaced the retired *AI Savjetnik*'s `AdvisorConversation`. |
 | Assistant Turn | `AiAssistantTurn` | One turn in a Session (`Role` = User or Assistant) — a typed/spoken command, a question, or the assistant's reply/answer. May carry proposed Actions (empty for a Q&A turn). |

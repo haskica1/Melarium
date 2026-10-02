@@ -363,12 +363,22 @@ public class DashboardService : IDashboardService
     private async Task<(List<MonthYieldDto> ByMonth, decimal ThisYear, decimal LastYearToDate)> YieldAsync(
         List<int> apiaryIds, HashSet<int> hiveSet, bool isBeekeeper, DateOnly today)
     {
-        var harvests = await _uow.Harvests.GetByApiariesAsync(apiaryIds);
+        // Honey only (SPEC-30): the card is "prinos meda". The organization's own records (no apiary)
+        // belong to whoever sees the whole organization — its owner.
+        var harvests = (await _uow.Harvests.GetByApiariesAsync(apiaryIds, HarvestKind.Honey)).ToList();
+        if (_currentUser.Role == UserRole.OrganizationAdmin && _currentUser.OrganizationId is int orgId)
+            harvests.AddRange(await _uow.Harvests.GetSharedAsync(orgId, HarvestKind.Honey));
         var locked = await _planLock.GetForCurrentUserAsync();
 
         // A Beekeeper counts their own hives only. Managers count the whole apiary — including hives
         // since merged away, whose honey was still harvested — minus anything the plan has locked.
         bool Counts(HarvestEntry e) => isBeekeeper ? hiveSet.Contains(e.BeehiveId) : !locked.BeehiveIds.Contains(e.BeehiveId);
+
+        // A record kept as one figure counts whole for a manager; it has no hive, so it is never a
+        // beekeeper's — their chart is their own hives.
+        decimal KgOf(Harvest h) => h.BulkKg is decimal bulk
+            ? (isBeekeeper ? 0m : bulk)
+            : h.Entries.Where(Counts).Sum(e => e.QuantityKg);
 
         var thisYear = new decimal[13];
         var lastYear = new decimal[13];
@@ -378,7 +388,7 @@ public class DashboardService : IDashboardService
         foreach (var h in harvests)
         {
             var day = _seasons.LocalDate(h.Date);
-            var kg = h.Entries.Where(Counts).Sum(e => e.QuantityKg);
+            var kg = KgOf(h);
             if (kg == 0) continue;
 
             if (day.Year == today.Year) thisYear[day.Month] += kg;

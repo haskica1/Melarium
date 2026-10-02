@@ -3,6 +3,8 @@ import type {
   Harvest,
   HarvestDetail,
   HiveYield,
+  HiveHarvestSummary,
+  HiveProductType,
   CreateHarvestPayload,
   UpdateHarvestPayload,
 } from '../models'
@@ -11,6 +13,9 @@ export interface HarvestFilters {
   apiaryId?: number
   beehiveId?: number
   year?: number
+  /** Without this (or `productType`) the API returns honey only — what clients before SPEC-30 expect. */
+  allProducts?: boolean
+  productType?: HiveProductType
 }
 
 export const harvestService = {
@@ -40,6 +45,11 @@ export const harvestService = {
 
   async getHiveYield(beehiveId: number): Promise<HiveYield> {
     const { data } = await apiClient.get<HiveYield>(`/harvests/hive/${beehiveId}/yield`)
+    return data
+  },
+
+  async getHiveSummary(beehiveId: number): Promise<HiveHarvestSummary> {
+    const { data } = await apiClient.get<HiveHarvestSummary>(`/harvests/hive/${beehiveId}/summary`)
     return data
   },
 }

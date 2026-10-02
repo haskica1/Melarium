@@ -10,8 +10,10 @@ public class HarvestEntryConfiguration : IEntityTypeConfiguration<HarvestEntry>
     {
         builder.HasKey(e => e.Id);
 
+        // Widened from numeric(6,2) in SPEC-30 (approved exception, see ignore.md): grams of royal
+        // jelly and milligrams of venom do not fit in two decimals of a kilogram.
         builder.Property(e => e.QuantityKg)
-            .HasColumnType("numeric(6,2)");
+            .HasColumnType("numeric(12,6)");
 
         // A harvest is deleted with its entries (cascade from Harvest). The hive FK also cascades:
         // deleting a beehive removes its harvest lines — documented v1 trade-off (totals recompute).

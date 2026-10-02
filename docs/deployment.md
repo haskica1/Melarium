@@ -389,6 +389,94 @@ reminders do not count toward the new per-apiary dedup, so every overdue apiary 
 fails on a detached HEAD, so checking out an older commit on the server does not work. The migration
 stays: an older API never reads the two columns (both have database defaults) or the new table.
 
+### Prinosi — honey and every bee product in one table (SPEC-30) — rehearse the migration first
+
+No new environment variable, secret or npm dependency. The deploy carries one migration,
+`20261001213201_AddProductsToHarvests`, and it is the first one in this list that is **not
+additive**: it makes `Harvests.ApiaryId` and `Harvests.HoneyType` nullable, widens
+`HarvestEntries.QuantityKg` to `numeric(12,6)`, adds `BulkKg` and `ProductType` (default 1 = honey), and
+adds `Harvests.OrganizationId`, **filled from each harvest's apiary by one SQL `UPDATE`** before it is
+made `NOT NULL`. No existing value is lost or rounded — but a failed backfill would stop the API from
+starting, so run it once on a copy of the production database first.
+
+**Rollback is a restore, not a revert.** An API older than this deploy cannot insert a harvest into the
+new table (`OrganizationId` is `NOT NULL` and it does not know the column) and fails to read any record
+of a product other than honey or of the whole organization. If something is wrong, restore the dump
+taken right before the deploy *and* revert the commit — anything entered in between is lost, so check
+right after the deploy, not the next day.
+
+#### Rehearse (on your machine, then on the server)
+
+Generate the migration script from the committed code — it applies only what a database is missing,
+exactly like `MigrateAsync()` on start:
+
+```bash
+cd backend/Melarium.Entity
+dotnet ef migrations script --idempotent -o ../../../melarium-migracije.sql
+scp ../../../melarium-migracije.sql <user>@<server>:~/
+```
+
+On the server — fresh dump, a scratch copy, the script against the copy, then the checks.
+`/opt/backups` belongs to root and a `>` redirect runs as your own user (`Permission denied`), so the
+dump goes through `sudo tee`; the script lives in your home directory:
+
+```bash
+cd /opt/melarium
+docker compose exec -T postgres pg_dump -U melarium MelariumDB | gzip | sudo tee /opt/backups/pre-spec30-$(date +%F).sql.gz > /dev/null
+zcat /opt/backups/pre-spec30-$(date +%F).sql.gz | tail -n 3      # must end with "PostgreSQL database dump complete"
+docker compose exec -T postgres createdb -U melarium melarium_proba
+gunzip -c /opt/backups/pre-spec30-$(date +%F).sql.gz | docker compose exec -T postgres psql -q -U melarium -d melarium_proba
+sed -i '1s/^\xEF\xBB\xBF//' ~/melarium-migracije.sql      # dotnet ef writes a BOM; psql chokes on it
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U melarium -d melarium_proba < ~/melarium-migracije.sql
+```
+
+```sql
+-- run with: docker compose exec -T postgres psql -U melarium -d melarium_proba
+SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId" DESC LIMIT 3;
+-- expected first row: 20261001213201_AddProductsToHarvests
+
+SELECT COUNT(*) AS all_rows,
+       COUNT(*) FILTER (WHERE "OrganizationId" IS NULL) AS no_org,
+       COUNT(*) FILTER (WHERE "ProductType" <> 1)       AS not_honey
+FROM "Harvests";
+-- expected: all_rows = what production has, no_org = 0, not_honey = 0
+
+SELECT COUNT(*) AS wrong_org
+FROM "Harvests" h JOIN "Apiaries" a ON a."Id" = h."ApiaryId"
+WHERE h."OrganizationId" <> a."OrganizationId";
+-- expected: 0
+```
+
+```bash
+docker compose exec -T postgres dropdb -U melarium melarium_proba
+```
+
+#### Deploy
+
+Not between **06:45 and 08:15** local time (the SPEC-29 morning jobs). The dump from the rehearsal is
+the pre-deploy backup — take a new one if production has been written to since.
+
+```bash
+cd /opt/melarium
+./deploy/deploy.sh
+```
+
+#### Verify
+
+```bash
+docker compose exec -T postgres psql -U melarium -d MelariumDB -c 'SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId" DESC LIMIT 1;'
+docker compose exec -T postgres psql -U melarium -d MelariumDB -c 'SELECT COUNT(*) FILTER (WHERE "OrganizationId" IS NULL) AS no_org FROM "Harvests";'
+docker compose logs --tail=80 api | grep -iE "fail|exception|error" || echo "no errors"
+curl -s https://melarium.app/health
+```
+
+In the browser, as an OrganizationAdmin: the menu says **Prinosi**; existing extractions are there as
+**Med** with their honey type; a new honey record saves at all three levels; on a paid plan a wax record
+saves, on Free it is refused with the Bosnian message; **Izvještaji** shows one "Prinosi" section and
+both exports open (č/ć/đ/š/ž in the PDF, four sheets in Excel); **Statistike** shows "Prinosi — sezona".
+Installed PWAs keep working on their old build until they update — the API still answers an older
+client with honey only.
+
 ### One-time: uploads volume ownership (non-root container)
 
 The API container now runs as the unprivileged user `1654` instead of root. A **newly created**

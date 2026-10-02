@@ -193,8 +193,9 @@ export default function App() {
                 <Route path="expenses/:id/edit"  element={<ExpenseFormPage />} />
               </Route>
 
-              {/* Harvests — list for all authenticated users (Beekeeper read-only);
-                  create/edit restricted to hive managers */}
+              {/* Prinosi (harvests: honey and, since SPEC-30, the other products) — list for all
+                  authenticated users (Beekeeper read-only); create/edit restricted to hive managers.
+                  The plan gate (Standard+ for products other than honey) is shown on the pages. */}
               <Route path="harvests" element={<HarvestsPage />} />
               <Route element={<RoleRoute allowedRoles={HIVE_MANAGERS} />}>
                 <Route path="harvests/new"      element={<HarvestFormPage />} />

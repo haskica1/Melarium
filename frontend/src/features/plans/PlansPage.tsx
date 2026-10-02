@@ -19,6 +19,7 @@ const FEATURES: FeatureRow[] = [
   { label: 'Kalendar, prognoza, statistika', values: { [PlanType.Free]: true, [PlanType.Standard]: true, [PlanType.Pro]: true, [PlanType.Max]: true, [PlanType.Partner]: true } },
   { label: 'Alarmi i edukacija',      values: { [PlanType.Free]: true, [PlanType.Standard]: true, [PlanType.Pro]: true, [PlanType.Max]: true, [PlanType.Partner]: true } },
   { label: 'Pašnjaci i selidbe',      values: { [PlanType.Free]: false, [PlanType.Standard]: true, [PlanType.Pro]: true, [PlanType.Max]: true, [PlanType.Partner]: true } },
+  { label: 'Vosak, propolis i ostali pčelinji proizvodi', values: { [PlanType.Free]: false, [PlanType.Standard]: true, [PlanType.Pro]: true, [PlanType.Max]: true, [PlanType.Partner]: true } },
   { label: 'Glasovni unos pregleda',  values: { [PlanType.Free]: false, [PlanType.Standard]: true, [PlanType.Pro]: true, [PlanType.Max]: true, [PlanType.Partner]: true } },
   { label: 'Sedmični AI sažetak',     values: { [PlanType.Free]: false, [PlanType.Standard]: true, [PlanType.Pro]: true, [PlanType.Max]: true, [PlanType.Partner]: true } },
   { label: 'AI savjetnik',            values: { [PlanType.Free]: false, [PlanType.Standard]: '10 poruka/mj', [PlanType.Pro]: 'neograničeno', [PlanType.Max]: 'neograničeno', [PlanType.Partner]: 'neograničeno' } },

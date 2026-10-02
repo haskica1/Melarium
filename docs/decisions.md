@@ -1390,3 +1390,85 @@ mini-markup inside the message text ("## " headings, "> " callouts) parsed by th
 the same text shows in the bell, and the structure would be guessed from punctuation); Razor or
 MJML templates (rejected — a build step and a second language for what is a dozen blocks).
 
+
+---
+
+## ADR-049: Every Bee Product Is a Harvest — One Record at One Level, Honey Kept Apart by the Compiler, Kept in kg, and Gated on Writing Only (SPEC-30)
+
+**Context:** Harvests recorded honey only (SPEC-02 left wax, propolis and pollen out on purpose), so
+propolis off the nets, pollen from the traps, royal jelly, bee bread, venom and rendered wax had
+nowhere to go — and were missing from the stats and from the SPEC-25 report a beekeeper files for a
+subsidy. Three things differ from honey: some products are never attributed to a hive (wax is
+rendered from many combs at once, often from every apiary together), their weights span six orders of
+magnitude (kilograms of wax, grams of royal jelly, milligrams of venom), and Asim wanted them on paid
+plans only. SPEC-30 first shipped them as a separate module with the Harvest shape (2026-09-30). The
+next day Asim pointed out that an extraction *is* the collection of a bee product, and that honey
+needs the same levels — per hive, per apiary, for the whole organization. The module was folded into
+`Harvests` before anything was committed.
+
+**Decision:** One `Harvest` per collection of one product (`ProductType`), honey included, plus five
+rules.
+
+**One level per record.** Per hive (`HarvestEntry` lines), one figure for the apiary (`BulkKg`), or one
+figure for the whole organization — never a mix, enforced by both validators. Totals and revenue are
+derived (`Domain/Common/HarvestTotals`), never stored, like karenca and the effective plan.
+
+**No apiary means the whole organization, and the row carries its own `OrganizationId`.**
+`ApiaryId = NULL` is the organization's own record — the meaning `Expense.ApiaryId = NULL` has had since
+SPEC-25, never "unknown". Such a record cannot reach its organization through an apiary, so the tenant
+key sits on the row (backfilled for existing honey by the migration). Only the OrganizationAdmin writes
+one; ApiaryAdmins read them (the report's "a shared expense always counts" rule); a Beekeeper, whose
+scope is hives, never sees one. Deleting an apiary **cascades** its records rather than setting them to
+NULL — that would silently turn them into organization records.
+
+**Honey is kept apart by the compiler.** Every aggregate method of `IHarvestRepository` takes a required
+`HarvestKind` (`Honey`, `OtherProducts`, or `All` — for lists, never sums). Before the merge, eight
+places summed "all harvests" as honey; after it the same line would have added wax to the honey yield
+without a warning. A required argument made each consumer state what it sums. **Comb honey is its own
+product and never honey** (Asim's choice): it sells differently and would distort the yield per hive.
+
+**Stored in kg, shown in the product's unit, never summed across types.** Every quantity is kg
+(`numeric(12,6)`, so one milligram) and every price KM/kg; that propolis, royal jelly and venom are
+typed and read in grams, and royal jelly and venom priced per gram, lives in one frontend module
+(`hiveProductUnits.ts`) used by the screens and both exports. No list, card, stats block or report
+prints a total kg across types — 200 g of royal jelly beside 20 kg of wax makes no total, and on a
+shared chart axis the jelly vanishes. Revenue (KM) is the only figure that compares across products,
+so it is the only one that is summed.
+
+**The plan gates writing other products, never honey and never reading.** Honey has been on every
+plan since SPEC-02 and stays there. `PlanFeature.HiveProducts` (Standard, Pro, Max) is checked on POST
+and PUT of any other product — on PUT for both the stored and the new product, so Free can neither edit
+its earlier wax nor convert between honey and wax. A Free organization — including one whose trial
+ended — still sees its products on the page, the hive card, the stats and the report, and may delete
+them. Unlike SPEC-27 (the whole feature locked), because this is income data: a report for a past
+season must not silently lose part of its revenue when the plan changes.
+
+**Consequences:**
+
+- **The API stays backward compatible.** `GET /api/harvests` without the new parameters returns honey
+  only, a POST without `productType` is honey and a PUT without it keeps the product — an installed PWA
+  of an older build never meets wax and never turns it into honey.
+- **The migration changes existing columns and backfills with SQL** (`AddProductsToHarvests`) — two
+  exceptions to `ignore.md` and to "no raw SQL" that Asim approved with the plan; recorded in SPEC-30.
+- **The SPEC-25 balance includes products.** `EstimatedRevenueBam` keeps its honey-only meaning;
+  `ProductRevenueBam` is added beside it and `NetBam` = honey + products − BAM expenses. Organization
+  records are in the total and in no apiary's row, like shared expenses.
+- **A one-figure record has no hive.** It is invisible to a Beekeeper, absent from the hive card, from
+  "top hives" and from the report's per-hive table — and the report says how much honey that is
+  (`HoneyNotPerHiveKg`). On the dashboard it counts for managers, never for a Beekeeper.
+- **The lock is honoured on the Beekeeper path too.** The org-wide list filters locked apiaries by
+  hand (ADR-042's hand-filtered paths), and so does the Beekeeper list — which the harvest service did
+  not do before this rewrite and the treatment service still does not (flagged separately).
+- **`PlanFeature` 5 is left free** for Achievements (SPEC-27, still in a stash). When that stash is
+  applied, its check that a linked harvest belongs to the organization must use `Harvest.OrganizationId`
+  — it goes through the apiary, which an organization record does not have.
+
+**Alternatives considered.** A separate module for the other products (built first, then replaced:
+two pages, two forms and two hive cards for one act, and honey without the organization level or a
+one-figure entry); apiary required, no organization records (the original prompt's shape — wax is
+typically rendered from all apiaries at once); mixed records, part per hive and the rest as one figure
+(rejected by Asim — two meanings in one total); comb honey counted as honey (rejected by Asim); a
+`ProductType` filter at each call site instead of a required argument (a forgotten filter compiles);
+the whole feature locked on Free like Achievements (rejected for the report reason above); a
+display-unit column in the database (a unit is presentation, and two stored units invite exactly the
+cross-type sum this ADR rules out).

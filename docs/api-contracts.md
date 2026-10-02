@@ -319,22 +319,63 @@ renders an upsell). Gated actions: create apiary/beehive/member, voice parse, AI
 
 ---
 
-### Harvests
+### Harvests — prinosi (SPEC-02, SPEC-30)
+
+Honey and every other bee product, in one resource.
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/harvests?apiaryId=&year=` | `HarvestDto[]` (role-scoped; incl. `totalKg`, `entryCount`, `apiaryName`, `estimatedRevenue`) |
-| GET | `/harvests/{id}` | `HarvestDetailDto` (entries with hive names) |
+| GET | `/harvests?apiaryId=&beehiveId=&year=&allProducts=&productType=` | `HarvestDto[]` (role-scoped) — **honey only** unless `allProducts=true` or a `productType` is given |
+| GET | `/harvests/{id}` | `HarvestDetailDto` (entries with hive names; empty for a one-figure record) |
 | POST | `/harvests` | `201 + HarvestDetailDto` |
 | PUT | `/harvests/{id}` | `200 + HarvestDetailDto` (apiary immutable — not in body) |
-| DELETE | `/harvests/{id}` | `204` |
-| GET | `/harvests/hive/{beehiveId}/yield` | `HiveYieldDto` `{ currentSeasonKg, byYear:[{year, kg}] }` |
+| DELETE | `/harvests/{id}` | `204` — on every plan |
+| GET | `/harvests/hive/{beehiveId}/yield` | `HiveYieldDto` `{ currentSeasonKg, byYear:[{year, kg}] }` — **honey only** (kept for older clients) |
+| GET | `/harvests/hive/{beehiveId}/summary` | `HiveHarvestSummaryDto` `{ byYear:[{ year, items:[{ productType, productTypeName, kg }] }] }` — every product, from this hive's own lines only |
 
-**Create body:** `{ apiaryId, date, honeyType, pricePerKg?, notes?, entries:[{beehiveId, quantityKg, framesExtracted?}] }`
-**Access:** apiary-scoped (like apiary management); managers write, **Beekeeper read-only** for harvests
-containing an assigned hive. Foreign/duplicate hive in `entries` → `400`.
-`GET /api/stats` gains: `seasonTotalKg`, `estimatedRevenue`, `kgByApiary[]`, `kgByHoneyType[]`,
-`topHivesByYield[]`, `yearlyYield[]`.
+**HarvestDto:** `{ id, apiaryId?, apiaryName?, date, productType, productTypeName, honeyType?,
+honeyTypeName, pricePerKg?, bulkKg?, notes?, totalKg, entryCount, estimatedRevenue?, createdByName?,
+createdAt }` — `apiaryId: null` is a record of the whole organization; `honeyType` is `null` and
+`honeyTypeName` `""` for every product but honey.
+
+**Create body:** `{ apiaryId?, date, productType?, honeyType?, pricePerKg?, bulkKg?, notes?,
+entries:[{ beehiveId, quantityKg, framesExtracted? }] }`
+- **Exactly one** of `bulkKg` and `entries` (both or neither → `400`). `apiaryId: null` = a record of
+  the **whole organization**; it cannot carry `entries` (→ `400`).
+- `productType` omitted = **honey** — what a client older than SPEC-30 sends. `honeyType` is required
+  for honey (→ `400`) and ignored for every other product, as is `framesExtracted`.
+- Quantities are **always kg** (`numeric(12,6)`, 1 mg resolution; 200 kg per hive line, 100.000 kg as
+  one figure) and `pricePerKg` is **always KM/kg** (to 999.999,99) — the grams and KM/g the UI shows
+  for propolis, royal jelly and venom are converted client-side.
+
+**Update body:** the same minus `apiaryId`. `productType` omitted = **keep** the record's product;
+`honeyType` is required when the result is honey. The entry set is replaced; switching between per-hive
+and one figure is allowed, except that an organization record cannot be split per hive (→ `400`).
+
+**Derived, never stored:** `totalKg` = `bulkKg` ?? Σ `entries.quantityKg`; `estimatedRevenue` =
+`totalKg × pricePerKg`, `null` without a price (`Domain/Common/HarvestTotals`).
+
+**Access:** apiary-scoped (like apiary management) — managers write within their apiary scope. An
+organization record is written by the **OrganizationAdmin only** (ApiaryAdmin → `403`) and read by
+OrgAdmin + ApiaryAdmins. **Beekeeper read-only**, only records containing one of their assigned hives
+— never a one-figure or organization record. The org-wide list and the Beekeeper list drop records of
+apiaries locked by a downgrade (SPEC-24). Foreign/duplicate hive → `400` (reason under `errors.detail`).
+
+**Plan:** honey is on every plan. Writing (POST, PUT) any other product needs Standard, Pro or Max →
+`402 plan-limit` (`PlanFeature.HiveProducts = 6`); PUT checks both the stored and the new product.
+Reading and DELETE are never gated, so a Free organization keeps reading what it recorded before.
+
+`GET /api/stats` — honey, current year: `seasonTotalKg`, `estimatedRevenue`, `kgByApiary[]`
+(organization records as a "Zajedničko" row), `kgByHoneyType[]`, `kgByPasture[]` (organization records
+in their own "Zajedničko" bucket), `topHivesByYield[]` (per-hive lines only); plus `yearlyYield[]` (last
+3 years). One-figure and organization records count everywhere but the per-hive chart.
+Every product, honey included and first (current year, enum order — **never a total kg across
+products**): `harvestsByProduct[]` `{ productType, name, kg, estimatedRevenue, unpricedKg, recordCount }`.
+The other products broken down like honey: `hiveProductsByApiary[]` `{ apiaryId?, apiaryName, items:[{
+productType, name, kg }] }` (organization records as the last row, `apiaryId: null`, "Zajedničko"),
+`hiveProductsByPasture[]` `{ name, items[] }` (empty without moves; "Matična lokacija" and "Zajedničko"
+rows last) and `hiveProductsByBeehive[]` `{ name, items[] }` (per-hive lines only, locked hives left
+out, ordered by hive name with numbers compared by value — K2 before K10).
 
 ---
 
@@ -665,13 +706,36 @@ components — see `Domain/Common/ReportPeriod`. Treatments belong to the period
 ```
 SeasonReportDto
   header     { organizationName, from, to, generatedAt, apiaryNames[] }
-  yield      { totalKg, pricedKg, unpricedKg, harvestCount,
+  harvests   { byProduct[] { productType, name, kg, pricedKg, unpricedKg,     // SPEC-30, every product,
+                             estimatedRevenueBam, recordCount },             // honey first
+               estimatedRevenueBam }                                          // the only cross-product sum
+  yield      { totalKg, pricedKg, unpricedKg, harvestCount,                  // honey only
                byApiary[], byHoneyType[], byBeehive[], byPasture[] }   // NamedKg { name, kg }
+  products   { recordCount,                                             // SPEC-30, never honey
+               byApiary[]  { apiaryId?, apiaryName, items[] { productType, name, kg } },
+               byPasture[] { name, items[] },                           // empty without moves
+               byBeehive[] { name, items[] } }                          // per-hive lines only
   expenses   { count, byCurrency[], byApiary[], sharedByCurrency[], byDiet[] }
-  balance    { estimatedRevenueBam, totalExpenseBam, netBam, byApiary[] }
+  balance    { estimatedRevenueBam, productRevenueBam, totalExpenseBam, netBam,
+               byApiary[] { apiaryId, apiaryName, kg, estimatedRevenueBam, productRevenueBam, expenseBam, netBam } }
   treatments { count, hivesTreated, activeKarencaCount, byProduct[] }
-  notes      { unpricedKg, unassignedExpenseCount, nonBamCurrencies[] }
+  notes      { unpricedKg, unassignedExpenseCount, nonBamCurrencies[],
+               unpriced[] { productType, name, kg }, notPerHive[] { productType, name, kg },
+               sharedHarvestCount }
 ```
+
+**SPEC-30:** `yield` and `balance.estimatedRevenueBam` keep their SPEC-25 meaning (**honey only** —
+comb honey is a product, not honey); `productRevenueBam` is the other bee products and `netBam` =
+honey + products − BAM expenses. Records of the whole organization (`apiaryId: null`) are in the totals,
+in `yield.byApiary` / `products.byApiary` as a last "Zajedničko" row and in `yield.byPasture` as their
+own bucket — never in a `balance.byApiary` row, the same rule as shared expenses — and they are included
+even when the report is filtered to one apiary. `harvests.estimatedRevenueBam` equals
+`balance.estimatedRevenueBam + balance.productRevenueBam`. A quantity kept as one figure (apiary or
+organization) is in every total but in no per-hive table (`yield.byBeehive`, `products.byBeehive`);
+`notes.notPerHive` says how much, per product. `notes.unpriced` lists every product's quantity without a
+price, honey included (`notes.unpricedKg` stays as honey's figure for older clients).
+`notes.sharedHarvestCount` counts organization records of honey and products together. Pasture
+attribution is the honey rule (SPEC-10) for every product (`Application/Common/PastureBuckets`).
 
 `byCurrency` / `sharedByCurrency` are `CurrencyAmount { currency, amount }` — **grouped, never
 summed across currencies**. The balance is BAM-only: revenue is denominated in KM by construction
@@ -700,6 +764,7 @@ name on purpose: `UserRole`, and the assistant's `kind` / `kindLabel` / `status`
 BeehiveType:     Langstroth | DadantBlatt | Warré | TopBar | Other
 BeehiveMaterial: Wood | Plastic | Polystyrene
 HoneyType:       Acacia | Linden | Chestnut | Sunflower | Meadow | Forest | Rapeseed | Other  (BsLabels: Bagrem, Lipa, …)
+HiveProductType: Honey=1 | CombHoney=2 | Wax=3 | Propolis=4 | Pollen=5 | RoyalJelly=6 | BeeBread=7 | BeeVenom=8 | Other=99  (SPEC-30, Harvest.ProductType; BsLabels: Med, Med u saću, Vosak, Propolis, Polen, Matična mliječ, Perga, Apitoksin, Ostalo)
 NotificationType: … | InspectionOverdue=10 | HoneyLevelDrop=11 | FrostWarning=12 | OldQueen=13 | WeeklySummary=14
                   | FeedbackSubmitted=21 (in-app only) | FeedbackStatusUpdated=22
                   | SeasonPhaseStarted=32 (SPEC-29; 31 is reserved for SPEC-27)

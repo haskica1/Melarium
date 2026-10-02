@@ -362,7 +362,10 @@ public class AiAssistantService : IAiAssistantService
 
         var queen = await _uow.Queens.GetActiveByBeehiveIdAsync(beehiveId);
 
-        var yearly = await _uow.Harvests.GetHiveYearlyTotalsAsync(beehiveId);
+        // Honey only — the context line reads "prinos meda" (SPEC-30 keeps the other products apart).
+        var yearly = (await _uow.Harvests.GetHiveTotalsByYearAsync(beehiveId))
+            .Where(kv => kv.Key.ProductType == HiveProductType.Honey)
+            .ToDictionary(kv => kv.Key.Year, kv => kv.Value);
         decimal? seasonYield = yearly.TryGetValue(DateTime.UtcNow.Year, out var kg) ? kg : null;
 
         var latestTreatment = (await _uow.Treatments.GetLatestForBeehivesAsync([beehiveId]))

@@ -74,7 +74,7 @@ public class AiAssistantServiceTests
         _uow.Inspections.GetByBeehiveIdAsync(beehiveId).Returns(Enumerable.Empty<Inspection>());
         _uow.Diets.GetActiveForBeehivesAsync(Arg.Any<IReadOnlyCollection<int>>()).Returns(new Dictionary<int, List<DietActiveInfo>>());
         _uow.Todos.GetByBeehiveIdAsync(beehiveId).Returns(Enumerable.Empty<Todo>());
-        _uow.Harvests.GetHiveYearlyTotalsAsync(beehiveId).Returns(new Dictionary<int, decimal>());
+        _uow.Harvests.GetHiveTotalsByYearAsync(beehiveId).Returns(new Dictionary<(int Year, HiveProductType ProductType), decimal>());
         _uow.Treatments.GetLatestForBeehivesAsync(Arg.Any<IReadOnlyCollection<int>>()).Returns(new Dictionary<int, TreatmentLatestInfo>());
     }
 

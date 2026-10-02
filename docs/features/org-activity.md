@@ -30,7 +30,7 @@ one per table, and merges them in memory:
 | 6 | Hranjenje (odrađena runda) | `FeedingEntry.Diet.Apiary` |
 | 7 | Tretman | `Treatment.Apiary` |
 | 8 | Runda tretmana | `TreatmentRound.Treatment.Apiary` |
-| 9 | Vrcanje | `Harvest.Apiary` |
+| 9 | Prinos (med i ostali proizvodi) | `Harvest.OrganizationId` — the row's own key since SPEC-30, as a record of the whole organization has no apiary |
 | 10 | Trošak | `Expense.OrganizationId` |
 | 11 | Pašnjak | `Pasture.OrganizationId` |
 | 12 | Član | `User.OrganizationId` |

@@ -1,3 +1,4 @@
+using Melarium.Application.Common;
 using Melarium.Application.Common.Interfaces;
 using Melarium.Application.Common.Localization;
 using Melarium.Application.Features.Stats.DTOs;
@@ -9,6 +10,9 @@ namespace Melarium.Application.Features.Stats;
 
 public class StatsService : IStatsService
 {
+    /// <summary>The row of records kept for the whole organization rather than one apiary (SPEC-30).</summary>
+    private const string SharedLabel = "Zajedničko";
+
     private readonly IUnitOfWork _uow;
     private readonly ICurrentUser _currentUser;
     private readonly Common.Security.IPlanLock _planLock;
@@ -181,31 +185,36 @@ public class StatsService : IStatsService
 
         var currentYear = DateTime.UtcNow.Year;
 
-        var harvests = apiaryIds.Count > 0
-            ? (await _uow.Harvests.GetByApiariesAsync(apiaryIds)).ToList()
-            : [];
+        // Honey only — the other products are their own section below and never join these kg
+        // (SPEC-30). The organization's own records (no apiary) are honey of the organization too,
+        // and a record kept as one figure counts in full everywhere except the per-hive chart.
+        var harvests = (apiaryIds.Count > 0
+                ? (await _uow.Harvests.GetByApiariesAsync(apiaryIds, HarvestKind.Honey)).ToList()
+                : [])
+            .Concat(await _uow.Harvests.GetSharedAsync(organizationId, HarvestKind.Honey))
+            .ToList();
 
         var currentYearHarvests = harvests.Where(h => h.Date.Year == currentYear).ToList();
 
-        var seasonTotalKg = currentYearHarvests.Sum(h => h.Entries.Sum(e => e.QuantityKg));
+        var seasonTotalKg = currentYearHarvests.Sum(HarvestTotals.TotalKg);
 
-        var estimatedRevenue = currentYearHarvests
-            .Where(h => h.PricePerKg.HasValue)
-            .Sum(h => h.Entries.Sum(e => e.QuantityKg) * h.PricePerKg!.Value);
+        var estimatedRevenue = currentYearHarvests.Sum(h => HarvestTotals.EstimatedRevenue(h) ?? 0m);
 
         var kgByApiary = currentYearHarvests
             .GroupBy(h => h.ApiaryId)
             .Select(g => new NameDecimalDto(
-                apiaryNames.TryGetValue(g.Key, out var name) ? name : $"Pčelinjak {g.Key}",
-                g.Sum(h => h.Entries.Sum(e => e.QuantityKg))))
+                g.Key is int id
+                    ? apiaryNames.TryGetValue(id, out var name) ? name : $"Pčelinjak {id}"
+                    : SharedLabel,
+                g.Sum(HarvestTotals.TotalKg)))
             .OrderByDescending(x => x.Value)
             .ToList();
 
         var kgByHoneyType = currentYearHarvests
             .GroupBy(h => h.HoneyType)
             .Select(g => new NameDecimalDto(
-                BsLabels.Label(g.Key),
-                g.Sum(h => h.Entries.Sum(e => e.QuantityKg))))
+                g.Key is HoneyType t ? BsLabels.Label(t) : "—",
+                g.Sum(HarvestTotals.TotalKg)))
             .OrderByDescending(x => x.Value)
             .ToList();
 
@@ -223,7 +232,7 @@ public class StatsService : IStatsService
             .Select(offset => currentYear - 2 + offset)
             .Select(y => new NameDecimalDto(
                 y.ToString(),
-                harvests.Where(h => h.Date.Year == y).Sum(h => h.Entries.Sum(e => e.QuantityKg))))
+                harvests.Where(h => h.Date.Year == y).Sum(HarvestTotals.TotalKg)))
             .ToList();
 
         // ── Feeding cost (SPEC-12 Phase E) ─────────────────────────────────────
@@ -240,32 +249,80 @@ public class StatsService : IStatsService
 
         // ── Yield per pasture (SPEC-10) ────────────────────────────────────────
 
-        var moves = apiaryIds.Count > 0
-            ? (await _uow.ApiaryMoves.GetByApiariesAsync(apiaryIds)).ToList()
-            : [];
+        // Shared with the other products below, so a pasture is named and bucketed the same in both.
+        var pastures = PastureBuckets.From(apiaryIds.Count > 0
+            ? await _uow.ApiaryMoves.GetByApiariesAsync(apiaryIds)
+            : []);
 
-        List<NameDecimalDto> kgByPasture = [];
-        if (moves.Count > 0)
-        {
-            var movesByApiary = moves.GroupBy(m => m.ApiaryId).ToDictionary(g => g.Key, g => g.ToList());
-            var pastureNames = moves
-                .Select(m => m.ToPasture)
-                .Where(p => p is not null)
-                .DistinctBy(p => p!.Id)
-                .ToDictionary(p => p!.Id, p => p!.Name);
-
-            kgByPasture = currentYearHarvests
-                .GroupBy(h => PastureAttribution.ResolveToPastureId(
-                    movesByApiary.TryGetValue(h.ApiaryId, out var apiaryMoves) ? apiaryMoves : (List<ApiaryMove>)[],
-                    h.Date))
-                .Select(g => new NameDecimalDto(
-                    g.Key is int pastureId
-                        ? pastureNames.TryGetValue(pastureId, out var name) ? name : $"Pašnjak {pastureId}"
-                        : "Matična lokacija",
-                    g.Sum(h => h.Entries.Sum(e => e.QuantityKg))))
+        // A record of the whole organization stood on no one pasture — it gets a bucket of its own.
+        var kgByPasture = pastures is null
+            ? []
+            : currentYearHarvests
+                .GroupBy(pastures.Of)
+                .Select(g => new NameDecimalDto(pastures.NameOf(g.Key), g.Sum(HarvestTotals.TotalKg)))
                 .OrderByDescending(x => x.Value)
                 .ToList();
-        }
+
+        // ── Other hive products (SPEC-30) ──────────────────────────────────────
+        // Current year, like the honey figures above. Shared records (no apiary) are the
+        // organization's own: they count toward the per-type totals and get a row of their own.
+
+        var productRecords = (apiaryIds.Count > 0
+                ? (await _uow.Harvests.GetByApiariesAsync(apiaryIds, HarvestKind.OtherProducts, currentYear)).ToList()
+                : [])
+            .Concat(await _uow.Harvests.GetSharedAsync(organizationId, HarvestKind.OtherProducts, currentYear))
+            .ToList();
+
+        // Every product side by side, honey first by the enum — the tiles that open "Prinosi". Revenue
+        // is the one figure a client may add up across them.
+        var harvestsByProduct = currentYearHarvests
+            .Concat(productRecords)
+            .GroupBy(p => p.ProductType)
+            .OrderBy(g => g.Key)
+            .Select(g => new ProductTypeTotalDto(
+                g.Key,
+                BsLabels.Label(g.Key),
+                g.Sum(HarvestTotals.TotalKg),
+                g.Sum(p => HarvestTotals.EstimatedRevenue(p) ?? 0m),
+                g.Where(p => p.PricePerKg is null).Sum(HarvestTotals.TotalKg),
+                g.Count()))
+            .ToList();
+
+        var hiveProductsByApiary = productRecords
+            .GroupBy(p => p.ApiaryId)
+            .Select(g => new ApiaryProductTotalsDto(
+                g.Key,
+                g.Key is int id
+                    ? apiaryNames.TryGetValue(id, out var name) ? name : $"Pčelinjak {id}"
+                    : SharedLabel,
+                g.GroupBy(p => p.ProductType)
+                 .OrderBy(t => t.Key)
+                 .Select(t => new ProductKgDto(t.Key, BsLabels.Label(t.Key), t.Sum(HarvestTotals.TotalKg)))
+                 .ToList()))
+            .OrderBy(x => x.ApiaryId is null)
+            .ThenBy(x => x.ApiaryName)
+            .ToList();
+
+        var hiveProductsByPasture = pastures is null
+            ? []
+            : pastures.Order(productRecords.GroupBy(pastures.Of), g => g.Key)
+                .Select(g => new NamedProductTotalsDto(pastures.NameOf(g.Key), ProductItems(g)))
+                .ToList();
+
+        // Per-hive lines only — a record kept as one figure has no hive. A hive the plan locked is left
+        // out (SPEC-24); by name, since no single kg can rank a row that holds several products.
+        var hiveProductsByBeehive = productRecords
+            .SelectMany(p => p.Entries.Select(e => (e.BeehiveId, p.ProductType, e.QuantityKg)))
+            .Where(x => !locked.BeehiveIds.Contains(x.BeehiveId))
+            .GroupBy(x => x.BeehiveId)
+            .Select(g => new NamedProductTotalsDto(
+                beehiveNamesById.TryGetValue(g.Key, out var name) ? name : $"Košnica {g.Key}",
+                g.GroupBy(x => x.ProductType)
+                 .OrderBy(t => t.Key)
+                 .Select(t => new ProductKgDto(t.Key, BsLabels.Label(t.Key), t.Sum(x => x.QuantityKg)))
+                 .ToList()))
+            .OrderBy(x => x.Name, NaturalComparer.Instance)
+            .ToList();
 
         // ── Build result ───────────────────────────────────────────────────────
 
@@ -294,8 +351,20 @@ public class StatsService : IStatsService
             YearlyYield              = yearlyYield,
             KgByPasture              = kgByPasture,
             FeedingCost              = feedingCost,
+            HarvestsByProduct        = harvestsByProduct,
+            HiveProductsByApiary     = hiveProductsByApiary,
+            HiveProductsByPasture    = hiveProductsByPasture,
+            HiveProductsByBeehive    = hiveProductsByBeehive,
         };
     }
+
+    /// <summary>Kg per product, in enum order — each product on its own.</summary>
+    private static IReadOnlyList<ProductKgDto> ProductItems(IEnumerable<Harvest> harvests) =>
+        harvests
+            .GroupBy(h => h.ProductType)
+            .OrderBy(g => g.Key)
+            .Select(g => new ProductKgDto(g.Key, BsLabels.Label(g.Key), g.Sum(HarvestTotals.TotalKg)))
+            .ToList();
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 

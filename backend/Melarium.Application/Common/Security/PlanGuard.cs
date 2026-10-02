@@ -82,6 +82,7 @@ public class PlanGuard : IPlanGuard
             PlanFeature.WeeklySummary => "Sedmični AI sažetak je dio plaćenih paketa — nadogradite na Standard.",
             PlanFeature.Pastures      => "Pašnjaci i selidbe su dio plaćenih paketa — nadogradite na Standard.",
             PlanFeature.PhotoAnalysis => "AI analiza fotografija je dio Pro paketa — nadogradite paket.",
+            PlanFeature.HiveProducts  => "Evidencija pčelinjih proizvoda je dio plaćenih paketa — nadogradite na Standard. Postojeće zapise i dalje možete pregledati.",
             _                         => "Ova funkcija nije dostupna u vašem paketu.",
         });
     }

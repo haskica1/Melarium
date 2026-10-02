@@ -6,6 +6,7 @@ using Melarium.Application.Common.Security;
 using Melarium.Application.Features.Reports.DTOs;
 using Melarium.Domain.Common;
 using Melarium.Domain.Entities;
+using Melarium.Domain.Enums;
 using Microsoft.Extensions.Configuration;
 
 namespace Melarium.Application.Features.Reports;
@@ -28,6 +29,7 @@ namespace Melarium.Application.Features.Reports;
 public class ReportService : IReportService
 {
     private const string Bam = "BAM";
+    private const string SharedLabel = "Zajedničko";
 
     private readonly IUnitOfWork _uow;
     private readonly IAccessGuard _access;
@@ -74,8 +76,17 @@ public class ReportService : IReportService
         if (apiaryIds.Count == 0)
             return new SeasonReportDto { Header = header };
 
-        var harvests = (await _uow.Harvests.GetByApiariesAsync(apiaryIds))
+        // Honey and the other products share one table and are never summed together (SPEC-30).
+        // Records of the whole organization join whichever apiaries are in scope, even a single one —
+        // the same rule as a shared expense: they belong to the organization, which is in every report.
+        var harvests = (await _uow.Harvests.GetByApiariesAsync(apiaryIds, HarvestKind.Honey))
+            .Concat(await _uow.Harvests.GetSharedAsync(orgId, HarvestKind.Honey))
             .Where(h => InPeriod(query, h.Date))
+            .ToList();
+
+        var products = (await _uow.Harvests.GetByApiariesAsync(apiaryIds, HarvestKind.OtherProducts))
+            .Concat(await _uow.Harvests.GetSharedAsync(orgId, HarvestKind.OtherProducts))
+            .Where(p => InPeriod(query, p.Date))
             .ToList();
 
         var treatments = (await _uow.Treatments.GetByApiaryIdsAsync(apiaryIds))
@@ -90,14 +101,21 @@ public class ReportService : IReportService
             .Where(e => e.ApiaryId is not int aid || apiaryNames.ContainsKey(aid))
             .ToList();
 
-        var yield      = await BuildYieldAsync(harvests, apiaryNames, apiaryIds);
+        // Shared by honey and the other products, so a hive or a pasture is named the same in both.
+        var hiveNames = await BuildHiveNameMapAsync(apiaryIds);
+        var pastures  = PastureBuckets.From(await _uow.ApiaryMoves.GetByApiariesAsync(apiaryIds));
+
+        var yield      = BuildYield(harvests, apiaryNames, hiveNames, pastures);
         var expenseDto = await BuildExpensesAsync(expenses, apiaryNames, apiaryIds);
-        var balance    = BuildBalance(harvests, expenses, apiaryNames);
+        var balance    = BuildBalance(harvests, products, expenses, apiaryNames);
+        var everything = harvests.Concat(products).ToList();
 
         return new SeasonReportDto
         {
             Header     = header,
+            Harvests   = BuildOverview(everything),
             Yield      = yield,
+            Products   = BuildProducts(products, apiaryNames, hiveNames, pastures),
             Expenses   = expenseDto,
             Balance    = balance,
             Treatments = BuildTreatments(treatments, header.GeneratedAt),
@@ -111,6 +129,13 @@ public class ReportService : IReportService
                     .Distinct()
                     .OrderBy(c => c)
                     .ToList(),
+                // One sentence for every product, honey included — the reader should not have to add
+                // two notes together to learn what is missing from the revenue (SPEC-30).
+                Unpriced   = ItemsOf(everything.Where(h => !h.PricePerKg.HasValue)).Where(x => x.Kg > 0).ToList(),
+                // Recorded as one figure for an apiary or the organization: in every total, in no
+                // per-hive table, which therefore adds up to less.
+                NotPerHive = ItemsOf(everything.Where(h => h.BulkKg.HasValue)).Where(x => x.Kg > 0).ToList(),
+                SharedHarvestCount = everything.Count(h => h.ApiaryId is null),
             },
         };
     }
@@ -120,24 +145,23 @@ public class ReportService : IReportService
 
     // ── Yield ──────────────────────────────────────────────────────────────────
 
-    private async Task<ReportYieldDto> BuildYieldAsync(
+    private static ReportYieldDto BuildYield(
         List<Harvest> harvests,
         Dictionary<int, string> apiaryNames,
-        List<int> apiaryIds)
+        Dictionary<int, string> hiveNames,
+        PastureBuckets? pastures)
     {
-        var hiveNames = await BuildHiveNameMapAsync(apiaryIds);
-
-        static decimal KgOf(Harvest h) => h.Entries.Sum(e => e.QuantityKg);
+        static decimal KgOf(Harvest h) => HarvestTotals.TotalKg(h);
 
         var byApiary = harvests
             .GroupBy(h => h.ApiaryId)
-            .Select(g => new NamedKgDto(NameOf(apiaryNames, g.Key, "Pčelinjak"), g.Sum(KgOf)))
+            .Select(g => new NamedKgDto(g.Key is int id ? NameOf(apiaryNames, id, "Pčelinjak") : SharedLabel, g.Sum(KgOf)))
             .OrderByDescending(x => x.Kg)
             .ToList();
 
         var byHoneyType = harvests
             .GroupBy(h => h.HoneyType)
-            .Select(g => new NamedKgDto(BsLabels.Label(g.Key), g.Sum(KgOf)))
+            .Select(g => new NamedKgDto(g.Key is HoneyType t ? BsLabels.Label(t) : "—", g.Sum(KgOf)))
             .OrderByDescending(x => x.Kg)
             .ToList();
 
@@ -148,6 +172,16 @@ public class ReportService : IReportService
             .OrderByDescending(x => x.Kg)
             .ToList();
 
+        // A record of the whole organization stood on no one pasture — it gets its own bucket rather
+        // than being attributed to the home location of an apiary it does not belong to.
+        var byPasture = pastures is null
+            ? []
+            : harvests
+                .GroupBy(pastures.Of)
+                .Select(g => new NamedKgDto(pastures.NameOf(g.Key), g.Sum(KgOf)))
+                .OrderByDescending(x => x.Kg)
+                .ToList();
+
         return new ReportYieldDto
         {
             TotalKg      = harvests.Sum(KgOf),
@@ -157,7 +191,7 @@ public class ReportService : IReportService
             ByApiary     = byApiary,
             ByHoneyType  = byHoneyType,
             ByBeehive    = byBeehive,
-            ByPasture    = await BuildByPastureAsync(harvests, apiaryIds),
+            ByPasture    = byPasture,
         };
     }
 
@@ -178,28 +212,79 @@ public class ReportService : IReportService
         return names;
     }
 
-    private async Task<IReadOnlyList<NamedKgDto>> BuildByPastureAsync(List<Harvest> harvests, List<int> apiaryIds)
-    {
-        var moves = (await _uow.ApiaryMoves.GetByApiariesAsync(apiaryIds)).ToList();
-        if (moves.Count == 0) return [];
+    // ── Prinosi overview and the other products (SPEC-30) ──────────────────────
 
-        var movesByApiary = moves.GroupBy(m => m.ApiaryId).ToDictionary(g => g.Key, g => g.ToList());
-        var pastureNames = moves
-            .Select(m => m.ToPasture)
-            .Where(p => p is not null)
-            .DistinctBy(p => p!.Id)
-            .ToDictionary(p => p!.Id, p => p!.Name);
+    /// <summary>
+    /// One row per product, honey included — the table that opens "Prinosi". Rows follow the enum, not
+    /// the label, so honey leads and a translated client does not reshuffle them. Revenue is the only
+    /// figure summed across the rows.
+    /// </summary>
+    private static ReportHarvestsDto BuildOverview(List<Harvest> everything) =>
+        new()
+        {
+            ByProduct = everything
+                .GroupBy(h => h.ProductType)
+                .OrderBy(g => g.Key)
+                .Select(g => new ProductTypeReportDto(
+                    g.Key,
+                    BsLabels.Label(g.Key),
+                    g.Sum(HarvestTotals.TotalKg),
+                    g.Where(h => h.PricePerKg.HasValue).Sum(HarvestTotals.TotalKg),
+                    g.Where(h => !h.PricePerKg.HasValue).Sum(HarvestTotals.TotalKg),
+                    g.Sum(h => HarvestTotals.EstimatedRevenue(h) ?? 0m),
+                    g.Count()))
+                .ToList(),
+            EstimatedRevenueBam = everything.Sum(h => HarvestTotals.EstimatedRevenue(h) ?? 0m),
+        };
 
-        return harvests
-            .GroupBy(h => PastureAttribution.ResolveToPastureId(
-                movesByApiary.TryGetValue(h.ApiaryId, out var apiaryMoves) ? apiaryMoves : [],
-                h.Date))
-            .Select(g => new NamedKgDto(
-                g.Key is int pastureId ? NameOf(pastureNames, pastureId, "Pašnjak") : "Matična lokacija",
-                g.Sum(h => h.Entries.Sum(e => e.QuantityKg))))
-            .OrderByDescending(x => x.Kg)
+    /// <summary>
+    /// The honey breakdowns, for every other product: per apiary, per pasture and per hive. Every row
+    /// lists each product on its own — never a total across types.
+    /// </summary>
+    private static ReportProductsDto BuildProducts(
+        List<Harvest> products,
+        Dictionary<int, string> apiaryNames,
+        Dictionary<int, string> hiveNames,
+        PastureBuckets? pastures) =>
+        new()
+        {
+            RecordCount = products.Count,
+            ByApiary = products
+                .GroupBy(p => p.ApiaryId)
+                .Select(g => new ApiaryProductsReportDto(
+                    g.Key,
+                    g.Key is int id ? NameOf(apiaryNames, id, "Pčelinjak") : SharedLabel,
+                    ItemsOf(g)))
+                .OrderBy(x => x.ApiaryId is null)
+                .ThenBy(x => x.ApiaryName)
+                .ToList(),
+            ByPasture = pastures is null
+                ? []
+                : pastures.Order(products.GroupBy(pastures.Of), g => g.Key)
+                    .Select(g => new NamedProductsReportDto(pastures.NameOf(g.Key), ItemsOf(g)))
+                    .ToList(),
+            // Per-hive lines only; one-figure records are in the notes. By name, since no single kg
+            // can rank a row that holds several products.
+            ByBeehive = products
+                .SelectMany(p => p.Entries.Select(e => (e.BeehiveId, p.ProductType, e.QuantityKg)))
+                .GroupBy(x => x.BeehiveId)
+                .Select(g => new NamedProductsReportDto(
+                    NameOf(hiveNames, g.Key, "Košnica"),
+                    g.GroupBy(x => x.ProductType)
+                     .OrderBy(t => t.Key)
+                     .Select(t => new ProductKgReportDto(t.Key, BsLabels.Label(t.Key), t.Sum(x => x.QuantityKg)))
+                     .ToList()))
+                .OrderBy(x => x.Name, NaturalComparer.Instance)
+                .ToList(),
+        };
+
+    /// <summary>Kg per product, in enum order — each product on its own.</summary>
+    private static IReadOnlyList<ProductKgReportDto> ItemsOf(IEnumerable<Harvest> harvests) =>
+        harvests
+            .GroupBy(h => h.ProductType)
+            .OrderBy(g => g.Key)
+            .Select(g => new ProductKgReportDto(g.Key, BsLabels.Label(g.Key), g.Sum(HarvestTotals.TotalKg)))
             .ToList();
-    }
 
     // ── Expenses ───────────────────────────────────────────────────────────────
 
@@ -270,37 +355,44 @@ public class ReportService : IReportService
     /// </summary>
     private static ReportBalanceDto BuildBalance(
         List<Harvest> harvests,
+        List<Harvest> products,
         List<Expense> expenses,
         Dictionary<int, string> apiaryNames)
     {
+        // KM by construction for honey and the other products alike: PricePerKg is KM/kg.
         static decimal RevenueOf(IEnumerable<Harvest> hs) =>
-            hs.Where(h => h.PricePerKg.HasValue)
-              .Sum(h => h.Entries.Sum(e => e.QuantityKg) * h.PricePerKg!.Value);
+            hs.Sum(h => HarvestTotals.EstimatedRevenue(h) ?? 0m);
 
         var bamExpenses = expenses
             .Where(e => string.Equals(e.Currency, Bam, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        var revenue = RevenueOf(harvests);
-        var total   = bamExpenses.Sum(e => e.TotalAmount);
+        var revenue        = RevenueOf(harvests);
+        var productRevenue = RevenueOf(products);
+        var total          = bamExpenses.Sum(e => e.TotalAmount);
 
         // Only apiaries that actually show up on one side or the other — an apiary with neither a
-        // harvest nor an expense in the period is not a zero row, it is simply absent from it.
-        var byApiary = harvests.Select(h => h.ApiaryId)
+        // harvest, a product nor an expense in the period is not a zero row, it is simply absent.
+        // Records of the whole organization stay out of every row, as shared expenses do: the total
+        // carries them.
+        var byApiary = harvests.Where(h => h.ApiaryId.HasValue).Select(h => h.ApiaryId!.Value)
+            .Concat(products.Where(p => p.ApiaryId.HasValue).Select(p => p.ApiaryId!.Value))
             .Concat(bamExpenses.Where(e => e.ApiaryId.HasValue).Select(e => e.ApiaryId!.Value))
             .Distinct()
             .Select(id =>
             {
                 var hs = harvests.Where(h => h.ApiaryId == id).ToList();
-                var apiaryRevenue = RevenueOf(hs);
-                var apiaryExpense = bamExpenses.Where(e => e.ApiaryId == id).Sum(e => e.TotalAmount);
+                var apiaryRevenue        = RevenueOf(hs);
+                var apiaryProductRevenue = RevenueOf(products.Where(p => p.ApiaryId == id));
+                var apiaryExpense        = bamExpenses.Where(e => e.ApiaryId == id).Sum(e => e.TotalAmount);
                 return new ApiaryBalanceDto(
                     id,
                     NameOf(apiaryNames, id, "Pčelinjak"),
-                    hs.Sum(h => h.Entries.Sum(e => e.QuantityKg)),
+                    hs.Sum(HarvestTotals.TotalKg),
                     apiaryRevenue,
+                    apiaryProductRevenue,
                     apiaryExpense,
-                    apiaryRevenue - apiaryExpense);
+                    apiaryRevenue + apiaryProductRevenue - apiaryExpense);
             })
             .OrderByDescending(x => x.NetBam)
             .ToList();
@@ -308,8 +400,9 @@ public class ReportService : IReportService
         return new ReportBalanceDto
         {
             EstimatedRevenueBam = revenue,
+            ProductRevenueBam   = productRevenue,
             TotalExpenseBam     = total,
-            NetBam              = revenue - total,
+            NetBam              = revenue + productRevenue - total,
             ByApiary            = byApiary,
         };
     }

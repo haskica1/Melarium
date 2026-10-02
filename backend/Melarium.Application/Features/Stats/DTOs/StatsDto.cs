@@ -42,4 +42,22 @@ public record StatsDto
     /// currencies would be a silent lie, and in practice everything is BAM.
     /// </summary>
     public decimal FeedingCost { get; init; }
+
+    // ── Prinosi — every product (SPEC-30) ──────────────────────────────────────
+    /// <summary>
+    /// Current-year totals per product, honey included and first (enum order). Never summed across
+    /// products: a gram of royal jelly and a kilo of wax do not add up to anything — revenue is the
+    /// only comparable figure.
+    /// </summary>
+    public IReadOnlyList<ProductTypeTotalDto> HarvestsByProduct { get; init; } = [];
+
+    // ── The other products, broken down like honey (SPEC-30) ───────────────────
+    /// <summary>Current-year quantities per apiary and type; the organization's own records form the last row.</summary>
+    public IReadOnlyList<ApiaryProductTotalsDto> HiveProductsByApiary { get; init; } = [];
+
+    /// <summary>Per pasture the apiary stood on at the record's date (SPEC-10 rule). Empty when no moves exist.</summary>
+    public IReadOnlyList<NamedProductTotalsDto> HiveProductsByPasture { get; init; } = [];
+
+    /// <summary>Per hive, from per-hive lines only, by hive name.</summary>
+    public IReadOnlyList<NamedProductTotalsDto> HiveProductsByBeehive { get; init; } = [];
 }

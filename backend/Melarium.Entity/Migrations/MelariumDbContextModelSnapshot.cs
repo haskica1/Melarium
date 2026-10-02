@@ -985,8 +985,11 @@ namespace Melarium.Entity.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("ApiaryId")
+                    b.Property<int?>("ApiaryId")
                         .HasColumnType("integer");
+
+                    b.Property<decimal?>("BulkKg")
+                        .HasColumnType("numeric(12,6)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -997,15 +1000,23 @@ namespace Melarium.Entity.Migrations
                     b.Property<DateTime>("Date")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("HoneyType")
+                    b.Property<int?>("HoneyType")
                         .HasColumnType("integer");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int>("OrganizationId")
+                        .HasColumnType("integer");
+
                     b.Property<decimal?>("PricePerKg")
                         .HasColumnType("numeric(8,2)");
+
+                    b.Property<int>("ProductType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -1017,6 +1028,8 @@ namespace Melarium.Entity.Migrations
                     b.HasIndex("CreatedById");
 
                     b.HasIndex("Date");
+
+                    b.HasIndex("OrganizationId");
 
                     b.ToTable("Harvests", (string)null);
                 });
@@ -1042,7 +1055,7 @@ namespace Melarium.Entity.Migrations
                         .HasColumnType("integer");
 
                     b.Property<decimal>("QuantityKg")
-                        .HasColumnType("numeric(6,2)");
+                        .HasColumnType("numeric(12,6)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2402,17 +2415,24 @@ namespace Melarium.Entity.Migrations
                     b.HasOne("Melarium.Domain.Entities.Apiary", "Apiary")
                         .WithMany()
                         .HasForeignKey("ApiaryId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("Melarium.Domain.Entities.User", "CreatedBy")
                         .WithMany()
                         .HasForeignKey("CreatedById")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Melarium.Domain.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.Navigation("Apiary");
 
                     b.Navigation("CreatedBy");
+
+                    b.Navigation("Organization");
                 });
 
             modelBuilder.Entity("Melarium.Domain.Entities.HarvestEntry", b =>

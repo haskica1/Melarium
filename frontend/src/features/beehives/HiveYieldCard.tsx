@@ -1,17 +1,24 @@
 import { Link } from 'react-router-dom'
 import { ArrowRight, Droplets } from 'lucide-react'
-import { useHiveYield } from '../../core/services/harvestQueries'
+import { useHiveHarvestSummary } from '../../core/services/harvestQueries'
+import { HiveProductType, HiveProductTypeLabels } from '../../core/models'
+import { fmtProductQty } from '../../shared/utils/hiveProductUnits'
+import { ProductTotalsChips } from '../harvests/ProductChips'
 
-const fmtKg = (kg: number) => `${kg.toFixed(1).replace(/\.0$/, '')} kg`
-
-/** Compact honey-yield card for the beehive detail sidebar (SPEC-02). */
+/**
+ * Yield card for the beehive detail sidebar (SPEC-02, every product since SPEC-30). Only this hive's
+ * own lines count — a record kept as one figure for the apiary or organization cannot be pinned on a hive.
+ */
 export function HiveYieldCard({ beehiveId }: { beehiveId: number }) {
-  const { data, isLoading } = useHiveYield(beehiveId)
+  const { data, isLoading } = useHiveHarvestSummary(beehiveId)
 
   if (isLoading || !data) return null
 
   const currentYear = new Date().getFullYear()
-  const prior = data.byYear.filter(y => y.year !== currentYear && y.kg > 0)
+  const current = data.byYear.find(y => y.year === currentYear)
+  const prior = data.byYear.filter(y => y.year !== currentYear)
+  const honeyNow = current?.items.find(i => i.productType === HiveProductType.Honey)?.kg ?? 0
+  const othersNow = current?.items.filter(i => i.productType !== HiveProductType.Honey) ?? []
 
   return (
     <div className="card">
@@ -21,23 +28,31 @@ export function HiveYieldCard({ beehiveId }: { beehiveId: number }) {
       </div>
 
       <div className="flex items-baseline gap-2">
-        <span className="text-3xl font-bold text-honey-700 dark:text-honey-300">{fmtKg(data.currentSeasonKg)}</span>
-        <span className="text-sm text-gray-500 dark:text-slate-400">sezona {currentYear}.</span>
+        <span className="text-3xl font-bold text-honey-700 dark:text-honey-300">{fmtProductQty(honeyNow, HiveProductType.Honey)}</span>
+        <span className="text-sm text-gray-500 dark:text-slate-400">meda, sezona {currentYear}.</span>
       </div>
+
+      {othersNow.length > 0 && (
+        <div className="mt-3">
+          <ProductTotalsChips totals={othersNow} small />
+        </div>
+      )}
 
       {prior.length > 0 && (
         <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-800 space-y-1.5">
           {prior.map(y => (
-            <div key={y.year} className="flex items-center justify-between text-sm">
-              <span className="text-gray-500 dark:text-slate-400">{y.year}.</span>
-              <span className="font-medium text-gray-700 dark:text-slate-200">{fmtKg(y.kg)}</span>
+            <div key={y.year} className="flex items-start justify-between gap-3 text-sm">
+              <span className="text-gray-500 dark:text-slate-400 shrink-0">{y.year}.</span>
+              <span className="text-right font-medium text-gray-700 dark:text-slate-200">
+                {y.items.map(i => `${HiveProductTypeLabels[i.productType]} ${fmtProductQty(i.kg, i.productType)}`).join(' · ')}
+              </span>
             </div>
           ))}
         </div>
       )}
 
-      {data.currentSeasonKg === 0 && prior.length === 0 && (
-        <p className="mt-2 text-sm text-gray-400 dark:text-slate-500">Još nema zabilježenog vrcanja za ovu košnicu.</p>
+      {!current && prior.length === 0 && (
+        <p className="mt-2 text-sm text-gray-400 dark:text-slate-500">Još nema zabilježenog prinosa za ovu košnicu.</p>
       )}
 
       <Link

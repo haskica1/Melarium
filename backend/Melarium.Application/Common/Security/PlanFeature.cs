@@ -14,4 +14,12 @@ public enum PlanFeature
 
     /// <summary>AI frame photo analysis, SPEC-05 (Pro+).</summary>
     PhotoAnalysis = 4,
+
+    // 5 is Achievements (SPEC-27), which is still in a stash — kept free so the two never collide.
+
+    /// <summary>
+    /// Recording bee products other than honey, SPEC-30 (Standard+). Only writing is gated: a Free
+    /// organization still reads what it recorded before, so a report for a past season stays whole.
+    /// </summary>
+    HiveProducts = 6,
 }

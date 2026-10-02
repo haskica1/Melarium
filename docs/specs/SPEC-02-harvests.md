@@ -105,6 +105,7 @@ Add to the stats DTO (org-scoped, same role rules as today): `seasonTotalKg` (cu
 
 Sales/customers/inventory (jars), harvest appearing on the Calendar, CSV/PDF export,
 notification on harvest creation, wax/propolis/pollen products (honey only — enum leaves room).
+*Update 2026-10-01: every other bee product is now a harvest too, and honey can be recorded as one figure for an apiary or the whole organization — [SPEC-30](SPEC-30-hive-products.md).*
 
 ## Acceptance criteria
 

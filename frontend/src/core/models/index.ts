@@ -1072,15 +1072,68 @@ export interface ApiaryBalance {
   apiaryName: string
   kg: number
   estimatedRevenueBam: number
+  /** Other bee products of this apiary (SPEC-30); shared ones are in no row. */
+  productRevenueBam: number
   expenseBam: number
   netBam: number
 }
 
 export interface ReportBalance {
+  /** Honey only. */
   estimatedRevenueBam: number
+  /** Other bee products, shared records included (SPEC-30). */
+  productRevenueBam: number
   totalExpenseBam: number
+  /** Honey + products − BAM expenses. */
   netBam: number
   byApiary: ApiaryBalance[]
+}
+
+/** One product in the report (SPEC-30), honey included — kg, never summed with another product. */
+export interface ReportProductType {
+  productType: HiveProductType
+  name: string
+  kg: number
+  pricedKg: number
+  unpricedKg: number
+  estimatedRevenueBam: number
+  recordCount: number
+}
+
+export interface ReportProductKg {
+  productType: HiveProductType
+  name: string
+  kg: number
+}
+
+export interface ReportApiaryProducts {
+  /** null = the row of shared records, always last. */
+  apiaryId: number | null
+  apiaryName: string
+  items: ReportProductKg[]
+}
+
+/** A pasture's or a hive's products, each on its own (SPEC-30). */
+export interface ReportNamedProducts {
+  name: string
+  items: ReportProductKg[]
+}
+
+/** The "Prinosi" overview (SPEC-30): every product of the period, honey first. */
+export interface ReportHarvests {
+  byProduct: ReportProductType[]
+  /** Honey + every other product — the one figure summed across products. Equals the balance's revenue. */
+  estimatedRevenueBam: number
+}
+
+/** Products other than honey, broken down like honey (SPEC-30). */
+export interface ReportProducts {
+  recordCount: number
+  byApiary: ReportApiaryProducts[]
+  /** Empty when the organization records no moves. */
+  byPasture: ReportNamedProducts[]
+  /** Per-hive lines only. */
+  byBeehive: ReportNamedProducts[]
 }
 
 export interface TreatmentProduct {
@@ -1102,11 +1155,20 @@ export interface ReportNotes {
   unassignedExpenseCount: number
   /** Currencies other than BAM in the period; their amounts stay out of the balance. */
   nonBamCurrencies: string[]
+  /** Per product, honey included, the quantity with no price — missing from the revenue estimate (SPEC-30). */
+  unpriced: ReportProductKg[]
+  /** Per product, honey included, the quantity kept as one figure — in every total, in no per-hive table. */
+  notPerHive: ReportProductKg[]
+  /** Records of the whole organization (honey and products): in the total balance, in no apiary's row. */
+  sharedHarvestCount: number
 }
 
 export interface SeasonReport {
   header: ReportHeader
+  harvests: ReportHarvests
+  /** Honey only. */
   yield: ReportYield
+  products: ReportProducts
   expenses: ReportExpenses
   balance: ReportBalance
   treatments: ReportTreatments
@@ -1161,18 +1223,55 @@ export interface HarvestEntry {
   framesExtracted?: number
 }
 
+// ── Prinosi: honey and the other bee products (SPEC-02, merged in SPEC-30) ──────────
+// Quantities are always kg on the wire; which unit a product is shown and entered in (g for
+// propolis, royal jelly and venom) lives in shared/utils/hiveProductUnits.ts.
+
+export enum HiveProductType {
+  Honey      = 1,
+  CombHoney  = 2,
+  Wax        = 3,
+  Propolis   = 4,
+  Pollen     = 5,
+  RoyalJelly = 6,
+  BeeBread   = 7,
+  BeeVenom   = 8,
+  Other      = 99,
+}
+
+export const HiveProductTypeLabels: Record<HiveProductType, string> = {
+  [HiveProductType.Honey]:      'Med',
+  [HiveProductType.CombHoney]:  'Med u saću',
+  [HiveProductType.Wax]:        'Vosak',
+  [HiveProductType.Propolis]:   'Propolis',
+  [HiveProductType.Pollen]:     'Polen',
+  [HiveProductType.RoyalJelly]: 'Matična mliječ',
+  [HiveProductType.BeeBread]:   'Perga',
+  [HiveProductType.BeeVenom]:   'Apitoksin',
+  [HiveProductType.Other]:      'Ostalo',
+}
+
 export interface Harvest {
   id: number
-  apiaryId: number
+  /** null = a record of the whole organization (zajednički), SPEC-30. */
+  apiaryId: number | null
   apiaryName?: string
   date: string
-  honeyType: HoneyType
+  /** What was collected (SPEC-30); honey for everything recorded before. */
+  productType: HiveProductType
+  productTypeName: string
+  /** Honey only. */
+  honeyType: HoneyType | null
+  /** Empty for every product but honey. */
   honeyTypeName: string
-  pricePerKg?: number
+  /** KM per kg, even for products the UI prices per gram. */
+  pricePerKg?: number | null
+  /** The quantity when it was not split per hive (apiary or organization level). */
+  bulkKg?: number | null
   notes?: string
   totalKg: number
   entryCount: number
-  estimatedRevenue?: number
+  estimatedRevenue?: number | null
   createdByName?: string
   createdAt: string
 }
@@ -1187,28 +1286,37 @@ export interface CreateHarvestEntryPayload {
   framesExtracted?: number | null
 }
 
+/** Exactly one of `bulkKg` and `entries` carries the quantity; `apiaryId: null` = whole organization. */
 export interface CreateHarvestPayload {
-  apiaryId: number
+  apiaryId: number | null
   date: string
-  honeyType: HoneyType
+  productType: HiveProductType
+  /** Required for honey, omitted for everything else. */
+  honeyType?: HoneyType | null
   pricePerKg?: number | null
+  bulkKg?: number | null
   notes?: string
   entries: CreateHarvestEntryPayload[]
 }
 
 /** Update shares the create shape except the apiary, which is immutable after creation. */
-export interface UpdateHarvestPayload {
-  date: string
-  honeyType: HoneyType
-  pricePerKg?: number | null
-  notes?: string
-  entries: CreateHarvestEntryPayload[]
-}
+export type UpdateHarvestPayload = Omit<CreateHarvestPayload, 'apiaryId'>
 
 /** Per-hive honey yield (from /harvests/hive/{id}/yield). */
 export interface HiveYield {
   currentSeasonKg: number
   byYear: { year: number; kg: number }[]
+}
+
+export interface HarvestKg {
+  productType: HiveProductType
+  productTypeName: string
+  kg: number
+}
+
+/** A hive's yield of every product per year, newest first, from its per-hive lines only. */
+export interface HiveHarvestSummary {
+  byYear: { year: number; items: HarvestKg[] }[]
 }
 
 // ── Treatments (SPEC-08) ──────────────────────────────────────────────────────────

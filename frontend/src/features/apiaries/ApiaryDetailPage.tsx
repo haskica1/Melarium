@@ -505,7 +505,7 @@ export default function ApiaryDetailPage() {
             isMutating={createTodo.isPending || updateTodo.isPending || deleteTodo.isPending}
           />
 
-          {/* Harvests (vrcanja) */}
+          {/* Prinosi — honey and the other products (SPEC-30) */}
           <ApiaryHarvestsSection apiaryId={apiaryId} />
 
           {/* Feeding programmes (prehrana) */}

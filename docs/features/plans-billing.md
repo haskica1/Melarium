@@ -48,6 +48,9 @@ already exists once a plan shrinks (see below). The org-less SystemAdmin bypasse
 | `GetMyPlanAsync` | `/organizations/my-plan` | — |
 
 `PlanFeature`: `VoiceInput`/`WeeklySummary`/`Pastures` need Standard+; `PhotoAnalysis` needs Pro+.
+`HiveProducts = 6` (SPEC-30) needs Standard+ **to write a harvest of any product other than honey** —
+honey stays on every plan, and reading and deleting work on every plan, so a Free organization keeps
+its history (ADR-049). Value 5 is reserved for `Achievements` (SPEC-27, in a stash).
 Violations throw `PlanLimitException` → **402** with `code: "plan-limit"` + Bosnian message
 (`GlobalExceptionMiddleware`). `WeeklySummaryService` skips orgs whose effective plan < Standard
 (no Groq call).

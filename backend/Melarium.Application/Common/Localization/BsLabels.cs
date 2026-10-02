@@ -182,6 +182,20 @@ public static class BsLabels
         _                   => t.ToString(),
     };
 
+    public static string Label(HiveProductType t) => t switch
+    {
+        HiveProductType.Honey      => "Med",
+        HiveProductType.CombHoney  => "Med u saću",
+        HiveProductType.Wax        => "Vosak",
+        HiveProductType.Propolis   => "Propolis",
+        HiveProductType.Pollen     => "Polen",
+        HiveProductType.RoyalJelly => "Matična mliječ",
+        HiveProductType.BeeBread   => "Perga",
+        HiveProductType.BeeVenom   => "Apitoksin",
+        HiveProductType.Other      => "Ostalo",
+        _                          => t.ToString(),
+    };
+
     public static string Label(TreatmentPurpose p) => p switch
     {
         TreatmentPurpose.Varroa     => "Varoa",

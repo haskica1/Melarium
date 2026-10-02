@@ -23,7 +23,11 @@ export const DEFAULT_SECTIONS: ReportSections = {
   treatments: true,
 }
 
-/** Section labels, in document order. The yield sub-tables are nested under `yield`. */
+/**
+ * Section labels, in document order. "Prinosi" (`yield`, the key it has had since SPEC-25, so a stored
+ * choice survives) holds every product since SPEC-30; its sub-tables apply to honey and to the other
+ * products alike, except the honey type.
+ */
 export const SECTION_GROUPS: Array<{
   key: keyof ReportSections
   label: string
@@ -31,7 +35,7 @@ export const SECTION_GROUPS: Array<{
 }> = [
   {
     key: 'yield',
-    label: 'Prinos',
+    label: 'Prinosi',
     children: [
       { key: 'yieldByApiary', label: 'Po pčelinjaku' },
       { key: 'yieldByHoneyType', label: 'Po vrsti meda' },
@@ -87,7 +91,7 @@ export function useReportPreferences() {
     setSectionsState(prev => {
       const next = { ...prev, [key]: !prev[key] }
       // Unticking a parent takes its sub-tables with it, and ticking it back brings them back —
-      // otherwise "Prinos" could be on with every table under it off, printing an empty heading.
+      // otherwise "Prinosi" could be on with every table under it off.
       if (key === 'yield')
         for (const child of SECTION_GROUPS[0].children!) next[child.key] = next.yield
       try { localStorage.setItem(SECTIONS_KEY, JSON.stringify(next)) } catch { /* ignore */ }

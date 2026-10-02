@@ -41,7 +41,8 @@ public class DashboardServiceTests
         _uow.Inspections.GetLevelsSinceAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<DateTime>()).Returns(new List<InspectionLevelInfo>());
         _uow.Treatments.GetByApiaryIdsAsync(Arg.Any<IEnumerable<int>>()).Returns(Enumerable.Empty<Treatment>());
         _uow.Diets.GetByApiaryIdsAsync(Arg.Any<IEnumerable<int>>()).Returns(Enumerable.Empty<Diet>());
-        _uow.Harvests.GetByApiariesAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<int?>()).Returns(Enumerable.Empty<Harvest>());
+        _uow.Harvests.GetByApiariesAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<HarvestKind>(), Arg.Any<int?>()).Returns(Enumerable.Empty<Harvest>());
+        _uow.Harvests.GetSharedAsync(Arg.Any<int?>(), Arg.Any<HarvestKind>(), Arg.Any<int?>()).Returns(Enumerable.Empty<Harvest>());
         _uow.LearningTopics.GetPublishedAsync(Arg.Any<LearningCategory?>(), Arg.Any<int?>()).Returns(Enumerable.Empty<LearningTopic>());
         _obligations.GatherAsync(Arg.Any<CalendarUserContext>(), Arg.Any<DateOnly>(), Arg.Any<DateOnly>(), Arg.Any<CalendarCategories>())
             .Returns(new List<CalendarObligation>());
@@ -106,7 +107,7 @@ public class DashboardServiceTests
     {
         GivenHives(Hive(11, "K1", 100));
         var beekeeper = new TestCurrentUser { UserId = 3, Role = UserRole.Beekeeper, OrganizationId = 1 };
-        _uow.Harvests.GetByApiariesAsync(Arg.Any<IReadOnlyCollection<int>>(), Arg.Any<int?>()).Returns(new[]
+        _uow.Harvests.GetByApiariesAsync(Arg.Any<IReadOnlyCollection<int>>(), HarvestKind.Honey, Arg.Any<int?>()).Returns(new[]
         {
             new Harvest
             {
@@ -119,6 +120,30 @@ public class DashboardServiceTests
 
         Assert.Equal(12m, dashboard.Counts.YieldThisYearKg);
         Assert.Equal(12m, Assert.Single(dashboard.YieldByMonth).ThisYearKg);
+    }
+
+    [Fact]
+    public async Task Yield_HoneyKeptAsOneFigure_CountsForTheOwner_NeverForABeekeeper()
+    {
+        // SPEC-30: honey recorded for the apiary (no hive split) and for the whole organization. The
+        // owner sees both in full; a beekeeper's chart is their own hives, so neither shows for them.
+        GivenHives(Hive(11, "K1", 100));
+        var may = new DateTime(2026, 5, 10, 9, 0, 0, DateTimeKind.Utc);
+        _uow.Harvests.GetByApiariesAsync(Arg.Any<IReadOnlyCollection<int>>(), HarvestKind.Honey, Arg.Any<int?>()).Returns(new[]
+        {
+            new Harvest { ApiaryId = 1, Date = may, BulkKg = 40m },
+            new Harvest { ApiaryId = 1, Date = may, Entries = [new HarvestEntry { BeehiveId = 11, QuantityKg = 12 }] },
+        });
+        _uow.Harvests.GetSharedAsync(1, HarvestKind.Honey, Arg.Any<int?>()).Returns(new[]
+        {
+            new Harvest { ApiaryId = null, OrganizationId = 1, Date = may, BulkKg = 8m },
+        });
+
+        var owner = await Service().GetAsync();
+        var beekeeper = await Service(new TestCurrentUser { UserId = 3, Role = UserRole.Beekeeper, OrganizationId = 1 }).GetAsync();
+
+        Assert.Equal(60m, owner.Counts.YieldThisYearKg);
+        Assert.Equal(12m, beekeeper.Counts.YieldThisYearKg);
     }
 
     [Fact]

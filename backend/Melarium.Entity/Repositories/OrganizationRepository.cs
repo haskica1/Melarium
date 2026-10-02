@@ -112,10 +112,12 @@ public class OrganizationRepository : Repository<Organization>, IOrganizationRep
             .Select(g => new { OrganizationId = g.Key, At = g.Max(r => r.UpdatedAt ?? r.CreatedAt) })
             .ToDictionaryAsync(x => x.OrganizationId, x => x.At));
 
-        // Vrcanje — entries are written inside the harvest's own create/update.
+        // Prinos (vrcanje meda i ostali proizvodi, SPEC-30) — by the row's own organization, since a
+        // record for the whole organization has no apiary to join through. Entries are written inside
+        // the harvest's own create/update.
         Merge(latest, await _context.Harvests.AsNoTracking()
-            .Where(h => organizationId == null || h.Apiary.OrganizationId == organizationId)
-            .GroupBy(h => h.Apiary.OrganizationId)
+            .Where(h => organizationId == null || h.OrganizationId == organizationId)
+            .GroupBy(h => h.OrganizationId)
             .Select(g => new { OrganizationId = g.Key, At = g.Max(h => h.UpdatedAt ?? h.CreatedAt) })
             .ToDictionaryAsync(x => x.OrganizationId, x => x.At));
 

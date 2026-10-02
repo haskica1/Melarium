@@ -1,5 +1,6 @@
 using Melarium.Application.Features.Harvests;
 using Melarium.Application.Features.Harvests.DTOs;
+using Melarium.Domain.Enums;
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -7,9 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace Melarium.API.Controllers;
 
 /// <summary>
-/// Records honey harvests (vrcanja) per apiary, broken down by hive. Access is apiary-scoped and
-/// enforced in the service layer: managers write within their scope; a Beekeeper has read-only
-/// access to harvests that contain at least one of their assigned hives.
+/// Records harvests (prinosi) — honey extractions and, since SPEC-30, every other bee product — per hive,
+/// per apiary or for the whole organization. Access is apiary-scoped and enforced in the service layer:
+/// managers write within their scope; a Beekeeper has read-only access to harvests that contain at
+/// least one of their assigned hives. Writing a product other than honey needs Standard or above.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
@@ -31,13 +33,31 @@ public class HarvestsController : ControllerBase
         _updateValidator = updateValidator;
     }
 
-    /// <summary>Returns role-scoped harvests, optionally filtered by apiary, hive, and/or year.</summary>
+    /// <summary>
+    /// Returns role-scoped harvests, optionally filtered by apiary, hive, and/or year. Honey only unless
+    /// <paramref name="allProducts"/> or <paramref name="productType"/> says otherwise (SPEC-30) — a
+    /// client older than that keeps getting exactly what it can draw.
+    /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<HarvestDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAll([FromQuery] int? apiaryId, [FromQuery] int? beehiveId, [FromQuery] int? year)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int? apiaryId, [FromQuery] int? beehiveId, [FromQuery] int? year,
+        [FromQuery] bool allProducts = false, [FromQuery] HiveProductType? productType = null)
     {
-        var harvests = await _service.GetAllAsync(apiaryId, beehiveId, year);
+        var harvests = await _service.GetAllAsync(
+            apiaryId, beehiveId, year, allProducts ? HarvestKind.All : HarvestKind.Honey, productType);
         return Ok(harvests);
+    }
+
+    /// <summary>A hive's yield of every product per year, from its per-hive lines (SPEC-30).</summary>
+    [HttpGet("hive/{beehiveId:int}/summary")]
+    [ProducesResponseType(typeof(HiveHarvestSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetHiveSummary(int beehiveId)
+    {
+        var summary = await _service.GetHiveSummaryAsync(beehiveId);
+        return Ok(summary);
     }
 
     /// <summary>Season + per-year honey yield for a single hive (visible to anyone who can view the hive).</summary>

@@ -201,10 +201,15 @@ public class WeeklySummaryService : IWeeklySummaryService
         var todosCompleted = todos.Count(t => t.IsCompleted && t.CompletedAt >= periodStart);
         var todosOverdue = todos.Count(t => !t.IsCompleted && t.DueDate.HasValue && t.DueDate.Value < now);
 
-        var harvests = apiaryIds.Count > 0
-            ? (await _uow.Harvests.GetByApiariesAsync(apiaryIds)).Where(h => h.Date >= periodStart).ToList()
-            : [];
-        var harvestKg = harvests.Sum(h => h.Entries.Sum(e => e.QuantityKg));
+        // Honey only (SPEC-30): the digest says "kg meda", and wax or pollen are not that. The
+        // organization's own records count, and a record kept as one figure counts in full.
+        var harvests = (apiaryIds.Count > 0
+                ? (await _uow.Harvests.GetByApiariesAsync(apiaryIds, HarvestKind.Honey)).ToList()
+                : [])
+            .Concat(await _uow.Harvests.GetSharedAsync(org.Id, HarvestKind.Honey))
+            .Where(h => h.Date >= periodStart)
+            .ToList();
+        var harvestKg = harvests.Sum(HarvestTotals.TotalKg);
 
         var weatherOutlook = new List<string>();
         foreach (var apiary in apiaries)

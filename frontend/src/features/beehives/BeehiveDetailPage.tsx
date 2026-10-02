@@ -329,7 +329,7 @@ export default function BeehiveDetailPage() {
           {/* Colonies merged into this hive — renders nothing when there are none (SPEC-19) */}
           <MergeSection beehiveId={beehiveId} />
 
-          {/* Honey yield (prinos) */}
+          {/* Yield (prinos) — honey and the other products (SPEC-30) */}
           <HiveYieldCard beehiveId={beehiveId} />
 
           {/* Feeding (prehrana) — sits next to Tretmani so the two hive-level cards match */}

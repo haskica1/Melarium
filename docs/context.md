@@ -246,7 +246,7 @@
 
 ### Sezonski i godišnji izvještaj (SPEC-25)
 - `/reports` — one consolidated document for an **arbitrary period**: yield per apiary/honey
-  type/hive/pasture, expenses, estimated revenue, balance and a treatment summary. Exported to
+  type/hive/pasture, other bee products (SPEC-30), expenses, estimated revenue, balance and a treatment summary. Exported to
   **PDF and Excel**, for subsidy applications. Before this, only QR labels and the treatment
   register produced a PDF; yield, costs and stats lived on screen only
 - `GET /api/reports/season?from=&to=&apiaryId=` → `SeasonReportDto`, `Roles.Managers`
@@ -254,9 +254,9 @@
   and the report carries the organization's finances). No organization → **403**. No plan gate
 - Free `od–do` range with presets (year, previous year, season 1.3.–31.10., Q1–Q4, single month) —
   one mechanism covers the monthly, quarterly, seasonal and yearly report
-- **Section checkboxes + format picker** (D13): Prinos (with its four sub-tables), Troškovi, Bilansa,
-  Tretmani; PDF or Excel, then one export button. The same selection drives the on-screen preview and
-  both exports. **Notes are not optional** — they are what keeps a figure honest. In Excel a
+- **Section checkboxes + format picker** (D13): Prinosi (with its four sub-tables, applying to honey
+  and the other products alike since SPEC-30), Troškovi, Bilansa, Tretmani; PDF or Excel, then one export
+  button. The same selection drives the on-screen preview and both exports. **Notes are not optional** — they are what keeps a figure honest. In Excel a
   deselected section loses its whole sheet rather than leaving an empty one; `Sažetak` always stays.
   "Po košnici" is off by default (one row per hive fills a page). The choice is remembered in
   `localStorage`, merged over the defaults so a stored object written before a new section existed
@@ -273,20 +273,56 @@
 - SPEC-24 locking comes free — scope is `IAccessGuard.GetAccessibleApiariesAsync()`, which already
   drops locked apiaries, and every other collection is keyed off that set
 - PDF is client-side jsPDF, A4 **portrait**, sharing the lazy DejaVu Sans chunk with the treatment
-  register; Excel is `write-excel-file` (MIT, lazy), four sheets. Both are rendered from the **same
+  register; Excel is `write-excel-file` (MIT, lazy), up to four sheets. Both are rendered from the **same
   DTO** so they cannot disagree. Header carries **blank fill-in lines for address and JIB** — the
   organization has no such fields (SPEC-22 D1). No charts; treatments are a summary, not a second
   copy of the register. See `docs/features/season-report.md`.
 
-### Harvests (Vrcanja)
-- Full CRUD via `/api/harvests` (apiary-scoped event + per-hive `HarvestEntry`); `HoneyType` with Bosnian `BsLabels`
-- Role scoping via `IAccessGuard`: managers write within scope; **Beekeeper read-only**, only harvests containing an assigned hive
-- Apiary immutable after creation; update replaces the entry set; entries must belong to the apiary (else 400)
-- `GET /api/harvests/hive/{id}/yield` — per-hive season + per-year totals (hive detail "Prinos" card)
-- Stats extended: `seasonTotalKg`, `estimatedRevenue`, `kgByApiary`, `kgByHoneyType`, `topHivesByYield`, `yearlyYield`
-- UI: "Vrcanja" sidebar item, `HarvestsPage` + `HarvestFormPage`, apiary/hive detail sections, StatsPage charts
-- Covered by unit tests (`HarvestServiceTests`). See `docs/features/harvests.md`.
-- Harvest form warns (non-blocking) when the date falls inside a treatment/karenca window (SPEC-08 soft integration)
+### Harvests — Prinosi (SPEC-02, SPEC-30)
+- Honey **and every other bee product** in one resource, `/api/harvests`: one `Harvest` per collection
+  of one product (`ProductType`: Med, Med u saću, Vosak, Propolis, Polen, Matična mliječ, Perga,
+  Apitoksin, Ostalo — `HiveProductType`, Bosnian `BsLabels`). SPEC-30 first shipped as its own module
+  and was folded in here the next day, before any commit
+- **Three levels, exactly one per record:** per hive (`HarvestEntry` lines), one figure for the apiary
+  (`BulkKg`), or one figure for the **whole organization** (`ApiaryId = NULL`, `BulkKg`) — never mixed.
+  The row carries its own `OrganizationId` (backfilled from the apiary by the migration). Totals and
+  revenue are derived (`Domain/Common/HarvestTotals`), never stored
+- `HoneyType` required for honey, dropped (with `FramesExtracted`) for every other product. **Comb
+  honey is its own product, never honey**
+- **Honey never includes other products:** every aggregate method of `IHarvestRepository` takes a
+  required `HarvestKind` (`Honey` / `OtherProducts` / `All` — lists only), so the compiler made each
+  consumer (stats, report, dashboard, weekly summary, AI assistant, hive yield, seeder) choose.
+  **No kg total across products anywhere**; revenue is the only cross-product sum
+- **Backward compatible:** `GET /api/harvests` without new parameters returns **honey only**
+  (`allProducts=true` / `productType` for the rest); POST without `productType` is honey; PUT without
+  it keeps the product — an installed PWA of an older build keeps working
+- Access: apiary-scoped via `IAccessGuard`; managers write within scope; an organization record is
+  written by the **OrganizationAdmin only**, read by ApiaryAdmins, never seen by a Beekeeper.
+  **Beekeeper read-only**, only records containing an assigned hive. The org list **and** the
+  Beekeeper list drop locked apiaries (SPEC-24)
+- Apiary immutable after creation; update replaces the entry set and may switch per hive ↔ one figure;
+  entries must belong to the apiary (else 400, reason under `errors.detail`)
+- Stored in **kg** (`numeric(12,6)` — 1 mg, for venom) and **KM/kg**; propolis, royal jelly and venom
+  are entered and shown in grams, royal jelly and venom priced per gram — one frontend module
+  (`shared/utils/hiveProductUnits.ts`), used by the screens and both report exports
+- **Plan:** honey on every plan (as since SPEC-02); writing any other product is Standard+
+  (`PlanFeature.HiveProducts = 6`, 402); reading and deleting work on every plan, so a Free
+  organization keeps its products in the page, stats and report (ADR-049)
+- `GET /api/harvests/hive/{id}/yield` (honey, kept for older clients) and `/summary` (every product per
+  year, the hive card)
+- Stats and season report each have **one "Prinosi" section**: every product side by side (honey
+  first; revenue the only total — `harvestsByProduct` / `harvests.byProduct`), then honey in detail, then
+  the other products per apiary, per pasture (honey's SPEC-10 rule, `Application/Common/PastureBuckets`)
+  and per hive (per-hive lines only, by name — `NaturalComparer`). Product revenue is **in the balance**
+  (`productRevenueBam`); the report notes list every product's unpriced and one-figure quantities
+- UI: **"Prinosi"** sidebar item; `HarvestsPage` (product + year filter, honey vitals for Med, product
+  vitals otherwise, organization group first), `HarvestFormPage` (level → apiary → product → honey
+  fields, unit conversion on product change, karenca warning — SPEC-08 soft integration),
+  `HiveYieldCard` (honey + product chips), `ApiaryHarvestsSection`, `HarvestStats` (stats), a row on `/plans`
+- Migration `AddProductsToHarvests` alters existing columns and backfills with one SQL `UPDATE` — both
+  approved exceptions (SPEC-30 "Frozen-area exceptions")
+- Tests: `HarvestServiceTests`, `HarvestValidatorTests`, `StatsServiceTests`, `ReportServiceTests`,
+  `DashboardServiceTests`. See `docs/features/harvests.md`
 
 ### Treatments (Evidencija tretmana)
 - Legal medicine register per EU 2019/6 / BiH propisi — full CRUD via `/api/treatments`
@@ -561,7 +597,7 @@
 
 **All roadmap specs shipped** (see `docs/specs/README.md`).
 
-**Shipped (were specced):** SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-20 Kontakt i podrška ✅, SPEC-21 Šta je novo ✅, SPEC-22 Moja organizacija ✅, SPEC-24 Downgrade lock ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
+**Shipped (were specced):** SPEC-30 Prinosi — med i ostali pčelinji proizvodi ✅ (2026-10-01), SPEC-01 AI Advisor ✅ (superseded by SPEC-18, merged into AI Asistent), SPEC-02 Harvest Log ✅, SPEC-03 Queen Tracking ✅, SPEC-04 Smart Alerts & Weekly AI Summary ✅, SPEC-05 Inspection Photos & AI Frame Analysis ✅, SPEC-06 Learning Module ✅, SPEC-07 Offline Inspections ✅, SPEC-08 Treatment Log ✅, SPEC-09 Plans & Billing ✅ (v1 manual annual billing; Paddle Phase 2 remains), SPEC-10 Apiary Migration ✅, SPEC-13 User Feedback ✅, SPEC-14 In-App Help ✅, SPEC-20 Kontakt i podrška ✅, SPEC-21 Šta je novo ✅, SPEC-22 Moja organizacija ✅, SPEC-24 Downgrade lock ✅, SPEC-15 Invite a Friend 🔨 (Faza 1: link + atribucija + nagrada; Faza 2 e-mail kanal ostaje)
 
 **Unspecced ideas:**
 

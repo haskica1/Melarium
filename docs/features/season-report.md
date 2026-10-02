@@ -23,11 +23,13 @@ Stranica prikazuje isti sadržaj koji izlazi u dokument, pa se ništa ne pojavlj
 
 ### Izbor sekcija i formata
 
-Kvačice biraju **šta ulazi u dokument**: Prinos (s podtabelama po pčelinjaku / vrsti meda / košnici /
-pašnjaku), Troškovi, Bilansa, Tretmani — u kartici s filterima, uz brojač „Odabrano: X od 4".
+Kvačice biraju **šta ulazi u dokument**: Prinosi (s podtabelama po pčelinjaku / vrsti meda / košnici /
+pašnjaku), Troškovi, Bilansa, Tretmani — u kartici s filterima, uz brojač „Odabrano: X od 4". Od
+SPEC-30 podtabele „Prinosa" važe i za med i za ostale proizvode (osim vrste meda); ključ kvačice je
+ostao `yield`, pa sačuvani izbor preživljava.
 
 Izvoz je **glavna akcija stranice i stoji u hero-u, desno**: `<select>` PDF/Excel + `btn-primary`
-„Izvezi" — isti raspored koji Vrcanja imaju s izborom godine i dugmetom „Dodaj vrcanje".
+„Izvezi" — isti raspored koji Prinosi imaju s izborom godine i dugmetom „Dodaj prinos".
 
 Kvačice koriste **isti markup i klase** kao izbor košnica na formama prehrane i tretmana
 (`accent-honey-500`). Prva verzija ih je imala bez `accent-*`, pa su se renderovale kao
@@ -71,6 +73,8 @@ za isti period ne mogu dati različit broj.
 | Prihod je **uvijek** označen kao procjena, uz `unpricedKg` | `Harvest.PricePerKg` je nullable; kg bez cijene bi tiho smanjili prihod |
 | Valute se **grupišu**, nikad ne sabiraju; bilansa je samo BAM | prihod je u KM po konstrukciji (`PricePerKg` je KM/kg) |
 | Zajednički troškovi (`ApiaryId = null`) se ne razmazuju po pčelinjacima | prikazani su kao vlastiti blok i ulaze samo u ukupnu bilansu |
+| Prinos za cijelu organizaciju (`Harvest.ApiaryId = null`) — isto | red „Zajedničko", samo u ukupnoj bilansi (SPEC-30) |
+| Med upisan ukupno ulazi u sve zbirove osim tabele po košnici | nema košnicu; napomena kaže koliko kg (SPEC-30) |
 | Zaključani pčelinjaci (SPEC-24) ne ulaze ni u jedan dio izvještaja | `IAccessGuard.GetAccessibleApiariesAsync()` ih već izbacuje — sve ostalo je vezano na taj skup |
 | Trošak vezan za pčelinjak izvan dosega se ne prikazuje; zajednički uvijek | pripada organizaciji, ne pčelinjaku |
 | Košnice spojene u drugo društvo (SPEC-19) ostaju imenovane u historijskom prinosu | spajanje ne dira zapisane `HarvestEntry` redove; imena se dopunjuju iz `GetMergedByApiaryIdAsync` |
@@ -99,7 +103,49 @@ svjesno odbio), a prijava na subvenciju ih traži — linije su predviđene da s
 ta polja jednom dođu.
 
 **Excel** — `shared/utils/seasonReportXlsx.ts`, `write-excel-file` (MIT), lazy. Do četiri lista:
-`Prinos`, `Troškovi`, `Tretmani`, `Sažetak` — isključena sekcija ne dobija list (vidi gore).
+`Prinosi`, `Troškovi`, `Tretmani`, `Sažetak` — isključena sekcija ne dobija list (vidi gore).
+
+## Prinosi i ostali pčelinji proizvodi (SPEC-30)
+
+Od SPEC-30 je vrcanje jedan od prinosa: zapis ima vrstu proizvoda i nivo (po košnicama, ukupno za
+pčelinjak, za cijelu organizaciju). Izvještaj to čita ovako:
+
+- **Sekcija „Prinos" je i dalje samo med.** Med u saću je zaseban proizvod i ne ulazi u nju.
+- **Med upisan ukupno** (za pčelinjak ili za organizaciju) ulazi u sve zbirove — ukupno, po
+  pčelinjaku, po vrsti meda, po pašnjaku, prihod — ali **ne u tabelu po košnici**, jer nema košnicu.
+  Napomena kaže koliko je to, po proizvodu (`notPerHive`), da se zbir tabele po košnici ne čita kao greška.
+- **Zapisi za cijelu organizaciju** (med i proizvodi) imaju vlastiti red „Zajedničko" (po pčelinjaku,
+  i kao zaseban pašnjak), ulaze u ukupnu bilansu, nikad u red pčelinjaka — isto pravilo kao zajednički
+  troškovi — i ulaze i u izvještaj filtriran na jedan pčelinjak.
+
+Sekcija **„Prinosi"** (2026-10-03, Asimov izbor) ima tri dijela, isto na ekranu, u PDF-u i u Excelu:
+
+1. **Po proizvodu** — svaki proizvod iz perioda, i med, po enumu (med prvi): količina u svojoj jedinici,
+   bez cijene, prihod, (u Excelu i broj zapisa). Zadnji red „Ukupno prihod" je **jedini zbir** i jednak je
+   prihodu u Bilansi. Kilogrami se ne sabiraju.
+2. **Med** — ukupno vrcano, broj vrcanja, sa i bez cijene (na ekranu red ispod naslova, u dokumentima
+   ključ–vrijednost), pa tabele po pčelinjaku, po vrsti meda, po košnici, po pašnjaku — kao do sada.
+3. **Ostali proizvodi** — po pčelinjaku, **po pašnjaku** i **po košnici**: red po pčelinjaku/pašnjaku/
+   košnici, kolona po proizvodu koji u periodu postoji. Na ekranu ćelija nosi jedinicu („256 g"); u PDF-u
+   i Excelu je jedinica u zaglavlju („Propolis (g)") a u ćeliji broj — portret A4 inače nema mjesta za
+   sedam kolona (zaglavlje se lomi u dva reda). Po pašnjaku istim pravilom kao med (gdje je pčelinjak
+   stajao na dan unosa; „Matična lokacija"; zapisi organizacije „Zajedničko"); po košnici samo redovi po
+   košnicama, poredano po imenu (K2 prije K10). Bez ostalih proizvoda u periodu ovog dijela nema.
+
+Kartica na vrhu se zove **„Med"** (ne „Prinos") — prikazuje samo med, a ostali proizvodi nemaju kg koji
+bi mu se mogli pridružiti. Na telefonu se zaglavlja tabela smiju prelomiti, pa pregled po proizvodu stane
+bez klizanja; široke matrice klize unutar svoje kartice, stranica nikad.
+
+**Bilansa uključuje proizvode.** `EstimatedRevenueBam` i dalje znači samo med; `ProductRevenueBam` je
+dodan, a `NetBam` = med + proizvodi − troškovi. U dokumentu: „Procijenjeni prihod — med" i
+„— ostali proizvodi", te kolona „Proizvodi" u tabeli po pčelinjaku. Vital „Prihod (procjena)" na
+stranici je zbir oba, da prihod − troškovi daje razliku.
+
+**Napomene** su spojene po proizvodu: „Prihod je procjena — bez upisane cijene, pa nije uračunato: Med
+81,5 kg, Vosak 4 kg, Matična mliječ 180 g." i „Upisano ukupno, bez raspodjele po košnicama: Med 200 kg,
+Vosak 7,7 kg… — u svim zbirovima, ali ne u tabelama po košnici." (potrebno i proizvodima otkako imaju
+tabelu po košnici), plus broj zapisa za cijelu organizaciju. Rečenica o zapisima je sklopljena s
+dvotačkom („…: 3 — ulaze u ukupnu bilansu"), da se glagol ne mora slagati s brojem.
 
 > **Zašto ne SheetJS:** npm paket `xlsx` je zaglavljen na 0.18.5 iz 2022. — distribucija je
 > preseljena na vlastiti CDN, pa se ne može pinati kao obična zavisnost.

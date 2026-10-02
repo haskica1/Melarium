@@ -268,42 +268,46 @@ export const HELP_CONTENT: Record<HelpKey, HelpEntry> = {
     ],
   },
 
-  // ── Harvests ────────────────────────────────────────────────────────────────
+  // ── Prinosi (honey and the other bee products, SPEC-30) ─────────────────────
   '/harvests': {
-    title: 'Vrcanja',
+    title: 'Prinosi',
     summary:
-      'Evidencija izvrcanog meda po pčelinjaku i po košnici — osnova za prinos, profitabilnost i statistiku.',
+      'Evidencija svega što pčelinjak da: med (vrcanje), med u saću, vosak, propolis, polen, matična mliječ, perga i apitoksin. Osnova za prinos, profitabilnost, statistiku i sezonski izvještaj.',
     steps: [
-      'Dodajte vrcanje dugmetom „Novo vrcanje“.',
-      'Unesite kilograme po košnici — po tome se računa prinos svake kolonije.',
+      'Dodajte zapis dugmetom „Dodaj prinos“.',
+      'Izaberite gdje je prikupljeno: po košnicama, ukupno za pčelinjak ili za cijelu organizaciju.',
+      'Filter „Proizvod“ u zaglavlju prikazuje samo jedan proizvod, npr. samo med.',
     ],
     tips: [
-      'Unesite vrstu meda: statistika prikazuje prinos po vrsti i po pašnjaku.',
+      'Unos po košnicama pokazuje koja košnica daje najviše; ako ste vagali samo ukupno, upišite ukupno — statistika po košnici tada ne zna za tu količinu.',
+      'Količine različitih proizvoda se nigdje ne sabiraju — 200 g mliječi i 20 kg voska ne daju smislen zbir. Zajednički broj je samo prihod.',
       'Ako vrcate u toku karence nakon tretmana, aplikacija će vas upozoriti. Upozorenje ne blokira unos, ali ga pročitajte.',
+      'Med unosite na svakom paketu; vosak, propolis i ostali proizvodi su dio paketa Standard, Pro i Max.',
     ],
     notesByRole: {
-      Beekeeper: 'Vi vidite vrcanja koja uključuju vaše košnice, ali ih ne možete mijenjati.',
+      Beekeeper: 'Vi vidite zapise po košnicama koji uključuju vaše košnice, ali ih ne možete mijenjati.',
     },
   },
 
   '/harvests/new': {
-    title: 'Novo vrcanje',
-    summary: 'Zabilježite koliko ste meda izvrcali i iz kojih košnica.',
+    title: 'Novi prinos',
+    summary: 'Zabilježite koliko ste meda ili drugog proizvoda uzeli i odakle.',
     steps: [
-      'Odaberite pčelinjak i datum vrcanja.',
-      'Unesite kilograme za svaku košnicu iz koje ste vrcali.',
-      'Odaberite vrstu meda i sačuvajte.',
+      'Izaberite nivo: po košnicama, ukupno za pčelinjak ili cijela organizacija.',
+      'Odaberite pčelinjak, proizvod (za med i vrstu meda) i datum.',
+      'Upišite količinu i, po želji, cijenu — pa sačuvajte.',
     ],
     tips: [
+      'Propolis, matična mliječ i apitoksin unose se u gramima, ostalo u kilogramima. Kad promijenite proizvod, upisano se pretvara, ne gubi.',
       'Pčelinjak se ne može mijenjati nakon spremanja — provjerite ga prije.',
-      'Košnice iz kojih niste vrcali ostavite prazne.',
+      'Košnice s kojih ništa nije uzeto ostavite prazne.',
     ],
   },
 
   '/harvests/:id/edit': {
-    title: 'Uredi vrcanje',
-    summary: 'Ispravite kilograme ili vrstu meda.',
-    tips: ['Uređivanje zamjenjuje cijeli set unosa po košnicama, pa provjerite sve redove prije spremanja.'],
+    title: 'Uredi prinos',
+    summary: 'Ispravite količinu, proizvod, cijenu ili način unosa.',
+    tips: ['Prelazak s „po košnicama“ na „ukupno za pčelinjak“ (ili obrnuto) zamjenjuje cijeli unos količine.'],
   },
 
   // ── Treatments ──────────────────────────────────────────────────────────────
@@ -543,7 +547,8 @@ export const HELP_CONTENT: Record<HelpKey, HelpEntry> = {
     summary: 'Brojevi vaše sezone: prinos, pregledi, temperature, najbolje košnice, troškovi.',
     tips: [
       'Grafikoni se računaju iz onoga što ste unijeli. Prazni grafikon obično znači da podaci za taj period nisu unošeni, a ne da je bilo nula.',
-      'Prinos po pašnjaku pripisuje med lokaciji na kojoj je pčelinjak bio na dan vrcanja.',
+      'Prinosi pokazuju svaki proizvod u njegovoj jedinici — kilogrami meda, voska i propolisa se nikad ne sabiraju; zajednički je samo prihod.',
+      'Prinos po pašnjaku pripisuje med i ostale proizvode lokaciji na kojoj je pčelinjak bio na dan unosa.',
     ],
   },
 

@@ -1,5 +1,7 @@
 import { jsPDF } from 'jspdf'
-import type { SeasonReport, CurrencyAmount, ReportSections } from '../../core/models'
+import { HiveProductTypeLabels } from '../../core/models'
+import type { SeasonReport, CurrencyAmount, ReportProductKg, ReportSections } from '../../core/models'
+import { fmtProductNumber, fmtProductQty, productColumns, productKgIn, qtyUnit, type ProductRow } from './hiveProductUnits'
 
 // The consolidated season report (SPEC-25), rendered client-side from the same DTO the Excel export
 // uses — so the two documents cannot disagree on a number. A4 portrait, unlike the treatment
@@ -32,7 +34,7 @@ export async function downloadSeasonReportPdf(report: SeasonReport, sections: Re
   const cur: Cursor = { y: MARGIN }
 
   drawHeader(doc, report, cur)
-  if (sections.yield) drawYield(doc, report, cur, sections)
+  if (sections.yield) drawHarvests(doc, report, cur, sections)
   if (sections.expenses) drawExpenses(doc, report, cur)
   if (sections.balance) drawBalance(doc, report, cur)
   if (sections.treatments) drawTreatments(doc, report, cur)
@@ -73,10 +75,27 @@ function drawHeader(doc: jsPDF, report: SeasonReport, cur: Cursor) {
   cur.y += 6
 }
 
-function drawYield(doc: jsPDF, report: SeasonReport, cur: Cursor, sections: ReportSections) {
-  const y = report.yield
+/**
+ * "Prinosi" (SPEC-30): every product side by side first, then honey in detail, then the other products
+ * broken down the same way. Quantities never add up across products; revenue is the one total.
+ */
+function drawHarvests(doc: jsPDF, report: SeasonReport, cur: Cursor, sections: ReportSections) {
+  const { harvests, yield: y, products } = report
 
-  sectionTitle(doc, cur, 'PRINOS')
+  sectionTitle(doc, cur, 'PRINOSI')
+  table(
+    doc, cur, 'Po proizvodu', ['Proizvod', 'Količina', 'Bez cijene', 'Prihod (KM)'],
+    harvests.byProduct.map(p => [
+      p.name,
+      fmtProductQty(p.kg, p.productType),
+      p.unpricedKg > 0 ? fmtProductQty(p.unpricedKg, p.productType) : '—',
+      fmtMoney(p.estimatedRevenueBam),
+    ]),
+    [64, 40, 40, 38],
+    harvests.byProduct.length > 1 ? ['Ukupno prihod', '', '', fmtMoney(harvests.estimatedRevenueBam)] : undefined,
+  )
+
+  subTitle(doc, cur, 'Med')
   keyValues(doc, cur, [
     ['Ukupno vrcano', `${fmtKg(y.totalKg)} kg`],
     ['Broj vrcanja', String(y.harvestCount)],
@@ -92,6 +111,38 @@ function drawYield(doc: jsPDF, report: SeasonReport, cur: Cursor, sections: Repo
     table(doc, cur, 'Po košnici', ['Košnica', 'kg'], y.byBeehive.map(r => [r.name, fmtKg(r.kg)]))
   if (sections.yieldByPasture && y.byPasture.length > 0)
     table(doc, cur, 'Po pašnjaku', ['Pašnjak', 'kg'], y.byPasture.map(r => [r.name, fmtKg(r.kg)]))
+
+  const byPasture = sections.yieldByPasture && products.byPasture.length > 0
+  if (products.recordCount === 0 || !(sections.yieldByApiary || sections.yieldByBeehive || byPasture)) return
+
+  subTitle(doc, cur, 'Ostali proizvodi')
+  if (sections.yieldByApiary)
+    productTable(doc, cur, 'Po pčelinjaku', 'Pčelinjak', products.byApiary.map(a => ({ name: a.apiaryName, items: a.items })))
+  if (byPasture)
+    productTable(doc, cur, 'Po pašnjaku', 'Pašnjak', products.byPasture)
+  if (sections.yieldByBeehive)
+    productTable(doc, cur, 'Po košnici', 'Košnica', products.byBeehive)
+}
+
+/**
+ * One column per product present, the unit in its header and plain numbers in the cells — a portrait
+ * page has room for every product only if the cells do not repeat "kg" and "g" in each row.
+ */
+function productTable(doc: jsPDF, cur: Cursor, caption: string, label: string, rows: ProductRow[]) {
+  const columns = productColumns(rows)
+  const each = Math.min(30, (CONTENT_W - 50) / Math.max(columns.length, 1))
+  table(
+    doc, cur, caption,
+    [label, ...columns.map(t => `${HiveProductTypeLabels[t]} (${qtyUnit(t)})`)],
+    rows.map(r => [
+      r.name,
+      ...columns.map(t => {
+        const kg = productKgIn(r, t)
+        return kg === null ? '—' : fmtProductNumber(kg, t)
+      }),
+    ]),
+    [CONTENT_W - each * columns.length, ...columns.map(() => each)],
+  )
 }
 
 function drawExpenses(doc: jsPDF, report: SeasonReport, cur: Cursor) {
@@ -123,17 +174,19 @@ function drawBalance(doc: jsPDF, report: SeasonReport, cur: Cursor) {
 
   sectionTitle(doc, cur, 'BILANSA (KM)')
   keyValues(doc, cur, [
-    ['Procijenjeni prihod', fmtMoney(b.estimatedRevenueBam)],
+    ['Procijenjeni prihod — med', fmtMoney(b.estimatedRevenueBam)],
+    ['Procijenjeni prihod — ostali proizvodi', fmtMoney(b.productRevenueBam)],
     ['Troškovi', fmtMoney(b.totalExpenseBam)],
     ['Razlika', fmtMoney(b.netBam)],
   ])
 
   table(
-    doc, cur, 'Po pčelinjaku', ['Pčelinjak', 'kg', 'Prihod', 'Trošak', 'Razlika'],
+    doc, cur, 'Po pčelinjaku', ['Pčelinjak', 'kg meda', 'Med', 'Proizvodi', 'Trošak', 'Razlika'],
     b.byApiary.map(a => [
-      a.apiaryName, fmtKg(a.kg), fmtMoney(a.estimatedRevenueBam), fmtMoney(a.expenseBam), fmtMoney(a.netBam),
+      a.apiaryName, fmtKg(a.kg), fmtMoney(a.estimatedRevenueBam), fmtMoney(a.productRevenueBam),
+      fmtMoney(a.expenseBam), fmtMoney(a.netBam),
     ]),
-    [62, 22, 30, 30, 30],
+    [52, 20, 27, 27, 27, 29],
   )
 }
 
@@ -162,10 +215,19 @@ function drawNotes(doc: jsPDF, report: SeasonReport, cur: Cursor) {
   const n = report.notes
   const lines: string[] = []
 
-  // The one number in this document that would otherwise lie by omission (SPEC-25 D6).
-  if (n.unpricedKg > 0)
+  // The one figure in this document that would otherwise lie by omission (SPEC-25 D6) — one sentence
+  // for every product, honey included, each in its own unit (SPEC-30).
+  if (n.unpriced.length > 0)
+    lines.push(`Prihod je procjena — bez upisane cijene, pa nije uračunato: ${productList(n.unpriced)}.`)
+  if (n.notPerHive.length > 0)
     lines.push(
-      `Prihod je procjena: ${fmtKg(n.unpricedKg)} kg nema upisanu cijenu i nije uračunato u prihod.`,
+      `Upisano ukupno, bez raspodjele po košnicama: ${productList(n.notPerHive)} — u svim zbirovima, ` +
+      'ali ne u tabelama po košnici.',
+    )
+  if (n.sharedHarvestCount > 0)
+    lines.push(
+      `Zapisi za cijelu organizaciju (nisu vezani za pčelinjak): ${n.sharedHarvestCount} — ` +
+      'ulaze u ukupnu bilansu, ne u bilansu pojedinog pčelinjaka.',
     )
   if (n.unassignedExpenseCount > 0)
     lines.push(
@@ -211,6 +273,17 @@ function drawSignature(doc: jsPDF, cur: Cursor) {
 
 // ── Drawing primitives ─────────────────────────────────────────────────────────
 
+/** A heading inside a section — "Med" and "Ostali proizvodi" under "PRINOSI". */
+function subTitle(doc: jsPDF, cur: Cursor, title: string) {
+  ensureSpace(doc, cur, 18)
+  cur.y += 1
+  doc.setFontSize(10)
+  doc.text(title, MARGIN + 1, cur.y + 4)
+  doc.setDrawColor(215)
+  doc.line(MARGIN, cur.y + 6, PAGE_W - MARGIN, cur.y + 6)
+  cur.y += 9
+}
+
 function sectionTitle(doc: jsPDF, cur: Cursor, title: string) {
   ensureSpace(doc, cur, 14)
   cur.y += 2
@@ -239,6 +312,7 @@ function table(
   head: string[],
   rows: string[][],
   widths?: number[],
+  foot?: string[],
 ) {
   const cols = widths ?? defaultWidths(head.length)
 
@@ -278,20 +352,41 @@ function table(
     })
     cur.y += 6
   })
+
+  // A total under a rule, never striped like a row — it is not one of them.
+  if (foot) {
+    if (cur.y + 7 > BOTTOM) {
+      newPage(doc, cur)
+      drawHeadRow(doc, cur, head, cols)
+    }
+    doc.setDrawColor(190)
+    doc.line(MARGIN, cur.y, MARGIN + sum(cols), cur.y)
+    doc.setFontSize(8)
+    let x = MARGIN
+    foot.forEach((cell, c) => {
+      if (c === 0) doc.text(cell, x + 1, cur.y + 4)
+      else if (cell) doc.text(cell, x + cols[c] - 1, cur.y + 4, { align: 'right' })
+      x += cols[c]
+    })
+    cur.y += 6
+  }
   cur.y += 4
 }
 
 function drawHeadRow(doc: jsPDF, cur: Cursor, head: string[], cols: number[]) {
   doc.setFontSize(8)
+  // A narrow product column wraps its header ("Matična / mliječ (g)") instead of cutting it off.
+  const lines = head.map((h, i) => doc.splitTextToSize(h, cols[i] - 2) as string[])
+  const height = Math.max(...lines.map(l => l.length)) * 3.4 + 2.6
   doc.setDrawColor(190)
   doc.line(MARGIN, cur.y, MARGIN + sum(cols), cur.y)
   let x = MARGIN
-  head.forEach((h, i) => {
-    if (i === 0) doc.text(h, x + 1, cur.y + 4)
-    else doc.text(h, x + cols[i] - 1, cur.y + 4, { align: 'right' })
+  lines.forEach((l, i) => {
+    if (i === 0) doc.text(l, x + 1, cur.y + 4)
+    else doc.text(l, x + cols[i] - 1, cur.y + 4, { align: 'right' })
     x += cols[i]
   })
-  cur.y += 6
+  cur.y += height
   doc.line(MARGIN, cur.y, MARGIN + sum(cols), cur.y)
 }
 
@@ -356,6 +451,11 @@ function fmtMoney(n: number): string {
 function fmtCurrencies(amounts: CurrencyAmount[]): string {
   if (amounts.length === 0) return '—'
   return amounts.map(c => `${fmtMoney(c.amount)} ${c.currency}`).join(' + ')
+}
+
+/** "Med 81,5 kg, Vosak 4 kg, Matična mliječ 180 g" — each product in its own unit, never one total. */
+function productList(items: ReportProductKg[]): string {
+  return items.map(p => `${p.name} ${fmtProductQty(p.kg, p.productType)}`).join(', ')
 }
 
 function fmtDate(iso: string): string {

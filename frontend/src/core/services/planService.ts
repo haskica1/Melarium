@@ -38,8 +38,14 @@ export const useMyPlan = () =>
     retry: false,
   })
 
-/** True when the effective plan can't use the given AI/pasture feature (proactive UI gating). */
-export function isFeatureLocked(plan: MyPlan | undefined, feature: 'voice' | 'pastures' | 'photoAnalysis'): boolean {
+/**
+ * True when the effective plan can't use the given feature (proactive UI gating). For `hiveProducts`
+ * (SPEC-30) "locked" means read-only: the records stay visible, only adding and editing are refused.
+ */
+export function isFeatureLocked(
+  plan: MyPlan | undefined,
+  feature: 'voice' | 'pastures' | 'photoAnalysis' | 'hiveProducts',
+): boolean {
   if (!plan) return false // unknown → let the 402 backstop handle it rather than false-blocking
   const eff = plan.effectivePlan
   if (feature === 'photoAnalysis') return eff < PlanType.Pro

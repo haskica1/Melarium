@@ -6,7 +6,9 @@ import { useApiaries } from '../../core/services/queries'
 import { ErrorState, PageSkeleton, VitalCard } from '../../shared/components'
 import { useToast } from '../../core/context/ToastContext'
 import { SECTION_GROUPS, hasAnySection, useReportPreferences } from './useReportPreferences'
-import type { CurrencyAmount, NamedKg, ReportFormat, ReportSections, SeasonReport } from '../../core/models'
+import { HiveProductTypeLabels } from '../../core/models'
+import type { CurrencyAmount, NamedKg, ReportFormat, ReportProductKg, ReportSections, SeasonReport } from '../../core/models'
+import { fmtProductQty, productColumns, productKgIn, type ProductRow } from '../../shared/utils/hiveProductUnits'
 
 // ── Period presets (SPEC-25 D3) ───────────────────────────────────────────────
 // A free from–to range with presets on top, rather than a fixed year/quarter/month dropdown: the
@@ -112,12 +114,12 @@ export default function ReportPage() {
             <div className="min-w-0">
               <h1 className="font-display text-2xl sm:text-3xl font-bold text-gray-900 dark:text-slate-50">Izvještaji</h1>
               <p className="mt-0.5 text-sm text-gray-600 dark:text-slate-400">
-                Objedinjeni prinos, troškovi i tretmani za bilo koji period — spremno za prijavu na subvencije
+                Objedinjeni prinosi, troškovi i tretmani za bilo koji period — spremno za prijavu na subvencije
               </p>
             </div>
           </div>
 
-          {/* Same shape as the Vrcanja hero: a small select next to the page's primary action. */}
+          {/* Same shape as the Prinosi hero: a small select next to the page's primary action. */}
           <div className="flex items-center gap-2 shrink-0">
             <select
               value={format}
@@ -249,25 +251,43 @@ export default function ReportPage() {
 // ── Preview ───────────────────────────────────────────────────────────────────
 
 function ReportPreview({ report, sections }: { report: SeasonReport; sections: ReportSections }) {
-  const { yield: y, expenses, balance, treatments, notes } = report
+  const { harvests, yield: y, products, expenses, balance, treatments, notes } = report
+  const hasNotes = notes.unpriced.length > 0 || notes.notPerHive.length > 0 || notes.sharedHarvestCount > 0
+    || notes.unassignedExpenseCount > 0 || notes.nonBamCurrencies.length > 0
+  const showProducts = products.recordCount > 0
+    && (sections.yieldByApiary || sections.yieldByBeehive || (sections.yieldByPasture && products.byPasture.length > 0))
 
   return (
     <>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 stagger mb-6">
-        <VitalCard icon="🍯" label="Prinos"    value={`${fmtKg(y.totalKg)} kg`}      gradient="from-honey-400 to-honey-600" />
-        <VitalCard icon="💰" label="Prihod (procjena)" value={fmtMoney(balance.estimatedRevenueBam)} gradient="from-emerald-400 to-teal-600" />
+        {/* Honey alone — the other products have no kg that could join it (SPEC-30). */}
+        <VitalCard icon="🍯" label="Med"       value={`${fmtKg(y.totalKg)} kg`}      gradient="from-honey-400 to-honey-600" />
+        {/* Honey and the other products together — otherwise prihod − troškovi would not give razlika. */}
+        <VitalCard icon="💰" label="Prihod (procjena)" value={fmtMoney(harvests.estimatedRevenueBam)} gradient="from-emerald-400 to-teal-600" />
         <VitalCard icon="🧾" label="Troškovi (KM)" value={fmtMoney(balance.totalExpenseBam)} gradient="from-rose-400 to-red-500" />
         <VitalCard icon="⚖️" label="Razlika (KM)"  value={fmtMoney(balance.netBam)}   gradient="from-violet-400 to-indigo-600" />
       </div>
 
       {/* The document's honesty clauses, shown on screen too so nothing appears only in the export. */}
-      {(notes.unpricedKg > 0 || notes.unassignedExpenseCount > 0 || notes.nonBamCurrencies.length > 0) && (
+      {hasNotes && (
         <div className="card mb-6 border-amber-200 dark:border-amber-500/30 bg-amber-50/60 dark:bg-amber-500/5">
           <h2 className="font-display text-base font-semibold text-gray-800 dark:text-slate-100 mb-2">Napomene</h2>
           <ul className="space-y-1.5 text-sm text-gray-700 dark:text-slate-300">
-            {notes.unpricedKg > 0 && (
+            {notes.unpriced.length > 0 && (
               <li>
-                Prihod je procjena: <strong>{fmtKg(notes.unpricedKg)} kg</strong> nema upisanu cijenu i nije uračunato.
+                Prihod je procjena — bez upisane cijene, pa nije uračunato: <strong>{fmtProductList(notes.unpriced)}</strong>.
+              </li>
+            )}
+            {notes.notPerHive.length > 0 && (
+              <li>
+                Upisano ukupno, bez raspodjele po košnicama: <strong>{fmtProductList(notes.notPerHive)}</strong> — u
+                svim zbirovima, ali ne u tabelama po košnici.
+              </li>
+            )}
+            {notes.sharedHarvestCount > 0 && (
+              <li>
+                Zapisi za cijelu organizaciju (nisu vezani za pčelinjak): <strong>{notes.sharedHarvestCount}</strong> —
+                ulaze u ukupnu bilansu, ne u bilansu pojedinog pčelinjaka.
               </li>
             )}
             {notes.unassignedExpenseCount > 0 && (
@@ -287,7 +307,29 @@ function ReportPreview({ report, sections }: { report: SeasonReport; sections: R
       )}
 
       {sections.yield && (
-        <Section title="Prinos" icon="🍯">
+        <Section title="Prinosi" icon="🍯">
+          {/* Every product side by side, honey first. Quantities stay in their own units and never add
+              up; revenue is the one column that does, and it is the balance's revenue (SPEC-30). */}
+          <SimpleTable
+            caption="Po proizvodu"
+            head={['Proizvod', 'Količina', 'Bez cijene', 'Prihod (KM)']}
+            rows={harvests.byProduct.map(p => [
+              p.name,
+              fmtProductQty(p.kg, p.productType),
+              p.unpricedKg > 0 ? fmtProductQty(p.unpricedKg, p.productType) : '—',
+              fmtMoney(p.estimatedRevenueBam),
+            ])}
+            foot={harvests.byProduct.length > 1 ? ['Ukupno prihod', '', '', fmtMoney(harvests.estimatedRevenueBam)] : undefined}
+          />
+
+          <SubHeading>Med</SubHeading>
+          {/* The same figures the PDF and Excel print under "Med" — the screen is the document. */}
+          <div className="flex flex-wrap gap-x-6 gap-y-1 mb-4 text-sm text-gray-600 dark:text-slate-400">
+            <span>Ukupno vrcano: <strong className="text-gray-900 dark:text-slate-100">{fmtKg(y.totalKg)} kg</strong></span>
+            <span>Broj vrcanja: <strong className="text-gray-900 dark:text-slate-100">{y.harvestCount}</strong></span>
+            <span>Sa cijenom: <strong className="text-gray-900 dark:text-slate-100">{fmtKg(y.pricedKg)} kg</strong></span>
+            <span>Bez cijene: <strong className="text-gray-900 dark:text-slate-100">{fmtKg(y.unpricedKg)} kg</strong></span>
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {sections.yieldByApiary && <KgTable caption="Po pčelinjaku" label="Pčelinjak" rows={y.byApiary} />}
             {sections.yieldByHoneyType && <KgTable caption="Po vrsti meda" label="Vrsta meda" rows={y.byHoneyType} />}
@@ -296,6 +338,28 @@ function ReportPreview({ report, sections }: { report: SeasonReport; sections: R
               <KgTable caption="Po pašnjaku" label="Pašnjak" rows={y.byPasture} />
             )}
           </div>
+
+          {showProducts && (
+            <>
+              <SubHeading>Ostali proizvodi</SubHeading>
+              {/* A column per product, each in its own unit — a row never adds them up. */}
+              <div className="space-y-6">
+                {sections.yieldByApiary && (
+                  <ProductMatrix
+                    caption="Po pčelinjaku"
+                    label="Pčelinjak"
+                    rows={products.byApiary.map(a => ({ name: a.apiaryName, items: a.items }))}
+                  />
+                )}
+                {sections.yieldByPasture && products.byPasture.length > 0 && (
+                  <ProductMatrix caption="Po pašnjaku" label="Pašnjak" rows={products.byPasture} />
+                )}
+                {sections.yieldByBeehive && (
+                  <ProductMatrix caption="Po košnici" label="Košnica" rows={products.byBeehive} />
+                )}
+              </div>
+            </>
+          )}
         </Section>
       )}
 
@@ -331,9 +395,10 @@ function ReportPreview({ report, sections }: { report: SeasonReport; sections: R
       {sections.balance && (
       <Section title="Bilansa po pčelinjaku (KM)" icon="⚖️">
         <SimpleTable
-          head={['Pčelinjak', 'kg', 'Prihod', 'Trošak', 'Razlika']}
+          head={['Pčelinjak', 'kg meda', 'Prihod med', 'Prihod proizvodi', 'Trošak', 'Razlika']}
           rows={balance.byApiary.map(a => [
-            a.apiaryName, fmtKg(a.kg), fmtMoney(a.estimatedRevenueBam), fmtMoney(a.expenseBam), fmtMoney(a.netBam),
+            a.apiaryName, fmtKg(a.kg), fmtMoney(a.estimatedRevenueBam), fmtMoney(a.productRevenueBam),
+            fmtMoney(a.expenseBam), fmtMoney(a.netBam),
           ])}
         />
       </Section>
@@ -393,11 +458,39 @@ function Section({ title, icon, children }: { title: string; icon: string; child
   )
 }
 
+function SubHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="mt-6 mb-3 pt-5 border-t border-gray-100 dark:border-slate-800 font-display text-base font-semibold text-gray-800 dark:text-slate-100">
+      {children}
+    </h3>
+  )
+}
+
 function KgTable({ caption, label, rows }: { caption: string; label: string; rows: NamedKg[] }) {
   return <SimpleTable caption={caption} head={[label, 'kg']} rows={rows.map(r => [r.name, fmtKg(r.kg)])} />
 }
 
-function SimpleTable({ caption, head, rows }: { caption?: string; head: string[]; rows: string[][] }) {
+/** Rows of products, one column per product present — same columns in the PDF and in Excel. */
+function ProductMatrix({ caption, label, rows }: { caption: string; label: string; rows: ProductRow[] }) {
+  const columns = productColumns(rows)
+  return (
+    <SimpleTable
+      caption={caption}
+      head={[label, ...columns.map(t => HiveProductTypeLabels[t])]}
+      rows={rows.map(r => [
+        r.name,
+        ...columns.map(t => {
+          const kg = productKgIn(r, t)
+          return kg === null ? '—' : fmtProductQty(kg, t)
+        }),
+      ])}
+    />
+  )
+}
+
+function SimpleTable({ caption, head, rows, foot }: {
+  caption?: string; head: string[]; rows: string[][]; foot?: string[]
+}) {
   return (
     <div>
       {caption && (
@@ -414,8 +507,9 @@ function SimpleTable({ caption, head, rows }: { caption?: string; head: string[]
                 {head.map((h, i) => (
                   <th
                     key={h}
+                    // On a phone a header may wrap ("Prihod / (KM)") so the figures fit without scrolling.
                     className={clsx(
-                      'py-2 font-medium text-gray-500 dark:text-slate-400 whitespace-nowrap',
+                      'py-2 font-medium text-gray-500 dark:text-slate-400 sm:whitespace-nowrap',
                       i === 0 ? 'text-left' : 'text-right pl-4',
                     )}
                   >
@@ -441,6 +535,23 @@ function SimpleTable({ caption, head, rows }: { caption?: string; head: string[]
                 </tr>
               ))}
             </tbody>
+            {foot && (
+              <tfoot>
+                <tr className="border-t border-gray-200 dark:border-slate-700">
+                  {foot.map((cell, c) => (
+                    <td
+                      key={c}
+                      className={clsx(
+                        'py-2 font-semibold text-gray-900 dark:text-slate-100',
+                        c === 0 ? 'text-left' : 'text-right pl-4 tabular-nums whitespace-nowrap',
+                      )}
+                    >
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       )}
@@ -459,6 +570,11 @@ function fmtKg(n: number): string {
 
 function fmtMoney(n: number): string {
   return n.toLocaleString('bs-BA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+/** "Med 81,5 kg · Propolis 200 g" — each product in its own unit, never one total. */
+function fmtProductList(items: ReportProductKg[]): string {
+  return items.map(i => `${i.name} ${fmtProductQty(i.kg, i.productType)}`).join(' · ')
 }
 
 function fmtCurrencies(amounts: CurrencyAmount[]): string {
